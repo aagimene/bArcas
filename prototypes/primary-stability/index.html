@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Primary stability — bArcas prototype</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <h1>Primary stability</h1>
+  <p class="subtitle">
+    A prismatic hull cross-section. Drag the white control points to reshape it; move the sliders.
+    <span class="hint">Hover any variable name for its definition · click any value for the equation.</span>
+  </p>
+</header>
+
+<main>
+  <section class="canvas-pane">
+    <svg id="hull-view" viewBox="-340 -260 680 380" preserveAspectRatio="xMidYMid meet" aria-label="Hull cross-section"></svg>
+    <div class="legend">
+      <span><i class="dot k"></i>K&nbsp;keel (body-frame reference)</span>
+      <span><i class="dot b"></i>B&nbsp;centre of buoyancy</span>
+      <span><i class="dot g"></i>G&nbsp;centre of gravity</span>
+      <span><i class="dot m"></i>M&nbsp;metacentre</span>
+      <span><i class="dot wl"></i>WL&nbsp;waterline</span>
+      <span><i class="dot gz"></i>GZ&nbsp;righting arm</span>
+    </div>
+  </section>
+
+  <section class="controls-pane">
+    <div class="sliders">
+      <label>Hull length <output id="length-out"></output>
+        <input type="range" id="length" min="2" max="8" step="0.1" value="5">
+      </label>
+      <label>Loaded mass <output id="mass-out"></output>
+        <input type="range" id="mass" min="20" max="200" step="1" value="100">
+      </label>
+      <label>KG (height of G above keel) <output id="kg-out"></output>
+        <input type="range" id="kg" min="0" max="0.5" step="0.005" value="0.20">
+      </label>
+      <label>Heel angle <output id="heel-out"></output>
+        <input type="range" id="heel" min="-60" max="60" step="1" value="0">
+      </label>
+      <button type="button" id="reset">Reset hull shape</button>
+    </div>
+
+    <div id="status" class="status"></div>
+
+    <table class="variables">
+      <thead><tr><th>Variable</th><th>Value</th></tr></thead>
+      <tbody id="vars-body"></tbody>
+    </table>
+
+    <div id="equation-panel">
+      <p class="hint">Click any value above to see its equation, inputs, and result.</p>
+    </div>
+
+    <div class="curves">
+      <h3>GZ curve <span class="ref">— righting arm vs heel angle</span></h3>
+      <svg id="gz-curve" viewBox="0 -120 320 240" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+
+    <p class="footer">
+      Reference: <a href="https://man.fas.org/dod-101/navy/docs/swos/dca/stg4-01.html" target="_blank" rel="noopener">U.S. Navy stability primer (KG, KM, GM, BM)</a>.
+      Background: <a href="../../wiki/theory/stability.md">wiki/theory/stability.md</a>.
+      Source: <a href="https://github.com/aagimene/bArcas/tree/main/prototypes/primary-stability" target="_blank" rel="noopener">github.com/aagimene/bArcas</a>.
+    </p>
+  </section>
+</main>
+
+<div id="tooltip" hidden></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

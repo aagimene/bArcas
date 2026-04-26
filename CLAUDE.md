@@ -18,7 +18,14 @@ ArcasBoat is a browser-based, API-first, visual kayak hull design tool — a mod
 
 ```
 wiki/        Research, design docs, theory, terminology, reference designs.
-             This IS the project right now.
+             This IS the main Phase-0 deliverable.
+prototypes/  Small, self-contained interactive concept demos (vanilla
+             HTML/CSS/JS, no build step). Each lives in its own subdirectory
+             and is intentionally throw-away — code may be scrapped when
+             the main app starts. Served by GitHub Pages from main at
+             aagimene.github.io/bArcas/prototypes/<name>/. See
+             prototypes/README.md for conventions (SI internally, hover
+             for definitions, click for equations, mobile-friendly).
 resources/   Read-only reference material from prior art.
              resources/bearboatxl/ contains the BearboatXL manual PDF and
              the original BearboatXL.zip. Do not edit; treat as archived

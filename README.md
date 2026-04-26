@@ -6,7 +6,7 @@ A research-and-design repository for **ArcasBoat**: a browser-based, API-first, 
 
 ## Status
 
-**Stage 0 — Research & Design.** No code yet. The deliverable for this phase is the [wiki/](wiki/), which captures vision, architecture, API sketch, theory, terminology, reference designs, and feature plans in enough detail that an engineer can pick up Phase 1 cold.
+**Stage 0 — Research & Design.** The main deliverable for this phase is the [wiki/](wiki/), which captures vision, architecture, API sketch, theory, terminology, reference designs, and feature plans in enough detail that an engineer can pick up Phase 1 cold. Alongside it, [prototypes/](prototypes/) holds small, self-contained interactive explorations of individual concepts.
 
 See [wiki/project/roadmap.md](wiki/project/roadmap.md) for staged plans.
 
@@ -15,6 +15,7 @@ See [wiki/project/roadmap.md](wiki/project/roadmap.md) for staged plans.
 | Path | Contents |
 |---|---|
 | [wiki/](wiki/) | Project docs, theory, terminology, design history, feature sketches. Start at [wiki/README.md](wiki/README.md). |
+| [prototypes/](prototypes/) | Small interactive concept demos (vanilla HTML/JS, no build). Live at `aagimene.github.io/bArcas/prototypes/<name>/`. |
 | [resources/bearboatxl/](resources/bearboatxl/) | Archived primary sources from prior art: the BearboatXL manual PDF and original distribution zip. |
 | [CLAUDE.md](CLAUDE.md) | Guidance for Claude Code instances working in this repo. |
 
