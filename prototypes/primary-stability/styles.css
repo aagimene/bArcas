@@ -252,6 +252,8 @@ main {
 #hull-view .control-point{ fill: white; stroke: #475569; stroke-width: 1.5; cursor: grab; }
 #hull-view .control-point:hover { stroke: #2563eb; stroke-width: 2.5; }
 #hull-view .control-point.dragging { cursor: grabbing; stroke: #2563eb; stroke-width: 2.5; }
+#hull-view .control-point-center { cursor: ns-resize; }
+#hull-view .control-point-center.dragging { cursor: ns-resize; }
 
 /* ── SVG: GZ curve ───────────────────────────────────────────── */
 

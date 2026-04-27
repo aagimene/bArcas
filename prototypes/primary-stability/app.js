@@ -400,13 +400,34 @@ function drawMarker(letter, p, cls) {
 }
 
 function drawControlPoints() {
+  const n = state.hullPoints.length;
   state.hullPoints.forEach((p, i) => {
     const wp = bodyToWorld(p, state.heel);
+    const isCenter = i === (n - 1) - i;
     hullSvg.appendChild(el('circle', {
       cx: sx(wp.x), cy: sy(wp.y), r: 6,
-      class: 'control-point', 'data-idx': i,
+      class: 'control-point' + (isCenter ? ' control-point-center' : ''),
+      'data-idx': i,
     }));
   });
+}
+
+// Symmetric edit: dragging point i also mirrors its pair across x = 0.
+// Port-side points (i < center) are clamped to x ≤ 0; starboard to x ≥ 0;
+// the center point is locked to x = 0 (vertical motion only).
+function setPointSymmetric(idx, pos) {
+  const n = state.hullPoints.length;
+  const mirror = n - 1 - idx;
+  if (idx === mirror) {
+    state.hullPoints[idx] = { x: 0, y: pos.y };
+    return;
+  }
+  const isPort = idx < mirror;
+  let x = pos.x;
+  if (isPort && x > 0) x = 0;
+  if (!isPort && x < 0) x = 0;
+  state.hullPoints[idx]    = { x:  x, y: pos.y };
+  state.hullPoints[mirror] = { x: -x, y: pos.y };
 }
 
 // ── GZ curve render ──────────────────────────────────────────────────────
@@ -572,7 +593,7 @@ hullSvg.addEventListener('pointermove', (e) => {
   const sp = pt.matrixTransform(hullSvg.getScreenCTM().inverse());
   const wx = sp.x / SCALE;
   const wy = -sp.y / SCALE;
-  state.hullPoints[drag.idx] = worldToBody({ x: wx, y: wy }, state.heel);
+  setPointSymmetric(drag.idx, worldToBody({ x: wx, y: wy }, state.heel));
   rerender();
 });
 
