@@ -11,6 +11,25 @@ const RHO_WATER = 1000;     // kg/m³
 const G_ACC = 9.81;         // m/s²
 const REF_URL = 'https://man.fas.org/dod-101/navy/docs/swos/dca/stg4-01.html';
 
+const MARKER_TIPS = {
+  K: {
+    label: 'K — Keel (body-frame reference)',
+    desc: 'The chosen body-frame reference point. All K-prefixed distances — KB, KG, KM — are measured vertically upward from K in the body (boat-fixed) frame. K is fixed at the origin regardless of hull shape.',
+  },
+  B: {
+    label: 'B — Centre of buoyancy',
+    desc: 'The centroid of the displaced (submerged) volume. The buoyant force acts vertically upward through B. As the hull heels, B shifts toward the immersed side — this shift is what generates the righting moment.',
+  },
+  G: {
+    label: 'G — Centre of gravity',
+    desc: 'The centroid of the boat\'s total mass (hull + crew + gear). Gravity acts vertically downward through G. Its height KG is set by the loaded condition (slider). Raising G reduces GM and stability.',
+  },
+  M: {
+    label: 'M — Metacentre',
+    desc: 'For small heel angles, the vertical line of buoyancy action passes through a fixed point M on the body\'s centerline. KM = KB + BM. GM = KM − KG: positive ⇒ initially stable, negative ⇒ unstable. M is a small-angle approximation; it moves at large heel.',
+  },
+};
+
 const state = {
   length: 5.0,
   mass: 100,
@@ -391,11 +410,19 @@ function drawHullOutline(r) {
 }
 
 function drawMarker(letter, p, cls) {
+  // Transparent hit-area circle (larger radius) so hover is easy to trigger
+  hullSvg.appendChild(el('circle', {
+    cx: sx(p.x), cy: sy(p.y), r: 14,
+    class: 'hull-tip', 'data-marker-key': letter,
+    fill: 'transparent', stroke: 'none',
+  }));
   hullSvg.appendChild(el('circle', {
     cx: sx(p.x), cy: sy(p.y), r: 4.5, class: 'marker marker-' + cls,
+    style: 'pointer-events: none',
   }));
   hullSvg.appendChild(el('text', {
-    x: sx(p.x) + 9, y: sy(p.y) + 4, class: 'marker-label',
+    x: sx(p.x) + 9, y: sy(p.y) + 4,
+    class: 'marker-label hull-tip', 'data-marker-key': letter,
   }, letter));
 }
 
@@ -636,12 +663,17 @@ document.body.addEventListener('mouseover', (e) => {
   const n = e.target.closest && e.target.closest('.var-name');
   if (n) {
     const v = VARS.find(x => x.key === n.dataset.varKey);
-    if (!v) return;
-    showTip(n, `<strong>${escapeHtml(v.name)} — ${escapeHtml(v.desc)}</strong><br>${escapeHtml(v.short || v.long || '')}`);
+    if (v) showTip(n, `<strong>${escapeHtml(v.name)} — ${escapeHtml(v.desc)}</strong><br>${escapeHtml(v.short || v.long || '')}`);
+    return;
+  }
+  const m = e.target.closest && e.target.closest('.hull-tip');
+  if (m) {
+    const t = MARKER_TIPS[m.dataset.markerKey];
+    if (t) showTip(m, `<strong>${escapeHtml(t.label)}</strong><br>${escapeHtml(t.desc)}`);
   }
 });
 document.body.addEventListener('mouseout', (e) => {
-  if (e.target.closest && e.target.closest('.var-name')) hideTip();
+  if (e.target.closest && (e.target.closest('.var-name') || e.target.closest('.hull-tip'))) hideTip();
 });
 document.body.addEventListener('click', (e) => {
   const v = e.target.closest && e.target.closest('.var-value');

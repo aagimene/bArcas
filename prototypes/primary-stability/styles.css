@@ -242,6 +242,7 @@ main {
 #hull-view .gravity-line { stroke: #dc2626; stroke-width: 1; stroke-dasharray: 3 2; fill: none; }
 #hull-view .buoyancy-line{ stroke: #2563eb; stroke-width: 1; stroke-dasharray: 3 2; fill: none; }
 #hull-view .gz-arrow     { stroke: #f59e0b; stroke-width: 2.5; fill: none; }
+#hull-view .hull-tip     { cursor: help; }
 #hull-view .marker       { stroke: white; stroke-width: 1.5; }
 #hull-view .marker-k     { fill: #1e293b; }
 #hull-view .marker-b     { fill: #2563eb; }
