@@ -53,6 +53,53 @@ function defaultHull() {
   ];
 }
 
+// ── Natural cubic spline (parametric, unit-spaced knots) ─────────────────
+// Solves for second derivatives with natural BCs (M_0 = M_{n-1} = 0) via
+// the Thomas algorithm, then samples each span. Used to smooth the hull
+// outline; the densified polyline is fed into BOTH rendering and the
+// area/centroid/waterline math so visual and physics agree.
+
+function naturalCubicSecondDerivs(y) {
+  const n = y.length;
+  const M = new Array(n).fill(0);
+  if (n < 3) return M;
+  const c = new Array(n).fill(0);
+  const d = new Array(n).fill(0);
+  c[1] = 1 / 4;
+  d[1] = (6 * (y[0] - 2 * y[1] + y[2])) / 4;
+  for (let i = 2; i < n - 1; i++) {
+    const m = 4 - c[i - 1];
+    c[i] = 1 / m;
+    d[i] = (6 * (y[i - 1] - 2 * y[i] + y[i + 1]) - d[i - 1]) / m;
+  }
+  for (let i = n - 2; i >= 1; i--) M[i] = d[i] - c[i] * M[i + 1];
+  return M;
+}
+
+function densifyHull(points, samplesPerSpan = 16) {
+  const n = points.length;
+  if (n < 3) return points.slice();
+  const xs = points.map(p => p.x);
+  const ys = points.map(p => p.y);
+  const Mx = naturalCubicSecondDerivs(xs);
+  const My = naturalCubicSecondDerivs(ys);
+  const out = [];
+  for (let i = 0; i < n - 1; i++) {
+    for (let k = 0; k < samplesPerSpan; k++) {
+      const s = k / samplesPerSpan;
+      const omS = 1 - s;
+      const ax = (omS ** 3 - omS) / 6;
+      const bx = (s ** 3 - s) / 6;
+      out.push({
+        x: omS * xs[i] + s * xs[i + 1] + ax * Mx[i] + bx * Mx[i + 1],
+        y: omS * ys[i] + s * ys[i + 1] + ax * My[i] + bx * My[i + 1],
+      });
+    }
+  }
+  out.push({ x: xs[n - 1], y: ys[n - 1] });
+  return out;
+}
+
 // ── Geometry primitives ──────────────────────────────────────────────────
 
 function rot(p, t) {
@@ -144,7 +191,8 @@ function waterlineHits(worldPoly, y_w) {
 // ── Stability ────────────────────────────────────────────────────────────
 
 function compute(st) {
-  const bodyArea = Math.abs(polyArea(st.hullPoints));
+  const bodyPoly = densifyHull(st.hullPoints);
+  const bodyArea = Math.abs(polyArea(bodyPoly));
   const targetVolume = st.mass / RHO_WATER;
   const targetArea = targetVolume / st.length;
 
@@ -152,7 +200,7 @@ function compute(st) {
     return { error: 'awash', bodyArea, targetArea };
   }
 
-  const worldPoly = st.hullPoints.map(p => bodyToWorld(p, st.heel));
+  const worldPoly = bodyPoly.map(p => bodyToWorld(p, st.heel));
   const { y_w, submerged, area: subArea } = solveWaterline(worldPoly, targetArea);
   if (submerged.length < 3) return { error: 'no submerged area' };
 
@@ -437,7 +485,7 @@ function renderHull(r) {
 }
 
 function drawHullOutline(r) {
-  const pts = (r.worldPoly || state.hullPoints.map(p => bodyToWorld(p, state.heel)))
+  const pts = (r.worldPoly || densifyHull(state.hullPoints).map(p => bodyToWorld(p, state.heel)))
     .map(p => `${sx(p.x).toFixed(2)},${sy(p.y).toFixed(2)}`).join(' ');
   hullSvg.appendChild(el('polyline', { points: pts, class: 'hull' }));
 }
