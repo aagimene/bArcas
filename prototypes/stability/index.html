@@ -3,16 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Primary stability — bArcas prototype</title>
+<title>Stability — bArcas prototype</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
 <header>
-  <h1>Primary stability</h1>
+  <h1>Stability</h1>
   <p class="subtitle">
     A prismatic hull cross-section. Drag the white control points to reshape it (edits mirror across the centerline); move the sliders.
     <span class="hint">Hover any variable name for its definition · click any value for the equation.</span>
+  </p>
+  <p class="subtitle note">
+    <strong>Primary (initial) stability</strong> is resistance to <em>small</em> heel (0°–15°) — set by the waterplane width and read off the slope of GZ at the origin (that&rsquo;s GM).
+    <strong>Secondary stability</strong> is resistance at <em>large</em> heel (15°–60°+) — set by topside shape (flare vs. tumblehome) and read off the peak, area, and zero-crossing of the GZ curve.
+    Both live on the same curve; they just describe different parts of it.
   </p>
 </header>
 
@@ -60,12 +65,15 @@
     <div class="curves">
       <h3>GZ curve <span class="ref">— righting arm vs heel angle</span></h3>
       <svg id="gz-curve" viewBox="0 -120 320 240" preserveAspectRatio="xMidYMid meet"></svg>
+      <p class="hint curve-key">
+        Slope at 0° = GM (primary). Peak GZ and the area under the positive lobe characterize secondary stability; the curve&rsquo;s zero-crossing is the angle of vanishing stability (AVS).
+      </p>
     </div>
 
     <p class="footer">
       Reference: <a href="https://man.fas.org/dod-101/navy/docs/swos/dca/stg4-01.html" target="_blank" rel="noopener">U.S. Navy stability primer (KG, KM, GM, BM)</a>.
       Background: <a href="../../wiki/theory/stability.md">wiki/theory/stability.md</a>.
-      Source: <a href="https://github.com/aagimene/bArcas/tree/main/prototypes/primary-stability" target="_blank" rel="noopener">github.com/aagimene/bArcas</a>.
+      Source: <a href="https://github.com/aagimene/bArcas/tree/main/prototypes/stability" target="_blank" rel="noopener">github.com/aagimene/bArcas</a>.
     </p>
   </section>
 </main>

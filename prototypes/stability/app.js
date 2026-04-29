@@ -361,6 +361,58 @@ const VARS = [
     inputs: (r) => [['B_world.x', fmt(r.B_world.x, 'm', 4)], ['G_world.x', fmt(r.G_world.x, 'm', 4)]],
     output:  (r) => fmt(r.GZ, 'm', 4),
     value:   (r) => fmt(r.GZ, 'm', 4) },
+
+  // ── Secondary-stability metrics (derived from the GZ curve) ────────────
+  { key: 'GZ30', name: 'GZ@30°', desc: 'Righting arm at 30° heel',
+    short: 'GZ evaluated at exactly 30° of heel — a common single-number proxy for secondary stability.',
+    long:  'Where GM characterizes stability at zero heel, GZ@30° characterizes it well past the small-angle regime. Recommended by some small-craft assessments (e.g. ISO 12217 for sailboats) as a sanity check that the hull still has a strong righting arm at moderate heel.',
+    equation: 'GZ(30°) — interpolated from the GZ curve',
+    inputs: (r) => [['curve sample at 30°', r.secondary?.GZ30 == null ? '—' : fmt(r.secondary.GZ30, 'm', 4)]],
+    output:  (r) => fmt(r.secondary?.GZ30, 'm', 4),
+    value:   (r) => fmt(r.secondary?.GZ30, 'm', 4) },
+
+  { key: 'GZpeak', name: 'GZ_peak', desc: 'Peak righting arm (secondary)',
+    short: 'Maximum value of GZ over the positive lobe of the curve. The hull is at its strongest "lock-in" here.',
+    long:  'Peak GZ is the most direct measure of secondary stability: it is the largest restoring lever the hull can produce at any heel. Higher peak ⇒ harder to push past the lean-and-hold point. Driven primarily by topside shape (flare ↑, tumblehome ↓).',
+    equation: 'GZ_peak = max φ∈[0, AVS] GZ(φ)',
+    inputs: (r) => [['samples', '76 in 0°–150°'], ['φ at peak', r.secondary?.phiPeak == null ? '—' : r.secondary.phiPeak.toFixed(1) + '°']],
+    output:  (r) => fmt(r.secondary?.peakGZ, 'm', 4),
+    value:   (r) => fmt(r.secondary?.peakGZ, 'm', 4) },
+
+  { key: 'phiPeak', name: 'φ_peak', desc: 'Heel at peak GZ',
+    short: 'The heel angle at which GZ is largest — i.e. where the boat "feels most locked in" on edge.',
+    long:  'A low φ_peak means the hull develops its full righting arm quickly (good for a beginner-friendly hull); a high φ_peak means the hull keeps gaining righting moment well into a lean (rewards leaned turns). Traditional sea kayaks tend to peak around 25°–40°.',
+    value: (r) => r.secondary?.phiPeak == null ? '—' : r.secondary.phiPeak.toFixed(1) + '°' },
+
+  { key: 'AVS', name: 'AVS', desc: 'Angle of vanishing stability',
+    short: 'The first heel past upright at which GZ crosses zero. Beyond AVS the boat wants to roll the rest of the way over.',
+    long:  'AVS sets the absolute outer limit of static stability: at this heel the righting arm has decayed to zero, and any further heel produces a capsizing rather than a righting moment. Driven mostly by reserve buoyancy in the topsides / deck. Traditional sea kayaks often have AVS in the 90°–150° range; SUPs much less.',
+    equation: 'AVS = first φ > 0 where GZ(φ) = 0  (after GZ has been positive)',
+    inputs: (r) => {
+      const s = r.secondary || {};
+      return [
+        ['GZ_peak',      s.peakGZ == null ? '—' : fmt(s.peakGZ, 'm', 4)],
+        ['sweep range',  '0° – 150°'],
+        ['reached?',     s.reachedAVS ? 'yes' : 'no, GZ still > 0 at sweep end'],
+      ];
+    },
+    output:  (r) => r.secondary?.AVS == null ? '> 150° (not reached)' : r.secondary.AVS.toFixed(1) + '°',
+    value:   (r) => r.secondary?.AVS == null ? '> 150°' : r.secondary.AVS.toFixed(1) + '°' },
+
+  { key: 'A_GZ', name: 'A_GZ', desc: 'Area under GZ curve (energy reserve)',
+    short: 'Integral of GZ over the positive lobe (m·rad). Times Δ·g it is the energy needed to roll the hull from upright to AVS.',
+    long:  'Sometimes called dynamic stability. Where peak GZ measures how hard the hull pushes back, A_GZ measures the total work a wave or paddler error must do to capsize it — a "reserve" account. A hull with modest peak but wide range can have more A_GZ than one with a tall, narrow peak.',
+    equation: 'A_GZ = ∫₀^AVS GZ(φ) dφ      (trapezoidal, φ in radians)',
+    inputs: (r) => {
+      const s = r.secondary || {};
+      const energy = (s.A_GZ != null && r.Delta) ? r.Delta * G_ACC * s.A_GZ : null;
+      return [
+        ['lobe end',          s.AVS == null ? `${s.sweepMax?.toFixed(0) ?? '—'}° (sweep)` : s.AVS.toFixed(1) + '°'],
+        ['Δ·g·A_GZ (energy)', energy == null ? '—' : fmt(energy, 'J', 1)],
+      ];
+    },
+    output:  (r) => fmt(r.secondary?.A_GZ, 'm·rad', 4),
+    value:   (r) => fmt(r.secondary?.A_GZ, 'm·rad', 4) },
 ];
 
 // ── SVG helpers ──────────────────────────────────────────────────────────
@@ -540,10 +592,10 @@ function setPointSymmetric(idx, pos) {
 
 // ── GZ curve render ──────────────────────────────────────────────────────
 
-function renderGZCurve(curve) {
+function renderGZCurve(curve, secondary) {
   gzSvg.innerHTML = '';
   const xMin = 25, xMax = 295, yMid = 0;
-  const angleMin = -90, angleMax = 90;
+  const angleMin = -150, angleMax = 150;
 
   const valid = curve.filter(c => c.GZ != null);
   if (valid.length === 0) return;
@@ -567,7 +619,7 @@ function renderGZCurve(curve) {
   gzSvg.appendChild(el('line', { x1: xOf(0), y1: yOf(maxAbs)-2, x2: xOf(0), y2: yOf(-maxAbs)+2, class: 'axis' }));
 
   // Heel-axis ticks
-  for (const deg of [-90, -45, 0, 45, 90]) {
+  for (const deg of [-150, -90, -45, 0, 45, 90, 150]) {
     gzSvg.appendChild(el('line', {
       x1: xOf(deg), y1: yOf(-maxAbs), x2: xOf(deg), y2: yOf(-maxAbs)+3, class: 'axis',
     }));
@@ -576,11 +628,58 @@ function renderGZCurve(curve) {
     }, deg + '°'));
   }
 
+  // Shaded area under positive lobe (0 → AVS, or sweep end)
+  const lobeEnd = secondary?.AVS != null ? secondary.AVS : (secondary?.sweepMax ?? angleMax);
+  const lobePts = valid.filter(c => c.heel >= 0 && c.heel <= lobeEnd && c.GZ > 0);
+  if (lobePts.length >= 2) {
+    let d = `M ${xOf(0).toFixed(2)} ${yOf(0).toFixed(2)}`;
+    for (const c of lobePts) d += ` L ${xOf(c.heel).toFixed(2)} ${yOf(c.GZ).toFixed(2)}`;
+    d += ` L ${xOf(lobeEnd).toFixed(2)} ${yOf(0).toFixed(2)} Z`;
+    gzSvg.appendChild(el('path', { d, class: 'area' }));
+  }
+
   // Curve
   const d = valid.map((c, i) =>
     `${i === 0 ? 'M' : 'L'} ${xOf(c.heel).toFixed(2)} ${yOf(c.GZ).toFixed(2)}`
   ).join(' ');
   gzSvg.appendChild(el('path', { d, class: 'curve' }));
+
+  // GM tangent at origin: GZ ≈ GM·sinφ → near 0, slope dGZ/dφ = GM (m/rad).
+  // Draw a short tangent over ±20° to highlight that GM is the slope.
+  if (lastResult && !lastResult.error && lastResult.GM != null) {
+    const GM = lastResult.GM;
+    const phi = 20 * Math.PI / 180;
+    const span = GM * phi; // m, GZ at +20° linearized
+    gzSvg.appendChild(el('line', {
+      x1: xOf(-20), y1: yOf(-span),
+      x2: xOf( 20), y2: yOf( span),
+      class: 'gm-tangent',
+    }));
+    gzSvg.appendChild(el('text', {
+      x: xOf(20) + 2, y: yOf(span) + 3, class: 'annot gm',
+    }, 'GM slope'));
+  }
+
+  // Peak GZ marker
+  if (secondary?.peakGZ != null) {
+    const px = xOf(secondary.phiPeak), py = yOf(secondary.peakGZ);
+    gzSvg.appendChild(el('circle', { cx: px, cy: py, r: 3.5, class: 'marker-peak' }));
+    gzSvg.appendChild(el('text', {
+      x: px, y: py - 6, 'text-anchor': 'middle', class: 'annot peak',
+    }, `peak ${secondary.peakGZ.toFixed(3)} m @ ${secondary.phiPeak.toFixed(0)}°`));
+  }
+
+  // AVS marker (vertical dashed line)
+  if (secondary?.AVS != null) {
+    gzSvg.appendChild(el('line', {
+      x1: xOf(secondary.AVS), y1: yOf(maxAbs),
+      x2: xOf(secondary.AVS), y2: yOf(-maxAbs),
+      class: 'marker-avs',
+    }));
+    gzSvg.appendChild(el('text', {
+      x: xOf(secondary.AVS) + 2, y: yOf(-maxAbs) - 3, class: 'annot avs',
+    }, `AVS ${secondary.AVS.toFixed(0)}°`));
+  }
 
   // Current heel marker
   const cur = valid.reduce(
@@ -780,7 +879,7 @@ function ensureCurve() {
   if (key === cachedCurveKey) return cachedCurve;
   cachedCurveKey = key;
   const angles = [];
-  for (let a = -90; a <= 90; a += 2) angles.push(a);
+  for (let a = -150; a <= 150; a += 2) angles.push(a);
   cachedCurve = angles.map(deg => {
     const r = compute({ ...state, heel: deg });
     return { heel: deg, GZ: r.error ? null : r.GZ };
@@ -788,23 +887,73 @@ function ensureCurve() {
   return cachedCurve;
 }
 
+// Secondary-stability metrics derived from the positive-heel side of the GZ curve.
+// AVS = first heel > 0 where GZ crosses from + to −.
+// Peak GZ and the angle where it occurs (within the positive lobe).
+// A_GZ = ∫ GZ dphi (m·rad) over the positive lobe — energy reserve per unit weight.
+// GZ30 = GZ at 30° — common secondary scalar for small craft.
+function secondaryMetrics(curve) {
+  const pos = curve.filter(c => c.heel >= 0 && c.GZ != null)
+                   .sort((a, b) => a.heel - b.heel);
+  const empty = { peakGZ: null, phiPeak: null, AVS: null, range: null,
+                  A_GZ: null, GZ30: null, reachedAVS: false,
+                  sweepMax: pos.length ? pos[pos.length - 1].heel : 0 };
+  if (pos.length < 2) return empty;
+  let avs = null;
+  let wasPositive = false;
+  for (let i = 0; i < pos.length - 1; i++) {
+    if (pos[i].GZ > 0) wasPositive = true;
+    if (wasPositive && pos[i].GZ > 0 && pos[i + 1].GZ <= 0) {
+      const t = pos[i].GZ / (pos[i].GZ - pos[i + 1].GZ);
+      avs = pos[i].heel + t * (pos[i + 1].heel - pos[i].heel);
+      break;
+    }
+  }
+  const sweepMax = pos[pos.length - 1].heel;
+  const lobeEnd = avs == null ? sweepMax : avs;
+  let peakGZ = -Infinity, phiPeak = null;
+  for (const c of pos) {
+    if (c.heel > lobeEnd) break;
+    if (c.GZ > peakGZ) { peakGZ = c.GZ; phiPeak = c.heel; }
+  }
+  if (peakGZ <= 0) { peakGZ = null; phiPeak = null; }
+  let A = 0;
+  for (let i = 0; i < pos.length - 1; i++) {
+    const a = pos[i], b = pos[i + 1];
+    if (a.heel >= lobeEnd) break;
+    const aGZ = Math.max(0, a.GZ);
+    const bHeel = Math.min(b.heel, lobeEnd);
+    const f = (bHeel - a.heel) / (b.heel - a.heel);
+    const bGZ = Math.max(0, a.GZ + f * (b.GZ - a.GZ));
+    const dphi = (bHeel - a.heel) * Math.PI / 180;
+    A += 0.5 * (aGZ + bGZ) * dphi;
+    if (b.heel > lobeEnd) break;
+  }
+  let GZ30 = null;
+  for (let i = 0; i < pos.length - 1; i++) {
+    if (pos[i].heel <= 30 && pos[i + 1].heel >= 30) {
+      const t = (30 - pos[i].heel) / (pos[i + 1].heel - pos[i].heel);
+      GZ30 = pos[i].GZ + t * (pos[i + 1].GZ - pos[i].GZ);
+      break;
+    }
+  }
+  return {
+    peakGZ, phiPeak, AVS: avs, range: avs,
+    A_GZ: A, GZ30, reachedAVS: avs != null, sweepMax,
+  };
+}
+
 function rerender() {
   const r = compute(state);
+  const curve = ensureCurve();
+  if (!r.error) r.secondary = secondaryMetrics(curve);
   lastResult = r;
   renderHull(r);
   if (!r.error) {
     renderVars(r);
     renderEquation(activeVar, r);
-    if (r.GM > 0) {
-      statusEl.className = 'status stable';
-      const stiffness = r.Delta * G_ACC * r.GM;
-      statusEl.textContent =
-        `Initially stable — GM = ${r.GM.toFixed(3)} m. Restoring stiffness ≈ ${stiffness.toFixed(1)} N·m / rad.`;
-    } else {
-      statusEl.className = 'status unstable';
-      statusEl.textContent =
-        `Initially unstable — GM = ${r.GM.toFixed(3)} m. The boat heels away from upright.`;
-    }
+    statusEl.className = 'status ' + (r.GM > 0 ? 'stable' : 'unstable');
+    statusEl.textContent = statusSentence(r);
   } else {
     statusEl.className = 'status awash';
     statusEl.textContent = r.error === 'awash'
@@ -813,7 +962,42 @@ function rerender() {
     varsBody.innerHTML = '';
     eqPanel.innerHTML = '<p class="hint">No solution — adjust inputs.</p>';
   }
-  renderGZCurve(ensureCurve());
+  renderGZCurve(curve, r.secondary);
+}
+
+function qualPrimary(GM) {
+  if (GM <= 0)        return 'unstable';
+  if (GM < 0.05)      return 'tender';
+  if (GM < 0.12)      return 'moderate';
+  if (GM < 0.20)      return 'firm';
+  return 'stiff';
+}
+function qualSecondary(peak) {
+  if (peak == null)   return 'none';
+  if (peak < 0.05)    return 'weak';
+  if (peak < 0.10)    return 'moderate';
+  if (peak < 0.18)    return 'strong';
+  return 'very strong';
+}
+
+function statusSentence(r) {
+  const s = r.secondary || {};
+  if (r.GM <= 0) {
+    return `Initially unstable — GM = ${r.GM.toFixed(3)} m. The boat heels away from upright.`;
+  }
+  const stiffness = r.Delta * G_ACC * r.GM;
+  let txt = `Primary stability ${qualPrimary(r.GM)} (GM = ${r.GM.toFixed(3)} m, restoring stiffness ≈ ${stiffness.toFixed(1)} N·m/rad). `;
+  if (s.peakGZ != null) {
+    txt += `Secondary ${qualSecondary(s.peakGZ)} — peak GZ = ${s.peakGZ.toFixed(3)} m at ${s.phiPeak.toFixed(0)}°`;
+    if (s.reachedAVS) {
+      txt += `, AVS ≈ ${s.AVS.toFixed(0)}°.`;
+    } else {
+      txt += `; positive past ${s.sweepMax.toFixed(0)}° (AVS not reached in sweep).`;
+    }
+  } else {
+    txt += `Secondary GZ never positive in sweep.`;
+  }
+  return txt;
 }
 
 rerender();

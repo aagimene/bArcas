@@ -261,5 +261,19 @@ main {
 #gz-curve .axis  { stroke: #94a3b8; stroke-width: 0.7; }
 #gz-curve .grid  { stroke: #e2e8f0; stroke-width: 0.5; }
 #gz-curve .curve { fill: none; stroke: #f59e0b; stroke-width: 1.8; stroke-linejoin: round; }
+#gz-curve .area  { fill: #f59e0b; opacity: 0.13; stroke: none; }
 #gz-curve .marker-current { fill: #f59e0b; stroke: white; stroke-width: 1.5; }
+#gz-curve .marker-peak { fill: #b45309; stroke: white; stroke-width: 1.2; }
+#gz-curve .marker-avs { stroke: #b91c1c; stroke-width: 1.2; stroke-dasharray: 3 3; }
+#gz-curve .gm-tangent { stroke: #2563eb; stroke-width: 1; stroke-dasharray: 3 2; opacity: 0.85; }
+#gz-curve .annot { font-family: -apple-system, sans-serif; font-size: 9px; fill: #475569; }
+#gz-curve .annot.peak { fill: #b45309; }
+#gz-curve .annot.avs  { fill: #b91c1c; }
+#gz-curve .annot.gm   { fill: #2563eb; }
 #gz-curve .label { font-family: -apple-system, sans-serif; font-size: 9px; fill: #64748b; }
+
+p.curve-key { margin: 0.4rem 0 0; font-size: 0.78rem; }
+
+.subtitle.note { margin-top: 0.35rem; font-size: 0.78rem; color: #cbd5e1; }
+.subtitle.note strong { color: #e2e8f0; }
+.subtitle.note em { color: #f1f5f9; font-style: normal; font-weight: 500; }

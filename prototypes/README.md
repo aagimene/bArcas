@@ -4,7 +4,7 @@ Small, self-contained interactive explorations of single concepts from kayak / h
 
 ## Index
 
-- [primary-stability/](primary-stability/) — editable hull cross-section with live KB / BM / KM / GM / GZ and a GZ-curve plot.
+- [stability/](stability/) — editable hull cross-section with live KB / BM / KM / GM / GZ, primary and secondary stability metrics, and an annotated GZ-curve plot.
 
 ## Conventions
 
@@ -16,7 +16,7 @@ Small, self-contained interactive explorations of single concepts from kayak / h
 ## Local preview
 
 ```sh
-cd prototypes/primary-stability
+cd prototypes/stability
 python3 -m http.server 8000
 # open http://localhost:8000
 ```
