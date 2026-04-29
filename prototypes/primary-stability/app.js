@@ -14,7 +14,7 @@ const REF_URL = 'https://man.fas.org/dod-101/navy/docs/swos/dca/stg4-01.html';
 const MARKER_TIPS = {
   K: {
     label: 'K — Keel (body-frame reference)',
-    desc: 'The chosen body-frame reference point. All K-prefixed distances — KB, KG, KM — are measured vertically upward from K in the body (boat-fixed) frame. K is fixed at the origin regardless of hull shape.',
+    desc: 'The keel reference: the lowest point of the hull on the centerline. All K-prefixed distances — KB, KG, KM — are measured vertically upward from K in the body (boat-fixed) frame. K tracks the center control point as the hull is reshaped.',
   },
   B: {
     label: 'B — Centre of buoyancy',
@@ -159,11 +159,15 @@ function compute(st) {
   const B_world = polyCentroid(submerged);
   const B_body = worldToBody(B_world, st.heel);
 
-  // K is by definition the body-frame origin (chosen reference, classical convention)
-  const K_body = { x: 0, y: 0 };
+  // K is the keel reference: lowest centerline point of the hull. By the
+  // symmetric-edit invariant (setPointSymmetric), the middle control point
+  // is locked to x = 0, so its y is the keel height in the body frame.
+  const centerIdx = (st.hullPoints.length - 1) / 2 | 0;
+  const keelY = st.hullPoints[centerIdx].y;
+  const K_body = { x: 0, y: keelY };
   const K_world = bodyToWorld(K_body, st.heel);
 
-  const G_body = { x: 0, y: st.KG };
+  const G_body = { x: 0, y: keelY + st.KG };
   const G_world = bodyToWorld(G_body, st.heel);
 
   const KB = B_body.y - K_body.y;
@@ -178,7 +182,7 @@ function compute(st) {
   const KM = KB + BM;
   const GM = KM - st.KG;
 
-  const M_body = { x: 0, y: KM };
+  const M_body = { x: 0, y: keelY + KM };
   const M_world = bodyToWorld(M_body, st.heel);
 
   const GZ = B_world.x - G_world.x;
@@ -212,6 +216,35 @@ const VARS = [
   { key: 'rho', name: 'ρ', desc: 'Water density (constant)',
     short: 'Mass per unit volume of fresh water (1000 kg/m³).',
     value: () => '1000 kg/m³' },
+
+  { key: 'K', name: 'K', desc: 'Keel — body-frame reference',
+    short: MARKER_TIPS.K.desc,
+    value: (r) => `(0, ${r.K_body.y.toFixed(3)}) m` },
+
+  { key: 'B', name: 'B', desc: 'Centre of buoyancy',
+    short: MARKER_TIPS.B.desc,
+    equation: 'B = centroid of submerged cross-section\nB_body = worldToBody( centroid(submerged polygon) )',
+    inputs: (r) => [
+      ['submerged area', fmt(r.subArea, 'm²', 5)],
+      ['B_world.x',      fmt(r.B_world.x, 'm', 4)],
+      ['B_world.y',      fmt(r.B_world.y, 'm', 4)],
+    ],
+    output: (r) => `B_body = (${fmt(r.B_body.x, 'm', 4)}, ${fmt(r.B_body.y, 'm', 4)})`,
+    value:  (r) => `(${r.B_body.x.toFixed(3)}, ${r.B_body.y.toFixed(3)}) m` },
+
+  { key: 'G', name: 'G', desc: 'Centre of gravity',
+    short: MARKER_TIPS.G.desc,
+    equation: 'G_body = (0, KG)  — fixed in body frame, set by slider',
+    inputs: (r, st) => [['KG', fmt(st.KG, 'm', 3)]],
+    output: (r) => `G_body = (0, ${fmt(r.G_body.y, 'm', 4)})`,
+    value:  (r) => `(0, ${r.G_body.y.toFixed(3)}) m` },
+
+  { key: 'M', name: 'M', desc: 'Metacentre',
+    short: MARKER_TIPS.M.desc,
+    equation: 'M_body = (0, KM) = (0, KB + BM)',
+    inputs: (r) => [['KB', fmt(r.KB, 'm', 4)], ['BM', fmt(r.BM, 'm', 4)]],
+    output: (r) => `M_body = (0, ${fmt(r.KM, 'm', 4)})`,
+    value:  (r) => `(0, ${r.KM.toFixed(3)}) m` },
 
   { key: 'A_sub', name: 'A_sub', desc: 'Submerged section area',
     short: 'Cross-sectional area below the waterline.',
