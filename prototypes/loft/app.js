@@ -8,6 +8,10 @@
 
 import * as THREE       from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass }     from 'three/addons/postprocessing/RenderPass.js';
+import { SSAOPass }       from 'three/addons/postprocessing/SSAOPass.js';
+import { OutputPass }     from 'three/addons/postprocessing/OutputPass.js';
 
 // ── State ────────────────────────────────────────────────────────────────
 
@@ -470,11 +474,35 @@ function rebuildHull() {
 
 let lastLoft = rebuildHull();
 
+// ── Post-processing: ambient occlusion ───────────────────────────────────
+//
+// SSAOPass (screen-space AO) darkens crevices and concave-ish regions —
+// here mostly the gunwale corner where the hull surface curls inward and
+// the bow/stern where curvature pinches. Tuned for kayak scale (sub-metre
+// kernel radius). Contrast slider maps to kernelRadius (0 disables).
+
+const _w0 = threeHost.clientWidth, _h0 = threeHost.clientHeight;
+const composer = new EffectComposer(renderer);
+composer.setPixelRatio(window.devicePixelRatio);
+composer.setSize(_w0, _h0);
+
+composer.addPass(new RenderPass(scene, camera));
+
+const ssaoPass = new SSAOPass(scene, camera, _w0, _h0);
+ssaoPass.kernelRadius = 0.18;
+ssaoPass.minDistance  = 0.0005;
+ssaoPass.maxDistance  = 0.05;
+composer.addPass(ssaoPass);
+
+composer.addPass(new OutputPass());
+
 // Resize handling.
 const resizeObserver = new ResizeObserver(() => {
   const w = threeHost.clientWidth, h = threeHost.clientHeight;
   if (w > 0 && h > 0) {
     renderer.setSize(w, h, false);
+    composer.setSize(w, h);
+    ssaoPass.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   }
@@ -485,7 +513,7 @@ resizeObserver.observe(threeHost);
 function animate() {
   requestAnimationFrame(animate);
   controls.update();
-  renderer.render(scene, camera);
+  composer.render();
 }
 animate();
 
@@ -747,6 +775,25 @@ hullMaterialOut.color.set(colorOutEl.value);
 hullMaterialIn.color.set(colorInEl.value);
 colorOutEl.addEventListener('input', () => hullMaterialOut.color.set(colorOutEl.value));
 colorInEl .addEventListener('input', () => hullMaterialIn .color.set(colorInEl .value));
+
+// AO contrast slider — maps 0..1 to SSAO kernelRadius (0 disables the pass).
+// At v = 1 the kernel is ~0.5 m, which gives broad darkening across the
+// hull's whole concave-ish lower half; at v = 0.3 you mostly see crevice
+// darkening at the gunwale and bow/stern pinch.
+const aoEl  = document.getElementById('ao');
+const aoOut = document.getElementById('ao-out');
+function applyAO(v) {
+  aoOut.textContent = (v * 100).toFixed(0) + '%';
+  if (v <= 0.001) {
+    ssaoPass.enabled = false;
+  } else {
+    ssaoPass.enabled = true;
+    ssaoPass.kernelRadius = 0.05 + v * 0.45;
+    ssaoPass.maxDistance  = 0.02 + v * 0.10;
+  }
+}
+applyAO(parseFloat(aoEl.value));
+aoEl.addEventListener('input', () => applyAO(parseFloat(aoEl.value)));
 
 // ── Side-view drag handlers ──────────────────────────────────────────────
 //
