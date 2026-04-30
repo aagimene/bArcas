@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Prototypes — bArcas</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1f2937;
+    background: #f8fafc;
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+  }
+  header {
+    padding: 1rem 1.25rem;
+    background: #0f172a;
+    color: #f1f5f9;
+  }
+  header h1 { margin: 0 0 0.25rem; font-size: 1.2rem; font-weight: 600; }
+  header p  { margin: 0; font-size: 0.86rem; color: #cbd5e1; }
+  header a  { color: #93c5fd; }
+
+  main {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 1.25rem;
+  }
+
+  h2 {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #475569;
+    margin: 1.25rem 0 0.5rem;
+  }
+
+  ul.protos {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 0.75rem;
+  }
+  li.proto {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 0.85rem 1rem;
+  }
+  li.proto h3 {
+    margin: 0 0 0.25rem;
+    font-size: 1rem;
+  }
+  li.proto h3 a {
+    color: #1e3a8a;
+    text-decoration: none;
+  }
+  li.proto h3 a:hover { text-decoration: underline; }
+  li.proto p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: #475569;
+  }
+  li.proto .meta {
+    margin-top: 0.4rem;
+    font-size: 0.78rem;
+    color: #64748b;
+  }
+  li.proto .meta a {
+    color: #2563eb;
+    text-decoration: none;
+  }
+  li.proto .meta a:hover { text-decoration: underline; }
+  li.proto.planned {
+    border-style: dashed;
+    background: #f8fafc;
+  }
+  li.proto.planned h3 { color: #64748b; }
+  li.proto.planned .badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    color: #64748b;
+    background: #e2e8f0;
+    padding: 0.05rem 0.4rem;
+    border-radius: 3px;
+    margin-left: 0.4rem;
+    vertical-align: middle;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  section.about {
+    margin-top: 2rem;
+    font-size: 0.86rem;
+    color: #475569;
+  }
+  section.about ul { padding-left: 1.2rem; }
+
+  footer {
+    text-align: center;
+    margin: 1.5rem 1rem 1.5rem;
+    font-size: 0.78rem;
+    color: #94a3b8;
+  }
+  footer a { color: #64748b; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>bArcas — prototypes</h1>
+  <p>
+    Small, self-contained interactive explorations of single concepts from
+    kayak / hull design. Vanilla HTML + CSS + JS; no build step.
+    <a href="https://github.com/aagimene/bArcas">github.com/aagimene/bArcas</a>
+  </p>
+</header>
+
+<main>
+  <h2>Available</h2>
+  <ul class="protos">
+    <li class="proto">
+      <h3><a href="stability/">stability/</a></h3>
+      <p>
+        Editable 2D hull cross-section with live <strong>KB / BM / KM / GM / GZ</strong>,
+        primary and secondary stability metrics (peak GZ, AVS, area under GZ, GZ@30°),
+        and an annotated GZ curve. Drag control points to reshape the hull and watch
+        the metacenter, righting arm, and stability curve update in real time.
+      </p>
+      <p class="meta">
+        Background: <a href="../wiki/theory/stability.md">wiki/theory/stability.md</a>
+      </p>
+    </li>
+
+    <li class="proto">
+      <h3><a href="loft/">loft/</a></h3>
+      <p>
+        3D kayak hull lofted from a curved spine (rocker) and editable
+        cross-sections, with a rotatable Three.js view, side-view rocker editor,
+        and per-station body-plan editor. Live recompute on every edit.
+      </p>
+      <p class="meta">
+        Plan: <a href="loft-plan.md">prototypes/loft-plan.md</a> · Currently:
+        Phase A (layout skeleton + placeholder geometry).
+      </p>
+    </li>
+  </ul>
+
+  <h2>Planned</h2>
+  <ul class="protos">
+    <li class="proto planned">
+      <h3>drag <span class="badge">future</span></h3>
+      <p>
+        Frictional drag (ITTC&nbsp;1957), wave-making (Michell thin-ship),
+        and total resistance vs. speed for a given lofted hull. Reads geometry
+        from the loft prototype.
+      </p>
+    </li>
+    <li class="proto planned">
+      <h3>seakeeping <span class="badge">future</span></h3>
+      <p>
+        Roll period, response in a beam sea, and reserve-buoyancy behaviour at
+        the bow. Strip-theory motion analysis on the lofted hull.
+      </p>
+    </li>
+  </ul>
+
+  <section class="about">
+    <h2>Conventions</h2>
+    <ul>
+      <li>SI units internally (m, kg, rad, m/s); imperial / degrees only in the UI.</li>
+      <li>Hover any variable name for its definition; click any value for its equation.</li>
+      <li>Mobile-friendly: layouts collapse to a single column on narrow screens.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <a href="../">../</a> ·
+  <a href="https://github.com/aagimene/bArcas/tree/main/prototypes">source</a> ·
+  <a href="../wiki/">wiki</a>
+</footer>
+
+</body>
+</html>
