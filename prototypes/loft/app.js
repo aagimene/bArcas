@@ -402,17 +402,29 @@ scene.add(centerlineLine);
 const hullGroup = new THREE.Group();
 scene.add(hullGroup);
 
-// Two single-sided materials so the hull's outside and inside can have
-// different colors. Triangle winding in buildLoft already produces outward
-// normals, so FrontSide = outside and BackSide = inside.
-const hullMaterialOut = new THREE.MeshStandardMaterial({
-  color: 0xffffff, metalness: 0.05, roughness: 0.55, side: THREE.FrontSide,
+// Single double-sided material with inside / outside colors discriminated
+// via gl_FrontFacing in a shader injection. Two physical meshes broke the
+// SSAOPass normal-pass (it re-renders the scene with MeshNormalMaterial,
+// FrontSide-only, so two meshes sharing geometry produce a degenerate
+// normal buffer). One mesh, double-sided, fixes that.
+const insideColorUniform = { value: new THREE.Color(0xffc0cb) };
+const hullMaterial = new THREE.MeshStandardMaterial({
+  color: new THREE.Color(0xffffff),
+  side: THREE.DoubleSide,
+  metalness: 0.05,
+  roughness: 0.6,
   flatShading: false,
 });
-const hullMaterialIn = new THREE.MeshStandardMaterial({
-  color: 0xffc0cb, metalness: 0.05, roughness: 0.7, side: THREE.BackSide,
-  flatShading: false,
-});
+hullMaterial.onBeforeCompile = (shader) => {
+  shader.uniforms.insideColor = insideColorUniform;
+  shader.fragmentShader =
+    'uniform vec3 insideColor;\n' +
+    shader.fragmentShader.replace(
+      '#include <color_fragment>',
+      '#include <color_fragment>\n' +
+      'if (!gl_FrontFacing) { diffuseColor.rgb = insideColor; }'
+    );
+};
 const hullWireMaterial = new THREE.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.25 });
 
 // Station-band group (highlight where stations live on the hull).
@@ -432,14 +444,13 @@ function rebuildHull() {
 
   const loft = buildLoft(state);
 
-  // Hull mesh — render twice with FrontSide / BackSide materials so the
-  // outside and inside colors are independent.
+  // Single double-sided hull mesh. Inside / outside colors are picked
+  // per-fragment via gl_FrontFacing in the shader.
   const geom = new THREE.BufferGeometry();
   geom.setAttribute('position', new THREE.Float32BufferAttribute(loft.positions, 3));
   geom.setIndex(loft.indices);
   geom.computeVertexNormals();
-  hullGroup.add(new THREE.Mesh(geom, hullMaterialOut));
-  hullGroup.add(new THREE.Mesh(geom, hullMaterialIn));
+  hullGroup.add(new THREE.Mesh(geom, hullMaterial));
 
   // Wireframe overlay (subtle).
   const wire = new THREE.LineSegments(new THREE.WireframeGeometry(geom), hullWireMaterial);
@@ -488,9 +499,12 @@ composer.setSize(_w0, _h0);
 composer.addPass(new RenderPass(scene, camera));
 
 const ssaoPass = new SSAOPass(scene, camera, _w0, _h0);
-ssaoPass.kernelRadius = 0.20;
-ssaoPass.minDistance  = 0.0005;
-ssaoPass.maxDistance  = 0.05;
+// Defaults tuned for kayak-scale geometry (boat ~5 m): kernel radius
+// generous enough to sample neighborhoods comparable to hull curvature,
+// max distance wide enough to count gunwale-corner-style depth steps.
+ssaoPass.kernelRadius = 0.5;
+ssaoPass.minDistance  = 0.001;
+ssaoPass.maxDistance  = 0.5;
 composer.addPass(ssaoPass);
 
 composer.addPass(new OutputPass());
@@ -766,14 +780,14 @@ loftResEl.addEventListener('change', () => {
   rebuildHull();
 });
 
-// Hull colors — outside (FrontSide) and inside (BackSide) of the same mesh.
-// Just update the material colors; no need to rebuild the geometry.
+// Hull colors — outside is the material's .color (used on front-facing
+// fragments); inside is the insideColor uniform injected into the shader.
 const colorOutEl = document.getElementById('color-out');
 const colorInEl  = document.getElementById('color-in');
-hullMaterialOut.color.set(colorOutEl.value);
-hullMaterialIn.color.set(colorInEl.value);
-colorOutEl.addEventListener('input', () => hullMaterialOut.color.set(colorOutEl.value));
-colorInEl .addEventListener('input', () => hullMaterialIn .color.set(colorInEl .value));
+hullMaterial.color.set(colorOutEl.value);
+insideColorUniform.value.set(colorInEl.value);
+colorOutEl.addEventListener('input', () => hullMaterial.color.set(colorOutEl.value));
+colorInEl .addEventListener('input', () => insideColorUniform.value.set(colorInEl.value));
 
 // ── Ambient occlusion — direct SSAOPass parameter knobs ──────────────────
 //
@@ -792,7 +806,7 @@ const aoMxOut     = document.getElementById('ao-mx-out');
 const aoResetBtn  = document.getElementById('ao-reset');
 
 const AO_DEFAULTS = {
-  enabled: true, kernelRadius: 0.20, minDistance: 0.0005, maxDistance: 0.05, output: 0,
+  enabled: true, kernelRadius: 0.5, minDistance: 0.001, maxDistance: 0.5, output: 0,
 };
 
 const aoOutputModes = [
