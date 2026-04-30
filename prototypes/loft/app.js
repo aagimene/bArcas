@@ -398,11 +398,18 @@ scene.add(centerlineLine);
 const hullGroup = new THREE.Group();
 scene.add(hullGroup);
 
-const hullMaterial = new THREE.MeshStandardMaterial({
-  color: 0xf59e0b, metalness: 0.05, roughness: 0.6, side: THREE.DoubleSide,
+// Two single-sided materials so the hull's outside and inside can have
+// different colors. Triangle winding in buildLoft already produces outward
+// normals, so FrontSide = outside and BackSide = inside.
+const hullMaterialOut = new THREE.MeshStandardMaterial({
+  color: 0xffffff, metalness: 0.05, roughness: 0.55, side: THREE.FrontSide,
   flatShading: false,
 });
-const hullWireMaterial = new THREE.LineBasicMaterial({ color: 0x78350f, transparent: true, opacity: 0.45 });
+const hullMaterialIn = new THREE.MeshStandardMaterial({
+  color: 0xffc0cb, metalness: 0.05, roughness: 0.7, side: THREE.BackSide,
+  flatShading: false,
+});
+const hullWireMaterial = new THREE.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.25 });
 
 // Station-band group (highlight where stations live on the hull).
 const bandGroup = new THREE.Group();
@@ -421,13 +428,14 @@ function rebuildHull() {
 
   const loft = buildLoft(state);
 
-  // Hull mesh.
+  // Hull mesh — render twice with FrontSide / BackSide materials so the
+  // outside and inside colors are independent.
   const geom = new THREE.BufferGeometry();
   geom.setAttribute('position', new THREE.Float32BufferAttribute(loft.positions, 3));
   geom.setIndex(loft.indices);
   geom.computeVertexNormals();
-  const mesh = new THREE.Mesh(geom, hullMaterial);
-  hullGroup.add(mesh);
+  hullGroup.add(new THREE.Mesh(geom, hullMaterialOut));
+  hullGroup.add(new THREE.Mesh(geom, hullMaterialIn));
 
   // Wireframe overlay (subtle).
   const wire = new THREE.LineSegments(new THREE.WireframeGeometry(geom), hullWireMaterial);
@@ -730,6 +738,15 @@ loftResEl.addEventListener('change', () => {
   state.loftRes = loftResEl.value;
   rebuildHull();
 });
+
+// Hull colors — outside (FrontSide) and inside (BackSide) of the same mesh.
+// Just update the material colors; no need to rebuild the geometry.
+const colorOutEl = document.getElementById('color-out');
+const colorInEl  = document.getElementById('color-in');
+hullMaterialOut.color.set(colorOutEl.value);
+hullMaterialIn.color.set(colorInEl.value);
+colorOutEl.addEventListener('input', () => hullMaterialOut.color.set(colorOutEl.value));
+colorInEl .addEventListener('input', () => hullMaterialIn .color.set(colorInEl .value));
 
 // ── Side-view drag handlers ──────────────────────────────────────────────
 //
