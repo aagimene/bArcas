@@ -549,14 +549,17 @@ composer.addPass(ssaoPass);
 
 // Debug-visibility boost for the SSAO-only / Blur output modes. The stock
 // SSAOPass output for those modes is the raw mask, which is hard to read
-// when the contrast is in pow-amplified ranges. This pass applies the same
+// when contrast is in pow-amplified ranges. This pass applies the same
 // pow curve in screen space, but only when one of those modes is active
 // (boost = 1.0 = passthrough otherwise).
-const aoVisBoostUniform = { value: 1.0 };
+//
+// Note: ShaderPass *clones* the uniforms object when you hand it a plain
+// shader descriptor, so we take a reference to the cloned uniform after
+// construction — `aoVisPass.uniforms.boost` — and write its `.value`.
 const aoVisPass = new ShaderPass({
   uniforms: {
     tDiffuse: { value: null },
-    boost:    aoVisBoostUniform,
+    boost:    { value: 1.0 },
   },
   vertexShader: `
     varying vec2 vUv;
@@ -576,6 +579,7 @@ const aoVisPass = new ShaderPass({
   `,
 });
 composer.addPass(aoVisPass);
+const aoVisBoostUniform = aoVisPass.uniforms.boost;  // reference into the cloned uniform set
 
 composer.addPass(new OutputPass());
 
