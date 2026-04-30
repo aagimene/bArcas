@@ -331,6 +331,59 @@ function buildLoft(state) {
   return { positions, indices, rows, stationRows, spine, N, M };
 }
 
+// Sample the lofted section in (b, n) at any normalized arc length s.
+// Used when adding a new station: the new station is seeded with a section
+// matching the *current* loft at that s, so the surface is unchanged at
+// the moment of insertion (per the plan's seed-from-current-loft rule).
+//
+// Returns an array of { b, n, chine: false } control points, count =
+// `numPoints` (default 7), distributed evenly along the section's
+// arc length, with the first point clamped to the keel (0, 0).
+function sectionAtS(state, s, numPoints = 7) {
+  const N_DENSE = 96;
+  const stationsSorted = state.stations.slice().sort((a, b) => a.s - b.s);
+  const ss = [0, ...stationsSorted.map(st => st.s), 1];
+  const stationSamples = ss.map((_, i) => {
+    if (i === 0 || i === ss.length - 1) return new Array(N_DENSE).fill({ b: 0, n: 0 });
+    return sampleSection(stationsSorted[i - 1].points, N_DENSE);
+  });
+
+  // Evaluate per-transverse-index splines at this s.
+  const dense = new Array(N_DENSE);
+  for (let k = 0; k < N_DENSE; k++) {
+    const bSpline = naturalCubicNonUniform(ss, stationSamples.map(samp => samp[k].b));
+    const nSpline = naturalCubicNonUniform(ss, stationSamples.map(samp => samp[k].n));
+    dense[k] = { b: bSpline(s), n: nSpline(s) };
+  }
+
+  // Resample the dense (b, n) curve down to numPoints by equal arc length.
+  const arc = [0];
+  for (let i = 1; i < N_DENSE; i++) {
+    const db = dense[i].b - dense[i - 1].b;
+    const dn = dense[i].n - dense[i - 1].n;
+    arc.push(arc[i - 1] + Math.hypot(db, dn));
+  }
+  const total = arc[arc.length - 1] || 1;
+
+  const points = new Array(numPoints);
+  for (let i = 0; i < numPoints; i++) {
+    const target = (i / (numPoints - 1)) * total;
+    let lo = 0;
+    while (lo < N_DENSE - 1 && arc[lo + 1] < target) lo++;
+    const hi = Math.min(N_DENSE - 1, lo + 1);
+    const t = arc[hi] === arc[lo] ? 0 : (target - arc[lo]) / (arc[hi] - arc[lo]);
+    points[i] = {
+      b: Math.max(0, dense[lo].b + t * (dense[hi].b - dense[lo].b)),
+      n: dense[lo].n + t * (dense[hi].n - dense[lo].n),
+      chine: false,
+    };
+  }
+  // Anchor the keel point at exactly (0, 0) — by definition of the model
+  // (cf. cross-section editor: the first point is locked to the spine).
+  points[0] = { b: 0, n: 0, chine: false };
+  return points;
+}
+
 // ── Three.js setup ───────────────────────────────────────────────────────
 
 const threeHost = document.getElementById('three-host');
@@ -834,6 +887,78 @@ function selectStation(i) {
 document.getElementById('prev-station').addEventListener('click', () => selectStation(state.selectedStation - 1));
 document.getElementById('next-station').addEventListener('click', () => selectStation(state.selectedStation + 1));
 
+// ── Add / remove stations (phase D) ──────────────────────────────────────
+//
+// Adding: the new station is placed at the midpoint of the largest gap
+// between adjacent station-knots (including the two degenerate endpoints
+// at s = 0 and s = 1) so the auto-spread is sensible. The new section is
+// seeded by sampling the *current* lofted geometry at that s, so the
+// surface is identical at the moment of insertion (the loft just gets
+// one extra knot pinning what was already there). After insertion the
+// user can drag it around like any other station.
+//
+// Removing: deletes the currently selected station. The longitudinal
+// cubic-spline gets one fewer constraint and re-fits, which can change
+// the surface slightly — that's the natural consequence of fewer pinned
+// sections, not a bug.
+
+const MAX_STATIONS = 9;
+const MIN_STATIONS = 2;
+
+function addStation() {
+  if (state.stations.length >= MAX_STATIONS) return;
+  const sortedSs = [0, ...state.stations.map(st => st.s).slice().sort((a, b) => a - b), 1];
+  let maxGap = 0, gapStart = 0;
+  for (let i = 0; i < sortedSs.length - 1; i++) {
+    const g = sortedSs[i + 1] - sortedSs[i];
+    if (g > maxGap) { maxGap = g; gapStart = sortedSs[i]; }
+  }
+  const newS = gapStart + maxGap / 2;
+  const points = sectionAtS(state, newS);
+
+  // Insert in sorted order (state.stations is kept sorted by s).
+  state.stations.sort((a, b) => a.s - b.s);
+  let insertIdx = state.stations.findIndex(st => st.s > newS);
+  if (insertIdx === -1) insertIdx = state.stations.length;
+  state.stations.splice(insertIdx, 0, { s: newS, points });
+  state.selectedStation = insertIdx;
+  stationLabel.textContent = String(state.selectedStation + 1);
+
+  renderStationList();
+  renderSideView();
+  renderSectionView();
+  rebuildHull();
+  syncStationButtons();
+}
+
+function removeStation() {
+  if (state.stations.length <= MIN_STATIONS) return;
+  state.stations.splice(state.selectedStation, 1);
+  state.selectedStation = Math.min(state.selectedStation, state.stations.length - 1);
+  stationLabel.textContent = String(state.selectedStation + 1);
+
+  renderStationList();
+  renderSideView();
+  renderSectionView();
+  rebuildHull();
+  syncStationButtons();
+}
+
+const addStationBtn    = document.getElementById('add-station');
+const removeStationBtn = document.getElementById('remove-station');
+addStationBtn.disabled    = false;
+removeStationBtn.disabled = false;
+addStationBtn.removeAttribute('title');
+removeStationBtn.removeAttribute('title');
+addStationBtn.addEventListener('click', addStation);
+removeStationBtn.addEventListener('click', removeStation);
+
+function syncStationButtons() {
+  addStationBtn.disabled    = state.stations.length >= MAX_STATIONS;
+  removeStationBtn.disabled = state.stations.length <= MIN_STATIONS;
+}
+syncStationButtons();
+
 // Length slider — proportionally rescales the spine X coordinates so the
 // user's interior rocker shape is preserved (just stretched/compressed).
 lengthEl.addEventListener('input', () => {
@@ -882,8 +1007,11 @@ const aoMxOut     = document.getElementById('ao-mx-out');
 const aoCtOut     = document.getElementById('ao-ct-out');
 const aoResetBtn  = document.getElementById('ao-reset');
 
+// AO is off by default — SSAOPass output is too weak for kayak-scale
+// crevices even with pow-amplified contrast. See loft-plan.md "TODO" for
+// the planned fix. Users can still flip it on in the AO panel.
 const AO_DEFAULTS = {
-  enabled: true,
+  enabled: false,
   kernelRadius: 0.2,
   minDistance:  0.00001,
   maxDistance:  0.5,

@@ -17,14 +17,14 @@
 <body>
 
 <header>
-  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · swift-eddy</span>
+  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · narrow-rocker</span>
   <h1>Loft</h1>
   <p class="subtitle">
     Design a 3D kayak hull from a curved spine (rocker) and a set of cross-sections, lofted live.
     <span class="hint">Drag the 3D view to rotate · scroll to zoom · double-click to reset.</span>
   </p>
   <p class="subtitle note">
-    <strong>Phase C — section editor.</strong> Side view: drag spine points to reshape the rocker, drag station ticks to reposition stations. Cross-section view: drag points to reshape the selected section, click empty space to add a point, right-click a point to delete (keel point is locked at the spine). The 3D loft rebuilds live. Add/remove stations and chine flags arrive in phases&nbsp;D&nbsp;–&nbsp;E.
+    <strong>Phase D — add / remove stations.</strong> Side view: drag spine points + station ticks. Cross-section view: drag / click-add / right-click-delete control points. <em>+&nbsp;add station</em> seeds the new section from the current lofted geometry at its s, so the surface stays put on insertion; <em>×&nbsp;remove</em> drops the selected one. Hard-chine flags arrive in phase&nbsp;E.
   </p>
 </header>
 
@@ -58,7 +58,7 @@
       <details class="ao-details" open>
         <summary>Ambient occlusion</summary>
         <label class="ao-toggle">
-          <input type="checkbox" id="ao-enabled" checked>
+          <input type="checkbox" id="ao-enabled">
           Enabled
         </label>
         <label>kernel radius <output id="ao-kr-out"></output>

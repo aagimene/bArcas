@@ -170,3 +170,35 @@ Each phase is a self-contained commit, shippable to GitHub Pages.
 | F | 3D view polish: smooth shading, lighting, station bands, camera reset, sheer overlay in side view |
 
 A–C carry most of the work; D–F are layered polish.
+
+## TODO / known issues
+
+- **Ambient occlusion is weak.** Three.js's `SSAOPass` produces a mask that's
+  very close to 1.0 (no occlusion) across most of a smooth kayak hull. Even
+  with a `pow(mask, contrast)` boost on the blendMaterial up to contrast = 40,
+  the visible darkening at deliberately-creased geometry is barely a tint of
+  gray. AO is off by default in the controls panel for now.
+
+  Options to investigate, roughly in order of effort vs. reward:
+  1. **Better lighting** — a softer/larger area-style fill plus a slightly
+     warmer key might make the existing AO read more strongly without
+     touching the post-process. Cheapest first try.
+  2. **Re-tuned SSAO kernel / sample distribution.** The default kernel is
+     32 samples in a hemisphere; a Poisson disc on the tangent plane with
+     more aggressive falloff can produce sharper crevice detection.
+     Requires forking the SSAO shader.
+  3. **GTAOPass** (Ground Truth AO) — Three.js shipped a GTAO addon
+     post-r160. Generally produces stronger, more physically-plausible AO
+     than SSAOPass. Drop-in replacement candidate.
+  4. **Baked vertex-color AO.** Raycast from each vertex into the mesh on
+     loft rebuild and store the occlusion factor as a vertex color. Free
+     at render time, sharp results, but adds compute on every loft change
+     (manageable at our mesh size). Doesn't help while dragging; could
+     debounce or only bake on pointer-up.
+  5. **Contour / form-line shader** instead of AO. Detect surface inflections
+     in screen space and draw thin dark lines at chines, gunwale corners,
+     and waterlines — naval-architect "form-lines" style. Stylistically
+     this is what the user actually wants AO to imply.
+
+  None of these are blocking the other phases — flagged here so we revisit
+  when the hull form work is far enough along to benefit.
