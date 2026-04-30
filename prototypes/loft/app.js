@@ -173,86 +173,157 @@ function sampleSection(section, N) {
   return out;
 }
 
-// Build a placeholder loft mesh. For Phase A we just sample each station
-// at its given s, project to world coordinates using the spine frame, and
-// stitch quads. No longitudinal interpolation yet — phase B does that.
-function buildPlaceholderLoft(state) {
+// Natural cubic spline through (sₖ, vₖ) at non-uniform knots — used for
+// longitudinal interpolation between stations. Returns an evaluator f(s).
+// Natural BCs: M_0 = M_{n-1} = 0. Tridiagonal solve via Thomas.
+function naturalCubicNonUniform(ss, vs) {
+  const n = ss.length;
+  if (n === 1) return (_) => vs[0];
+  if (n === 2) {
+    return (s) => {
+      const t = (s - ss[0]) / (ss[1] - ss[0]);
+      return vs[0] + t * (vs[1] - vs[0]);
+    };
+  }
+  const h = new Array(n - 1);
+  for (let i = 0; i < n - 1; i++) h[i] = ss[i + 1] - ss[i];
+  const a = new Array(n).fill(0);
+  const b = new Array(n).fill(1);
+  const c = new Array(n).fill(0);
+  const d = new Array(n).fill(0);
+  for (let i = 1; i < n - 1; i++) {
+    a[i] = h[i - 1];
+    b[i] = 2 * (h[i - 1] + h[i]);
+    c[i] = h[i];
+    d[i] = 6 * ((vs[i + 1] - vs[i]) / h[i] - (vs[i] - vs[i - 1]) / h[i - 1]);
+  }
+  // Boundary rows already enforce M_0 = M_{n-1} = 0 (b=1, d=0).
+  // Forward sweep
+  for (let i = 1; i < n; i++) {
+    const m = a[i] / b[i - 1];
+    b[i] -= m * c[i - 1];
+    d[i] -= m * d[i - 1];
+  }
+  // Back substitution
+  const M = new Array(n).fill(0);
+  M[n - 1] = d[n - 1] / b[n - 1];
+  for (let i = n - 2; i >= 0; i--) {
+    M[i] = (d[i] - c[i] * M[i + 1]) / b[i];
+  }
+  return (s) => {
+    if (s <= ss[0])     return vs[0];
+    if (s >= ss[n - 1]) return vs[n - 1];
+    let lo = 0, hi = n - 1;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (ss[mid] <= s) lo = mid; else hi = mid;
+    }
+    const H = ss[hi] - ss[lo];
+    const A = (ss[hi] - s) / H;
+    const B = (s - ss[lo]) / H;
+    const C = (1 / 6) * (A * A * A - A) * H * H;
+    const D = (1 / 6) * (B * B * B - B) * H * H;
+    return A * vs[lo] + B * vs[hi] + C * M[lo] + D * M[hi];
+  };
+}
+
+// Loft mesh. For each transverse sample index k, fit a natural cubic spline
+// over normalized arc length s through the per-station (b_k, n_k) values
+// (with degenerate endpoint stations contributing b=0, n=0). Sample those
+// splines at M longitudinal positions, project to world via the spine
+// frame, and stitch quads. Mirror starboard → port.
+function buildLoft(state) {
   const sampled = sampledSpine(state.spine, 32);
   const spine = { ctrl: state.spine, sampled };
 
-  const res = { low: { N: 32 }, med: { N: 64 }, high: { N: 128 } }[state.loftRes];
-  const N = res.N;
+  const res = { low: { N: 32, M: 24 }, med: { N: 64, M: 36 }, high: { N: 128, M: 64 } }[state.loftRes];
+  const N = res.N, M = res.M;
 
-  // Endpoint stations are degenerate (single point at s=0 and s=1).
-  const allStations = [
-    { s: 0, points: null }, // bow/stern degenerate
-    ...state.stations,
-    { s: 1, points: null },
-  ];
+  // Sort stations by s (defensive — UI may not enforce ordering during drag).
+  const stationsSorted = state.stations.slice().sort((a, b) => a.s - b.s);
 
-  // Generate world-frame points: rows (one per station) × N samples
-  // (transverse). Endpoint rows are N copies of the spine endpoint.
-  const rows = allStations.map(st => {
-    const { p, tx, tz } = spineAt(spine, st.s);
-    // Local frame: tangent (tx, 0, tz), local up = (-tz, 0, tx) rotated
-    // 90° in X-Z keeps n̂ in centerline plane and pointing roughly +Z.
-    const nx = -tz, nz = tx; // 90° CCW in X-Z
-    if (!st.points) {
-      // Degenerate: every sample is the spine endpoint itself.
-      const pt = { x: p.x, y: 0, z: p.z };
-      return new Array(N).fill(pt);
-    }
-    const samples = sampleSection(st.points, N);
-    return samples.map(s => ({
-      x: p.x + s.n * nx,
-      y: s.b,                         // transverse (starboard +)
-      z: p.z + s.n * nz,
-    }));
+  // All knots: degenerate endpoints + interior stations.
+  const ss            = [0, ...stationsSorted.map(st => st.s), 1];
+  const stationSamples = ss.map((_, i) => {
+    if (i === 0 || i === ss.length - 1) return new Array(N).fill({ b: 0, n: 0 });
+    return sampleSection(stationsSorted[i - 1].points, N);
   });
 
-  // Build a starboard mesh (quad strip) from rows, then mirror for port.
+  // Per-transverse-index splines b_k(s), n_k(s).
+  const bSplines = new Array(N);
+  const nSplines = new Array(N);
+  for (let k = 0; k < N; k++) {
+    bSplines[k] = naturalCubicNonUniform(ss, stationSamples.map(samp => samp[k].b));
+    nSplines[k] = naturalCubicNonUniform(ss, stationSamples.map(samp => samp[k].n));
+  }
+
+  // Sample at M longitudinal positions, build world-frame rows.
+  const rows = new Array(M);
+  for (let i = 0; i < M; i++) {
+    const s = i / (M - 1);
+    const { p, tx, tz } = spineAt(spine, s);
+    const nx = -tz, nz = tx; // 90° CCW in X-Z; n̂ is local "up" perpendicular to spine
+    const row = new Array(N);
+    for (let k = 0; k < N; k++) {
+      const b = bSplines[k](s);
+      const n = nSplines[k](s);
+      row[k] = {
+        x: p.x + n * nx,
+        y: b,
+        z: p.z + n * nz,
+      };
+    }
+    rows[i] = row;
+  }
+
+  // Starboard mesh + port mirror.
   const positions = [];
   const indices   = [];
-  const rowCount  = rows.length;
-
-  // Push starboard vertices.
-  for (let i = 0; i < rowCount; i++) {
+  for (let i = 0; i < M; i++) {
     for (let k = 0; k < N; k++) {
       positions.push(rows[i][k].x, rows[i][k].z, rows[i][k].y);
-      // Three.js default: Y up. We map our Z (vertical) → Three.js Y, and
-      // our Y (transverse) → Three.js Z.
     }
   }
-  for (let i = 0; i < rowCount - 1; i++) {
+  for (let i = 0; i < M - 1; i++) {
     for (let k = 0; k < N - 1; k++) {
-      const a = i       * N + k;
-      const b = i       * N + k + 1;
+      const a = i * N + k;
+      const b = i * N + k + 1;
       const c = (i + 1) * N + k;
       const d = (i + 1) * N + k + 1;
       indices.push(a, c, b);
       indices.push(b, c, d);
     }
   }
-  // Port mirror (negate transverse / Three.js Z).
-  const stbdVertCount = rowCount * N;
-  for (let i = 0; i < rowCount; i++) {
+  const stbdVertCount = M * N;
+  for (let i = 0; i < M; i++) {
     for (let k = 0; k < N; k++) {
       positions.push(rows[i][k].x, rows[i][k].z, -rows[i][k].y);
     }
   }
-  for (let i = 0; i < rowCount - 1; i++) {
+  for (let i = 0; i < M - 1; i++) {
     for (let k = 0; k < N - 1; k++) {
-      const a = stbdVertCount + i       * N + k;
-      const b = stbdVertCount + i       * N + k + 1;
+      const a = stbdVertCount + i * N + k;
+      const b = stbdVertCount + i * N + k + 1;
       const c = stbdVertCount + (i + 1) * N + k;
       const d = stbdVertCount + (i + 1) * N + k + 1;
-      // Reversed winding so port faces outward.
       indices.push(a, b, c);
       indices.push(b, d, c);
     }
   }
 
-  return { positions, indices, rows, spine };
+  // Also project interior-station rows to world for the side-view tick
+  // marks and 3D station bands (they're computed at the actual station s,
+  // not at the M-grid sample positions).
+  const stationRows = stationsSorted.map((st, idx) => {
+    const { p, tx, tz } = spineAt(spine, st.s);
+    const nx = -tz, nz = tx;
+    const samp = stationSamples[idx + 1];
+    return samp.map(({ b, n }) => ({
+      x: p.x + n * nx, y: b, z: p.z + n * nz,
+    }));
+  });
+
+  return { positions, indices, rows, stationRows, spine, N, M };
 }
 
 // ── Three.js setup ───────────────────────────────────────────────────────
@@ -348,7 +419,7 @@ function rebuildHull() {
     child.geometry?.dispose();
   }
 
-  const loft = buildPlaceholderLoft(state);
+  const loft = buildLoft(state);
 
   // Hull mesh.
   const geom = new THREE.BufferGeometry();
@@ -369,19 +440,17 @@ function rebuildHull() {
     new THREE.Vector3( half, 0, 0),
   ]);
 
-  // Station bands: draw each interior station as a thin loop following its
-  // section, both starboard and port halves.
-  const N = loft.rows[0].length;
-  const interior = loft.rows.slice(1, -1); // skip degenerate endpoints
-  interior.forEach((row, idx) => {
+  // Station bands: each interior station as a thin loop following its
+  // section at its actual s, both starboard and port halves.
+  const N = loft.N;
+  loft.stationRows.forEach((row, idx) => {
     const isSelected = idx === state.selectedStation;
-    const color = isSelected ? 0xb45309 : 0xfbbf24;
-    const opacity = isSelected ? 1.0 : 0.55;
-    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity });
+    const color = isSelected ? 0xfde68a : 0xb45309;
+    const opacity = isSelected ? 1.0 : 0.6;
+    const linewidth = isSelected ? 2.5 : 1.0;
+    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity, linewidth });
     const linePts = [];
-    // Starboard
     for (let k = 0; k < N; k++) linePts.push(new THREE.Vector3(row[k].x, row[k].z, row[k].y));
-    // Mirror back (port) to close the loop visually.
     for (let k = N - 1; k >= 0; k--) linePts.push(new THREE.Vector3(row[k].x, row[k].z, -row[k].y));
     linePts.push(linePts[0].clone());
     const g = new THREE.BufferGeometry().setFromPoints(linePts);
@@ -425,12 +494,18 @@ const el = (tag, attrs = {}, content) => {
 const sideSvg    = document.getElementById('side-view');
 const sectionSvg = document.getElementById('section-view');
 
+// Side view scale constants — also used by drag-handler coordinate math.
+const SIDE_SCALE_X = 100; // px/m horizontal
+const SIDE_SCALE_Z = 200; // px/m vertical (exaggerated so rocker is visible)
+
 function renderSideView() {
   sideSvg.innerHTML = '';
-  const SCALE_X = 100; // px/m horizontal
-  const SCALE_Z = 200; // px/m vertical (exaggerate so rocker is visible)
-  const xOf = (x) => x * SCALE_X;
-  const yOf = (z) => -z * SCALE_Z;
+  const xOf = (x) => x * SIDE_SCALE_X;
+  const yOf = (z) => -z * SIDE_SCALE_Z;
+
+  // Sample the spine once for everything that needs it.
+  const sampled = sampledSpine(state.spine, 32);
+  const spine   = { ctrl: state.spine, sampled };
 
   // Waterline (Z = 0).
   sideSvg.appendChild(el('line', {
@@ -440,44 +515,41 @@ function renderSideView() {
     x: 320, y: yOf(0) - 3, class: 'label', 'text-anchor': 'end',
   }, 'WL (Z = 0)'));
 
-  // Hull silhouette: trace top (sheer) and bottom (keel) seen from beam.
-  // Sheer = max-Z over all stations at each X; keel = spine line.
-  const half = state.length / 2;
+  // Sheer + keel silhouette traced along the spine.
   const samples = 80;
   const sheerPath = [];
   const keelPath  = [];
+  const stations  = state.stations;
   for (let i = 0; i <= samples; i++) {
-    const s = i / samples;
-    const sp = spineAt({ ctrl: state.spine, sampled: sampledSpine(state.spine, 32) }, s);
+    const s  = i / samples;
+    const sp = spineAt(spine, s);
     keelPath.push({ x: sp.p.x, z: sp.p.z });
-    // Sheer height at this s: linear-interpolate the gunwale-n from neighboring stations.
-    const stations = state.stations;
-    let sheerN = 0;
+    let sheerN;
     if (s <= stations[0].s) sheerN = stations[0].points[stations[0].points.length - 1].n;
     else if (s >= stations[stations.length - 1].s) sheerN = stations[stations.length - 1].points.slice(-1)[0].n;
     else {
+      sheerN = 0;
       for (let j = 0; j < stations.length - 1; j++) {
         const a = stations[j], b = stations[j + 1];
         if (s >= a.s && s <= b.s) {
-          const t = (s - a.s) / (b.s - a.s);
+          const t  = (s - a.s) / (b.s - a.s);
           const aN = a.points[a.points.length - 1].n;
           const bN = b.points[b.points.length - 1].n;
-          sheerN = aN + t * (bN - aN);
+          sheerN   = aN + t * (bN - aN);
           break;
         }
       }
     }
-    // Sheer in world Z: spine.z + sheerN (n is local up; here local up ≈ Z for mild rocker).
-    sheerPath.push({ x: sp.p.x, z: sp.p.z + sheerN });
+    // Sheer in world Z: project local n (up) using the spine's local frame.
+    // For mild rocker, local up ≈ +Z, so this collapses to spine.z + sheerN.
+    const nx = -sp.tz, nz = sp.tx;
+    sheerPath.push({ x: sp.p.x + sheerN * nx, z: sp.p.z + sheerN * nz });
   }
-  // Silhouette polygon: sheer forward then keel back.
   const silPts = [
     ...sheerPath.map(p => `${xOf(p.x).toFixed(2)},${yOf(p.z).toFixed(2)}`),
     ...keelPath.slice().reverse().map(p => `${xOf(p.x).toFixed(2)},${yOf(p.z).toFixed(2)}`),
   ];
   sideSvg.appendChild(el('polygon', { points: silPts.join(' '), class: 'silhouette' }));
-
-  // Sheer line and keel line drawn explicitly.
   sideSvg.appendChild(el('path', {
     class: 'sheer',
     d: 'M ' + sheerPath.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.z).toFixed(2)}`).join(' L '),
@@ -487,45 +559,60 @@ function renderSideView() {
     d: 'M ' + keelPath.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.z).toFixed(2)}`).join(' L '),
   }));
 
-  // Spine control polyline + control points.
+  // Spine control polyline.
   sideSvg.appendChild(el('path', {
     class: 'spine-line',
     d: 'M ' + state.spine.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.z).toFixed(2)}`).join(' L '),
   }));
-  for (const p of state.spine) {
+  // Spine control points (with invisible halo for easy hit-testing).
+  state.spine.forEach((p, i) => {
     sideSvg.appendChild(el('circle', {
-      cx: xOf(p.x), cy: yOf(p.z), r: 4, class: 'spine-pt',
+      cx: xOf(p.x), cy: yOf(p.z), r: 12,
+      class: 'spine-hit',
+      'data-drag': 'spine', 'data-idx': String(i),
     }));
-  }
+    sideSvg.appendChild(el('circle', {
+      cx: xOf(p.x), cy: yOf(p.z), r: 4.2,
+      class: 'spine-pt',
+      'data-drag': 'spine', 'data-idx': String(i),
+    }));
+  });
 
-  // Station markers along the spine.
+  // Station markers along the spine — also draggable along arc length.
   state.stations.forEach((st, i) => {
-    const sp = spineAt({ ctrl: state.spine, sampled: sampledSpine(state.spine, 32) }, st.s);
+    const sp = spineAt(spine, st.s);
     const isSel = i === state.selectedStation;
-    const cls = 'station-tick' + (isSel ? ' selected' : '');
-    // Vertical hash mark
     sideSvg.appendChild(el('line', {
       x1: xOf(sp.p.x), y1: yOf(sp.p.z) - 12,
       x2: xOf(sp.p.x), y2: yOf(sp.p.z) + 6,
       class: 'station' + (isSel ? ' selected' : ''),
     }));
-    // Tick dot
+    // Hit halo (transparent, large) for grabbing the station tick.
     sideSvg.appendChild(el('circle', {
-      cx: xOf(sp.p.x), cy: yOf(sp.p.z) - 12, r: 3.5, class: cls,
+      cx: xOf(sp.p.x), cy: yOf(sp.p.z) - 12, r: 14,
+      class: 'station-hit',
+      'data-drag': 'station', 'data-idx': String(i),
+    }));
+    sideSvg.appendChild(el('circle', {
+      cx: xOf(sp.p.x), cy: yOf(sp.p.z) - 12, r: 4.2,
+      class: 'station-tick' + (isSel ? ' selected' : ''),
+      'data-drag': 'station', 'data-idx': String(i),
     }));
     sideSvg.appendChild(el('text', {
-      x: xOf(sp.p.x), y: yOf(sp.p.z) - 16, class: 'station-label',
+      x: xOf(sp.p.x), y: yOf(sp.p.z) - 18, class: 'station-label',
     }, String(i + 1)));
   });
 
-  // Endpoints (bow/stern).
-  ['bow', 'stern'].forEach((label) => {
-    const isBow = label === 'bow';
-    const x = isBow ? half : -half;
-    sideSvg.appendChild(el('text', {
-      x: xOf(x), y: yOf(0) + 18, class: 'label', 'text-anchor': 'middle',
-    }, label));
-  });
+  // Endpoint labels follow the actual spine endpoints (which are the same
+  // draggable spine control points as any other).
+  const sternX = state.spine[0].x;
+  const bowX   = state.spine[state.spine.length - 1].x;
+  sideSvg.appendChild(el('text', {
+    x: xOf(sternX), y: yOf(0) + 22, class: 'label', 'text-anchor': 'middle',
+  }, 'stern'));
+  sideSvg.appendChild(el('text', {
+    x: xOf(bowX), y: yOf(0) + 22, class: 'label', 'text-anchor': 'middle',
+  }, 'bow'));
 }
 
 function renderSectionView() {
@@ -606,11 +693,18 @@ function selectStation(i) {
 document.getElementById('prev-station').addEventListener('click', () => selectStation(state.selectedStation - 1));
 document.getElementById('next-station').addEventListener('click', () => selectStation(state.selectedStation + 1));
 
+// Length slider — proportionally rescales the spine X coordinates so the
+// user's interior rocker shape is preserved (just stretched/compressed).
 lengthEl.addEventListener('input', () => {
-  state.length = parseFloat(lengthEl.value);
-  lengthOut.textContent = state.length.toFixed(2) + ' m';
-  // Rescale spine endpoints proportionally; interior keeps its rocker shape.
-  state.spine = spinePlaceholder(state.length);
+  const newL = parseFloat(lengthEl.value);
+  const last = state.spine.length - 1;
+  const currentL = state.spine[last].x - state.spine[0].x;
+  if (currentL > 0) {
+    const ratio = newL / currentL;
+    for (const p of state.spine) p.x *= ratio;
+  }
+  state.length = newL;
+  lengthOut.textContent = newL.toFixed(2) + ' m';
   renderSideView();
   rebuildHull();
 });
@@ -619,6 +713,100 @@ loftResEl.addEventListener('change', () => {
   state.loftRes = loftResEl.value;
   rebuildHull();
 });
+
+// ── Side-view drag handlers ──────────────────────────────────────────────
+//
+// Pointer Events for desktop & touch parity. Drag spine control points in
+// (X, Z); drag station ticks along the spine arc length. Loft rebuilds live.
+
+// Convert a pointer event to viewBox-local coordinates.
+function svgToLocal(svg, e) {
+  const pt = svg.createSVGPoint();
+  pt.x = e.clientX;
+  pt.y = e.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+
+// Map a target world X to a normalized arc-length parameter s along the
+// spine. Assumes the spine is monotonic in X (true for kayak rocker — we
+// enforce it during drag).
+function spineXToS(spine, targetX) {
+  const { pts, arc, total } = spine.sampled;
+  if (targetX <= pts[0].x)              return 0;
+  if (targetX >= pts[pts.length - 1].x) return 1;
+  for (let i = 0; i < pts.length - 1; i++) {
+    if (pts[i].x <= targetX && targetX <= pts[i + 1].x) {
+      const dx = pts[i + 1].x - pts[i].x;
+      const t  = dx > 1e-9 ? (targetX - pts[i].x) / dx : 0;
+      const a  = arc[i] + t * (arc[i + 1] - arc[i]);
+      return Math.max(0, Math.min(1, a / total));
+    }
+  }
+  return 1;
+}
+
+let drag = null;
+
+sideSvg.addEventListener('pointerdown', (e) => {
+  const target = e.target.closest('[data-drag]');
+  if (!target) return;
+  e.preventDefault();
+  drag = {
+    kind: target.dataset.drag,
+    idx:  +target.dataset.idx,
+    moved: false,
+    pointerId: e.pointerId,
+  };
+  if (drag.kind === 'station') selectStation(drag.idx);
+  sideSvg.setPointerCapture(e.pointerId);
+});
+
+sideSvg.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  const { x, y } = svgToLocal(sideSvg, e);
+  const wx = x / SIDE_SCALE_X;
+  const wz = -y / SIDE_SCALE_Z;
+  drag.moved = true;
+
+  if (drag.kind === 'spine') {
+    const i    = drag.idx;
+    const last = state.spine.length - 1;
+    // Endpoints are free to move in X (set hull length); interior points
+    // are clamped between their neighbors so the spine stays monotonic.
+    let nx = wx;
+    if (i > 0)    nx = Math.max(nx, state.spine[i - 1].x + 0.02);
+    if (i < last) nx = Math.min(nx, state.spine[i + 1].x - 0.02);
+    state.spine[i].x = nx;
+    state.spine[i].z = wz;
+    state.length = state.spine[last].x - state.spine[0].x;
+    lengthEl.value = state.length.toFixed(2);
+    lengthOut.textContent = state.length.toFixed(2) + ' m';
+    renderSideView();
+    rebuildHull();
+  } else if (drag.kind === 'station') {
+    const sampled = sampledSpine(state.spine, 32);
+    const spine   = { ctrl: state.spine, sampled };
+    const s       = spineXToS(spine, wx);
+    // Keep stations strictly inside (0, 1) and ordered.
+    const i       = drag.idx;
+    const minS    = i === 0                              ? 0.01 : state.stations[i - 1].s + 0.01;
+    const maxS    = i === state.stations.length - 1      ? 0.99 : state.stations[i + 1].s - 0.01;
+    state.stations[i].s = Math.max(minS, Math.min(maxS, s));
+    renderStationList();
+    renderSideView();
+    rebuildHull();
+  }
+});
+
+function endDrag(e) {
+  if (!drag) return;
+  if (drag.pointerId != null && sideSvg.hasPointerCapture(drag.pointerId)) {
+    sideSvg.releasePointerCapture(drag.pointerId);
+  }
+  drag = null;
+}
+sideSvg.addEventListener('pointerup',     endDrag);
+sideSvg.addEventListener('pointercancel', endDrag);
 
 // ── Initial render ───────────────────────────────────────────────────────
 

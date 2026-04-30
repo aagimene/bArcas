@@ -185,15 +185,19 @@ main {
 }
 #side-view .sheer { fill: none; stroke: #94a3b8; stroke-dasharray: 3 2; stroke-width: 1; }
 #side-view .keel  { fill: none; stroke: #1f2937; stroke-width: 1.6; }
-#side-view .spine-line { fill: none; stroke: #2563eb; stroke-width: 1.4; }
-#side-view .spine-pt   { fill: white; stroke: #2563eb; stroke-width: 1.4; }
-#side-view .station    { stroke: #f59e0b; stroke-width: 1.6; }
+#side-view .spine-line { fill: none; stroke: #2563eb; stroke-width: 1.4; pointer-events: none; }
+#side-view .spine-pt   { fill: white; stroke: #2563eb; stroke-width: 1.4; cursor: grab; }
+#side-view .spine-pt:active { cursor: grabbing; }
+#side-view .spine-hit  { fill: transparent; cursor: grab; }
+#side-view .station    { stroke: #f59e0b; stroke-width: 1.6; pointer-events: none; }
 #side-view .station.selected { stroke: #b45309; stroke-width: 2.2; }
 #side-view .station-tick {
   fill: #f59e0b; stroke: white; stroke-width: 0.8;
+  cursor: ew-resize;
 }
 #side-view .station-tick.selected { fill: #b45309; }
-#side-view .station-label { font: 9px -apple-system, sans-serif; fill: #b45309; text-anchor: middle; }
+#side-view .station-hit { fill: transparent; cursor: ew-resize; }
+#side-view .station-label { font: 9px -apple-system, sans-serif; fill: #b45309; text-anchor: middle; pointer-events: none; }
 
 /* ── SVG: cross-section ──────────────────────────────────────── */
 
