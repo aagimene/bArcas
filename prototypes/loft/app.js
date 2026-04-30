@@ -11,6 +11,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass }     from 'three/addons/postprocessing/RenderPass.js';
 import { SSAOPass }       from 'three/addons/postprocessing/SSAOPass.js';
+import { ShaderPass }     from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass }     from 'three/addons/postprocessing/OutputPass.js';
 
 // ── State ────────────────────────────────────────────────────────────────
@@ -502,10 +503,79 @@ const ssaoPass = new SSAOPass(scene, camera, _w0, _h0);
 // Defaults tuned for kayak-scale geometry (boat ~5 m): kernel radius
 // generous enough to sample neighborhoods comparable to hull curvature,
 // max distance wide enough to count gunwale-corner-style depth steps.
-ssaoPass.kernelRadius = 0.5;
-ssaoPass.minDistance  = 0.001;
+ssaoPass.kernelRadius = 0.2;
+ssaoPass.minDistance  = 0.00001;
 ssaoPass.maxDistance  = 0.5;
+
+// Replace SSAOPass's internal blendMaterial with one that does
+// pow(mask, contrast) before the multiply-blend with the beauty pass.
+// SSAOPass's stock blendMaterial just copies the mask straight out, so a
+// "0.9" occlusion value dims the pixel by 10% — invisible. With pow(0.9, 4)
+// it dims by ~34%; pow(0.9, 16) by ~81%. Contrast > 1 darkens crevices
+// non-linearly without changing the underlying SSAO algorithm.
+const aoContrastUniform = { value: 4.0 };
+ssaoPass.blendMaterial = new THREE.ShaderMaterial({
+  uniforms: {
+    tDiffuse:   { value: null },
+    aoContrast: aoContrastUniform,
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float aoContrast;
+    varying vec2 vUv;
+    void main() {
+      vec3 ao = texture2D(tDiffuse, vUv).rgb;
+      gl_FragColor = vec4(pow(ao, vec3(aoContrast)), 1.0);
+    }
+  `,
+  transparent: true,
+  depthTest:  false,
+  depthWrite: false,
+  blendSrc: THREE.DstColorFactor,
+  blendDst: THREE.ZeroFactor,
+  blendEquation: THREE.AddEquation,
+  blendSrcAlpha: THREE.DstAlphaFactor,
+  blendDstAlpha: THREE.ZeroFactor,
+  blendEquationAlpha: THREE.AddEquation,
+});
 composer.addPass(ssaoPass);
+
+// Debug-visibility boost for the SSAO-only / Blur output modes. The stock
+// SSAOPass output for those modes is the raw mask, which is hard to read
+// when the contrast is in pow-amplified ranges. This pass applies the same
+// pow curve in screen space, but only when one of those modes is active
+// (boost = 1.0 = passthrough otherwise).
+const aoVisBoostUniform = { value: 1.0 };
+const aoVisPass = new ShaderPass({
+  uniforms: {
+    tDiffuse: { value: null },
+    boost:    aoVisBoostUniform,
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float boost;
+    varying vec2 vUv;
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      gl_FragColor = vec4(pow(c.rgb, vec3(boost)), c.a);
+    }
+  `,
+});
+composer.addPass(aoVisPass);
 
 composer.addPass(new OutputPass());
 
@@ -799,14 +869,21 @@ const aoEnabledEl = document.getElementById('ao-enabled');
 const aoKrEl      = document.getElementById('ao-kr');
 const aoMnEl      = document.getElementById('ao-mn');
 const aoMxEl      = document.getElementById('ao-mx');
+const aoCtEl      = document.getElementById('ao-ct');
 const aoOutSel    = document.getElementById('ao-output');
 const aoKrOut     = document.getElementById('ao-kr-out');
 const aoMnOut     = document.getElementById('ao-mn-out');
 const aoMxOut     = document.getElementById('ao-mx-out');
+const aoCtOut     = document.getElementById('ao-ct-out');
 const aoResetBtn  = document.getElementById('ao-reset');
 
 const AO_DEFAULTS = {
-  enabled: true, kernelRadius: 0.5, minDistance: 0.001, maxDistance: 0.5, output: 0,
+  enabled: true,
+  kernelRadius: 0.2,
+  minDistance:  0.00001,
+  maxDistance:  0.5,
+  contrast:     4.0,
+  output:       0,
 };
 
 const aoOutputModes = [
@@ -827,6 +904,7 @@ function syncAOLabels() {
   aoKrOut.textContent = fmtFixed(aoKrEl.value, 3) + ' m';
   aoMnOut.textContent = fmtFixed(aoMnEl.value, 5) + ' m';
   aoMxOut.textContent = fmtFixed(aoMxEl.value, 4) + ' m';
+  aoCtOut.textContent = '×' + fmtFixed(aoCtEl.value, 1);
 }
 
 function applyAO() {
@@ -834,11 +912,20 @@ function applyAO() {
   ssaoPass.kernelRadius = parseFloat(aoKrEl.value);
   ssaoPass.minDistance  = parseFloat(aoMnEl.value);
   ssaoPass.maxDistance  = parseFloat(aoMxEl.value);
-  ssaoPass.output       = aoOutputModes[parseInt(aoOutSel.value, 10)] ?? aoOutputModes[0];
+  const mode = parseInt(aoOutSel.value, 10);
+  ssaoPass.output       = aoOutputModes[mode] ?? aoOutputModes[0];
+
+  const contrast = parseFloat(aoCtEl.value);
+  aoContrastUniform.value = contrast;
+  // Boost the screen-space view of the raw mask only when SSAO-only or
+  // Blur output mode is active — otherwise the Default mode would get
+  // double-pow'd (blendMaterial already applies pow once).
+  aoVisBoostUniform.value = (mode === 1 || mode === 2) ? contrast : 1.0;
+
   syncAOLabels();
 }
 
-[aoEnabledEl, aoKrEl, aoMnEl, aoMxEl, aoOutSel].forEach(elx =>
+[aoEnabledEl, aoKrEl, aoMnEl, aoMxEl, aoCtEl, aoOutSel].forEach(elx =>
   elx.addEventListener('input', applyAO)
 );
 
@@ -847,6 +934,7 @@ aoResetBtn.addEventListener('click', () => {
   aoKrEl.value        = AO_DEFAULTS.kernelRadius;
   aoMnEl.value        = AO_DEFAULTS.minDistance;
   aoMxEl.value        = AO_DEFAULTS.maxDistance;
+  aoCtEl.value        = AO_DEFAULTS.contrast;
   aoOutSel.value      = String(AO_DEFAULTS.output);
   applyAO();
 });
