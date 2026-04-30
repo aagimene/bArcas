@@ -264,7 +264,8 @@ renderer.setSize(threeHost.clientWidth, threeHost.clientHeight);
 threeHost.appendChild(renderer.domElement);
 
 const scene  = new THREE.Scene();
-scene.background = null;
+// Dark slate background so the light gridlines and the orange hull pop.
+scene.background = new THREE.Color(0x0b1220);
 
 const camera = new THREE.PerspectiveCamera(
   35, threeHost.clientWidth / Math.max(1, threeHost.clientHeight), 0.05, 100
@@ -286,21 +287,38 @@ renderer.domElement.addEventListener('dblclick', () => {
 });
 
 // Lighting.
-scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-const keyLight = new THREE.DirectionalLight(0xffffff, 0.85);
+// Brighter lights to make up for the dark background.
+scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.05);
 keyLight.position.set(2, 4, 1.5);
 scene.add(keyLight);
-const fillLight = new THREE.DirectionalLight(0xc7d2fe, 0.4);
+const fillLight = new THREE.DirectionalLight(0xc7d2fe, 0.55);
 fillLight.position.set(-2, 1, -2);
 scene.add(fillLight);
 
-// Reference grid at Z = 0 (waterline-ish).
-const grid = new THREE.GridHelper(8, 16, 0x94a3b8, 0xe2e8f0);
+// Horizontal reference grid at Z = 0 (waterline plane).
+// Three.js Y is up here, so the grid sits in the X-Z (Three.js) plane = the
+// X-Y (world) plane = the waterline. Light lines on dark bg.
+const grid = new THREE.GridHelper(8, 16, 0xe2e8f0, 0x64748b);
 grid.position.y = 0;
+grid.material.transparent = true;
+grid.material.opacity = 0.85;
 scene.add(grid);
 
-// Centerline plane outline (a thin line marking Y = 0 from -L/2 to +L/2).
-const centerlineMat  = new THREE.LineBasicMaterial({ color: 0xcbd5e1 });
+// Centerline plane grid (the boat's longitudinal-vertical bisecting plane).
+// In Three.js terms this is the X-Y plane at z = 0. Build it by rotating a
+// horizontal GridHelper 90° about X. Slightly cooler color so the two
+// reference planes are distinguishable at a glance.
+const centerGrid = new THREE.GridHelper(6, 12, 0xa5b4fc, 0x475569);
+centerGrid.rotation.x = Math.PI / 2;
+centerGrid.material.transparent = true;
+centerGrid.material.opacity = 0.6;
+centerGrid.position.y = 0; // straddles the waterline
+scene.add(centerGrid);
+
+// Bright centerline at the intersection of the two grid planes — runs along
+// the length of the boat at (Y_three=0, Z_three=0).
+const centerlineMat  = new THREE.LineBasicMaterial({ color: 0xfbbf24 });
 const centerlineGeom = new THREE.BufferGeometry();
 const centerlineLine = new THREE.Line(centerlineGeom, centerlineMat);
 scene.add(centerlineLine);
@@ -313,7 +331,7 @@ const hullMaterial = new THREE.MeshStandardMaterial({
   color: 0xf59e0b, metalness: 0.05, roughness: 0.6, side: THREE.DoubleSide,
   flatShading: false,
 });
-const hullWireMaterial = new THREE.LineBasicMaterial({ color: 0xb45309, transparent: true, opacity: 0.35 });
+const hullWireMaterial = new THREE.LineBasicMaterial({ color: 0x78350f, transparent: true, opacity: 0.45 });
 
 // Station-band group (highlight where stations live on the hull).
 const bandGroup = new THREE.Group();
