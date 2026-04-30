@@ -10,7 +10,7 @@ import * as THREE       from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass }     from 'three/addons/postprocessing/RenderPass.js';
-import { SSAOPass }       from 'three/addons/postprocessing/SSAOPass.js';
+import { SAOPass }        from 'three/addons/postprocessing/SAOPass.js';
 import { OutputPass }     from 'three/addons/postprocessing/OutputPass.js';
 
 // ── State ────────────────────────────────────────────────────────────────
@@ -476,10 +476,10 @@ let lastLoft = rebuildHull();
 
 // ── Post-processing: ambient occlusion ───────────────────────────────────
 //
-// SSAOPass (screen-space AO) darkens crevices and concave-ish regions —
-// here mostly the gunwale corner where the hull surface curls inward and
-// the bow/stern where curvature pinches. Tuned for kayak scale (sub-metre
-// kernel radius). Contrast slider maps to kernelRadius (0 disables).
+// SAOPass (Scalable AO) — gives a direct saoIntensity knob that goes well
+// past 1, so we can crank contrast to crevice-shading-as-art. Kernel
+// radius is in screen-space pixels; saoScale tightens the depth falloff
+// for our small (kayak-scale) geometry.
 
 const _w0 = threeHost.clientWidth, _h0 = threeHost.clientHeight;
 const composer = new EffectComposer(renderer);
@@ -488,11 +488,18 @@ composer.setSize(_w0, _h0);
 
 composer.addPass(new RenderPass(scene, camera));
 
-const ssaoPass = new SSAOPass(scene, camera, _w0, _h0);
-ssaoPass.kernelRadius = 0.18;
-ssaoPass.minDistance  = 0.0005;
-ssaoPass.maxDistance  = 0.05;
-composer.addPass(ssaoPass);
+const saoPass = new SAOPass(scene, camera);
+saoPass.params.output           = SAOPass.OUTPUT.Default;
+saoPass.params.saoBias          = 0.4;
+saoPass.params.saoIntensity     = 1.0;   // overwritten by the contrast slider
+saoPass.params.saoScale         = 4.0;   // amplify depth-distance falloff
+saoPass.params.saoKernelRadius  = 200;   // px — broad sampling for soft falloff
+saoPass.params.saoMinResolution = 0;
+saoPass.params.saoBlur          = true;
+saoPass.params.saoBlurRadius    = 8;
+saoPass.params.saoBlurStdDev    = 4;
+saoPass.params.saoBlurDepthCutoff = 0.01;
+composer.addPass(saoPass);
 
 composer.addPass(new OutputPass());
 
@@ -502,7 +509,7 @@ const resizeObserver = new ResizeObserver(() => {
   if (w > 0 && h > 0) {
     renderer.setSize(w, h, false);
     composer.setSize(w, h);
-    ssaoPass.setSize(w, h);
+    saoPass.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   }
@@ -776,20 +783,25 @@ hullMaterialIn.color.set(colorInEl.value);
 colorOutEl.addEventListener('input', () => hullMaterialOut.color.set(colorOutEl.value));
 colorInEl .addEventListener('input', () => hullMaterialIn .color.set(colorInEl .value));
 
-// AO contrast slider — maps 0..1 to SSAO kernelRadius (0 disables the pass).
-// At v = 1 the kernel is ~0.5 m, which gives broad darkening across the
-// hull's whole concave-ish lower half; at v = 0.3 you mostly see crevice
-// darkening at the gunwale and bow/stern pinch.
+// AO contrast slider — drives SAO intensity nonlinearly so the upper third
+// of the slider gets aggressively darker. At 0% the pass is disabled.
+//   0%  → off
+//   25% → ~0.6  (subtle crevice darkening)
+//   50% → ~2.5  (clear shading)
+//   75% → ~7    (strong)
+//   100%→ ~16   (extreme — almost ink-line crevices)
 const aoEl  = document.getElementById('ao');
 const aoOut = document.getElementById('ao-out');
 function applyAO(v) {
   aoOut.textContent = (v * 100).toFixed(0) + '%';
   if (v <= 0.001) {
-    ssaoPass.enabled = false;
+    saoPass.enabled = false;
   } else {
-    ssaoPass.enabled = true;
-    ssaoPass.kernelRadius = 0.05 + v * 0.45;
-    ssaoPass.maxDistance  = 0.02 + v * 0.10;
+    saoPass.enabled = true;
+    // Cubic ramp + scale → big headroom at the top end.
+    saoPass.params.saoIntensity = 0.15 + v * v * v * 16;
+    // Also widen the kernel a little so high-contrast doesn't look pixelated.
+    saoPass.params.saoKernelRadius = 120 + v * 200;
   }
 }
 applyAO(parseFloat(aoEl.value));
