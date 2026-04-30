@@ -5,6 +5,7 @@ Small, self-contained interactive explorations of single concepts from kayak / h
 ## Index
 
 - [stability/](stability/) — editable hull cross-section with live KB / BM / KM / GM / GZ, primary and secondary stability metrics, and an annotated GZ-curve plot.
+- [loft/](loft/) — 3D hull lofted from a curved spine (rocker) and a set of cross-sections, with a rotatable Three.js view, side-view rocker editor, and cross-section editor. ([plan](loft-plan.md))
 
 ## Conventions
 

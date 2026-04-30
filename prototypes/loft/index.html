@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Loft — bArcas prototype</title>
+<link rel="stylesheet" href="styles.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<header>
+  <h1>Loft</h1>
+  <p class="subtitle">
+    Design a 3D kayak hull from a curved spine (rocker) and a set of cross-sections, lofted live.
+    <span class="hint">Drag the 3D view to rotate · scroll to zoom · double-click to reset.</span>
+  </p>
+  <p class="subtitle note">
+    <strong>Phase A — skeleton.</strong> Layout and panes are wired up; geometry is a placeholder. Spine and section editing arrive in phase&nbsp;B.
+  </p>
+</header>
+
+<main>
+  <section class="pane pane-3d">
+    <div class="pane-title">3D loft <span class="ref">— rotatable</span></div>
+    <div id="three-host"></div>
+  </section>
+
+  <aside class="pane pane-controls">
+    <div class="pane-title">Controls</div>
+    <div class="controls">
+      <label>Hull length <output id="length-out"></output>
+        <input type="range" id="length" min="3" max="7" step="0.05" value="5.2">
+      </label>
+      <label>Loft resolution
+        <select id="loft-res">
+          <option value="low">low (M=20, N=32)</option>
+          <option value="med" selected>med (M=30, N=64)</option>
+          <option value="high">high (M=60, N=128)</option>
+        </select>
+      </label>
+      <div class="station-list">
+        <div class="station-list-header">
+          <span>Stations</span>
+          <span class="station-count">5 of 5</span>
+        </div>
+        <ol id="stations"></ol>
+        <div class="station-actions">
+          <button type="button" id="add-station" disabled title="Phase D">+ add station</button>
+          <button type="button" id="remove-station" disabled title="Phase D">× remove</button>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i class="dot spine"></i>spine ctrl pt</span>
+        <span><i class="dot station"></i>station</span>
+        <span><i class="dot chine"></i>chine flag</span>
+      </div>
+    </div>
+  </aside>
+
+  <section class="pane pane-side">
+    <div class="pane-title">Side view <span class="ref">— X-Z, rocker editor</span></div>
+    <svg id="side-view" viewBox="-340 -140 680 240" preserveAspectRatio="xMidYMid meet" aria-label="Side view"></svg>
+    <p class="hint pane-hint">
+      Edit rocker by dragging spine control points (phase B). Sheer line shown ghosted; derived from cross-sections.
+    </p>
+  </section>
+
+  <section class="pane pane-section">
+    <div class="pane-title">
+      Cross-section <span class="ref">— body plan, station <span id="station-label">3</span> of 5</span>
+      <span class="cycle">
+        <button type="button" id="prev-station" aria-label="Previous station">◀</button>
+        <button type="button" id="next-station" aria-label="Next station">▶</button>
+      </span>
+    </div>
+    <svg id="section-view" viewBox="-340 -240 680 360" preserveAspectRatio="xMidYMid meet" aria-label="Cross-section editor"></svg>
+    <p class="hint pane-hint">
+      Drag control points to reshape (phase C). Right-click a point to toggle hard-chine flag (phase E).
+    </p>
+  </section>
+</main>
+
+<p class="footer">
+  Plan: <a href="../loft-plan.md">prototypes/loft-plan.md</a> ·
+  Source: <a href="https://github.com/aagimene/bArcas/tree/main/prototypes/loft" target="_blank" rel="noopener">github.com/aagimene/bArcas</a>.
+</p>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
