@@ -538,11 +538,12 @@ ssaoPass.blendMaterial = new THREE.ShaderMaterial({
   transparent: true,
   depthTest:  false,
   depthWrite: false,
-  blendSrc: THREE.DstColorFactor,
-  blendDst: THREE.ZeroFactor,
-  blendEquation: THREE.AddEquation,
-  blendSrcAlpha: THREE.DstAlphaFactor,
-  blendDstAlpha: THREE.ZeroFactor,
+  blending:           THREE.CustomBlending,
+  blendSrc:           THREE.DstColorFactor,
+  blendDst:           THREE.ZeroFactor,
+  blendEquation:      THREE.AddEquation,
+  blendSrcAlpha:      THREE.DstAlphaFactor,
+  blendDstAlpha:      THREE.ZeroFactor,
   blendEquationAlpha: THREE.AddEquation,
 });
 composer.addPass(ssaoPass);
