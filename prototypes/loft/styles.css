@@ -206,12 +206,26 @@ main {
 #section-view .label { font: 9px -apple-system, sans-serif; fill: #64748b; }
 #section-view .section-curve  { fill: none; stroke: #1f2937; stroke-width: 1.8; }
 #section-view .section-mirror { fill: none; stroke: #94a3b8; stroke-width: 1.2; stroke-dasharray: 3 3; }
+#section-view { cursor: crosshair; }  /* signals "click to add" */
+#section-view .section-curve  { pointer-events: none; }
+#section-view .section-mirror { pointer-events: none; }
+#section-view .axis           { pointer-events: none; }
+#section-view .water          { pointer-events: none; }
+#section-view .label          { pointer-events: none; }
+
 #section-view .ctrl-pt {
   fill: white; stroke: #2563eb; stroke-width: 1.4;
+  cursor: grab;
 }
+#section-view .ctrl-pt:active { cursor: grabbing; }
 #section-view .ctrl-pt.chine {
   fill: #b91c1c; stroke: white;
 }
+#section-view .ctrl-pt.keel {
+  fill: #2563eb; stroke: white; cursor: not-allowed;
+}
+#section-view .ctrl-hit       { fill: transparent; cursor: grab; }
+#section-view .ctrl-hit.keel  { cursor: not-allowed; pointer-events: none; }
 
 /* ── Footer ──────────────────────────────────────────────────── */
 

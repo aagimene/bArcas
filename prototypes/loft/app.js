@@ -615,11 +615,13 @@ function renderSideView() {
   }, 'bow'));
 }
 
+// Section-view scale constants — also used by drag-handler coordinate math.
+const SECTION_SCALE = 600; // px/m
+
 function renderSectionView() {
   sectionSvg.innerHTML = '';
-  const SCALE = 600; // px/m — section is small so big scale
-  const bOf = (b) => b * SCALE;
-  const nOf = (n) => -n * SCALE; // n is up; SVG y down
+  const bOf = (b) => b * SECTION_SCALE;
+  const nOf = (n) => -n * SECTION_SCALE; // n is up; SVG y down
 
   const station = state.stations[state.selectedStation];
 
@@ -644,13 +646,28 @@ function renderSectionView() {
   sectionSvg.appendChild(el('path', { class: 'section-curve',  d: stbdPath }));
   sectionSvg.appendChild(el('path', { class: 'section-mirror', d: portPath }));
 
-  // Control points (starboard half).
-  for (const p of station.points) {
+  // Control points (starboard half) — draggable, except the keel which is
+  // locked at (0, 0) (it must sit on the spine, by definition of the model).
+  station.points.forEach((p, i) => {
+    const isKeel = i === 0;
+    // Hit halo for easy grabbing on touch / pen.
     sectionSvg.appendChild(el('circle', {
-      cx: bOf(p.b), cy: nOf(p.n),
-      r: 4,
-      class: 'ctrl-pt' + (p.chine ? ' chine' : ''),
+      cx: bOf(p.b), cy: nOf(p.n), r: 14,
+      class: 'ctrl-hit' + (isKeel ? ' keel' : ''),
+      'data-drag': 'ctrl', 'data-idx': String(i),
     }));
+    sectionSvg.appendChild(el('circle', {
+      cx: bOf(p.b), cy: nOf(p.n), r: 4.2,
+      class: 'ctrl-pt' + (p.chine ? ' chine' : '') + (isKeel ? ' keel' : ''),
+      'data-drag': 'ctrl', 'data-idx': String(i),
+    }));
+  });
+
+  // Hint text near the keel for new users.
+  if (station.points.length <= 5) {
+    sectionSvg.appendChild(el('text', {
+      x: 0, y: 110, class: 'label', 'text-anchor': 'middle',
+    }, 'click to add · right-click a point to delete'));
   }
 }
 
@@ -748,6 +765,7 @@ function spineXToS(spine, targetX) {
 let drag = null;
 
 sideSvg.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return; // primary button only
   const target = e.target.closest('[data-drag]');
   if (!target) return;
   e.preventDefault();
@@ -807,6 +825,104 @@ function endDrag(e) {
 }
 sideSvg.addEventListener('pointerup',     endDrag);
 sideSvg.addEventListener('pointercancel', endDrag);
+
+// ── Cross-section drag / add / delete handlers ───────────────────────────
+//
+// Drag any non-keel control point in (b, n). Clicking empty space inserts a
+// new control point in the segment closest to the click. Right-click a
+// point to delete (the keel — index 0 — and final two-point sections are
+// protected). The keel is locked at (0, 0) by definition of the model.
+
+let sectionDrag = null;
+
+sectionSvg.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return; // ignore right/middle clicks (contextmenu handles delete)
+  const target = e.target.closest('[data-drag]');
+  if (!target) return;
+  e.preventDefault();
+  sectionDrag = { idx: +target.dataset.idx, pointerId: e.pointerId, moved: false };
+  sectionSvg.setPointerCapture(e.pointerId);
+});
+
+sectionSvg.addEventListener('pointermove', (e) => {
+  if (!sectionDrag) return;
+  const i = sectionDrag.idx;
+  if (i === 0) return; // keel locked
+  const { x, y } = svgToLocal(sectionSvg, e);
+  const b = Math.max(0, x / SECTION_SCALE);
+  const n = -y / SECTION_SCALE;
+  const station = state.stations[state.selectedStation];
+  station.points[i].b = b;
+  station.points[i].n = n;
+  sectionDrag.moved = true;
+  renderSectionView();
+  rebuildHull();
+});
+
+function endSectionDrag() {
+  if (!sectionDrag) return;
+  if (sectionDrag.pointerId != null && sectionSvg.hasPointerCapture(sectionDrag.pointerId)) {
+    sectionSvg.releasePointerCapture(sectionDrag.pointerId);
+  }
+  sectionDrag = null;
+}
+sectionSvg.addEventListener('pointerup',     endSectionDrag);
+sectionSvg.addEventListener('pointercancel', endSectionDrag);
+
+// Click empty space to add a new control point.
+sectionSvg.addEventListener('click', (e) => {
+  // Skip if click landed on a control point (drag/right-click handle those).
+  if (e.target.closest('[data-drag]')) return;
+  // Skip if a drag actually moved (defensive — pointerup fires click after).
+  if (sectionDrag && sectionDrag.moved) return;
+  const { x, y } = svgToLocal(sectionSvg, e);
+  const b = x / SECTION_SCALE;
+  const n = -y / SECTION_SCALE;
+  if (b < 0) return; // ignore clicks on the port mirror — it's read-only
+  const station = state.stations[state.selectedStation];
+  const insertIdx = nearestSegmentInsertIdx(station.points, b, n);
+  station.points.splice(insertIdx, 0, { b, n, chine: false });
+  renderStationList();
+  renderSectionView();
+  rebuildHull();
+});
+
+// Right-click a control point to delete it. Keel (idx 0) is protected, and
+// we keep at least 3 points so the natural-cubic spline stays valid.
+sectionSvg.addEventListener('contextmenu', (e) => {
+  const target = e.target.closest('[data-drag]');
+  if (!target) return;
+  e.preventDefault();
+  const i = +target.dataset.idx;
+  const station = state.stations[state.selectedStation];
+  if (i === 0 || station.points.length <= 3) return;
+  station.points.splice(i, 1);
+  renderStationList();
+  renderSectionView();
+  rebuildHull();
+});
+
+// Find the index at which a new (b, n) should be inserted into a section's
+// control-point list to land in the segment closest to the click. Returns
+// the insertion index (so splice(idx, 0, newPt) puts it between the chosen
+// segment's two existing endpoints).
+function nearestSegmentInsertIdx(points, clickB, clickN) {
+  let bestI = 0, bestDist = Infinity;
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i], c = points[i + 1];
+    const dx = c.b - a.b, dy = c.n - a.n;
+    const lenSq = dx * dx + dy * dy;
+    let t = ((clickB - a.b) * dx + (clickN - a.n) * dy) / (lenSq || 1);
+    t = Math.max(0, Math.min(1, t));
+    const px = a.b + t * dx, py = a.n + t * dy;
+    const dist = Math.hypot(clickB - px, clickN - py);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestI = i;
+    }
+  }
+  return bestI + 1;
+}
 
 // ── Initial render ───────────────────────────────────────────────────────
 
