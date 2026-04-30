@@ -54,9 +54,33 @@
           <input type="color" id="color-in" value="#ffc0cb">
         </label>
       </div>
-      <label>AO contrast <output id="ao-out"></output>
-        <input type="range" id="ao" min="0" max="1" step="0.01" value="0.5">
-      </label>
+      <details class="ao-details" open>
+        <summary>Ambient occlusion</summary>
+        <label class="ao-toggle">
+          <input type="checkbox" id="ao-enabled" checked>
+          Enabled
+        </label>
+        <label>kernel radius <output id="ao-kr-out"></output>
+          <input type="range" id="ao-kr" min="0.001" max="10" step="0.001" value="0.20">
+        </label>
+        <label>min distance <output id="ao-mn-out"></output>
+          <input type="range" id="ao-mn" min="0.00001" max="2" step="0.00001" value="0.0005">
+        </label>
+        <label>max distance <output id="ao-mx-out"></output>
+          <input type="range" id="ao-mx" min="0.0001" max="10" step="0.0001" value="0.05">
+        </label>
+        <label>output
+          <select id="ao-output">
+            <option value="0" selected>Default (beauty + AO)</option>
+            <option value="1">SSAO only</option>
+            <option value="2">Blur</option>
+            <option value="3">Beauty only</option>
+            <option value="4">Depth</option>
+            <option value="5">Normal</option>
+          </select>
+        </label>
+        <button type="button" id="ao-reset" class="ao-reset">reset to defaults</button>
+      </details>
       <div class="station-list">
         <div class="station-list-header">
           <span>Stations</span>

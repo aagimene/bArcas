@@ -10,7 +10,7 @@ import * as THREE       from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass }     from 'three/addons/postprocessing/RenderPass.js';
-import { SAOPass }        from 'three/addons/postprocessing/SAOPass.js';
+import { SSAOPass }       from 'three/addons/postprocessing/SSAOPass.js';
 import { OutputPass }     from 'three/addons/postprocessing/OutputPass.js';
 
 // ── State ────────────────────────────────────────────────────────────────
@@ -476,10 +476,9 @@ let lastLoft = rebuildHull();
 
 // ── Post-processing: ambient occlusion ───────────────────────────────────
 //
-// SAOPass (Scalable AO) — gives a direct saoIntensity knob that goes well
-// past 1, so we can crank contrast to crevice-shading-as-art. Kernel
-// radius is in screen-space pixels; saoScale tightens the depth falloff
-// for our small (kayak-scale) geometry.
+// SSAOPass — screen-space AO. The user-facing knobs (collapsible advanced
+// panel below) are the actual SSAOPass parameters; ranges go intentionally
+// far past sensible defaults so the look can be pushed to extremes.
 
 const _w0 = threeHost.clientWidth, _h0 = threeHost.clientHeight;
 const composer = new EffectComposer(renderer);
@@ -488,18 +487,11 @@ composer.setSize(_w0, _h0);
 
 composer.addPass(new RenderPass(scene, camera));
 
-const saoPass = new SAOPass(scene, camera);
-saoPass.params.output           = SAOPass.OUTPUT.Default;
-saoPass.params.saoBias          = 0.4;
-saoPass.params.saoIntensity     = 1.0;   // overwritten by the contrast slider
-saoPass.params.saoScale         = 4.0;   // amplify depth-distance falloff
-saoPass.params.saoKernelRadius  = 200;   // px — broad sampling for soft falloff
-saoPass.params.saoMinResolution = 0;
-saoPass.params.saoBlur          = true;
-saoPass.params.saoBlurRadius    = 8;
-saoPass.params.saoBlurStdDev    = 4;
-saoPass.params.saoBlurDepthCutoff = 0.01;
-composer.addPass(saoPass);
+const ssaoPass = new SSAOPass(scene, camera, _w0, _h0);
+ssaoPass.kernelRadius = 0.20;
+ssaoPass.minDistance  = 0.0005;
+ssaoPass.maxDistance  = 0.05;
+composer.addPass(ssaoPass);
 
 composer.addPass(new OutputPass());
 
@@ -509,7 +501,7 @@ const resizeObserver = new ResizeObserver(() => {
   if (w > 0 && h > 0) {
     renderer.setSize(w, h, false);
     composer.setSize(w, h);
-    saoPass.setSize(w, h);
+    ssaoPass.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   }
@@ -783,29 +775,69 @@ hullMaterialIn.color.set(colorInEl.value);
 colorOutEl.addEventListener('input', () => hullMaterialOut.color.set(colorOutEl.value));
 colorInEl .addEventListener('input', () => hullMaterialIn .color.set(colorInEl .value));
 
-// AO contrast slider — drives SAO intensity nonlinearly so the upper third
-// of the slider gets aggressively darker. At 0% the pass is disabled.
-//   0%  → off
-//   25% → ~0.6  (subtle crevice darkening)
-//   50% → ~2.5  (clear shading)
-//   75% → ~7    (strong)
-//   100%→ ~16   (extreme — almost ink-line crevices)
-const aoEl  = document.getElementById('ao');
-const aoOut = document.getElementById('ao-out');
-function applyAO(v) {
-  aoOut.textContent = (v * 100).toFixed(0) + '%';
-  if (v <= 0.001) {
-    saoPass.enabled = false;
-  } else {
-    saoPass.enabled = true;
-    // Cubic ramp + scale → big headroom at the top end.
-    saoPass.params.saoIntensity = 0.15 + v * v * v * 16;
-    // Also widen the kernel a little so high-contrast doesn't look pixelated.
-    saoPass.params.saoKernelRadius = 120 + v * 200;
-  }
+// ── Ambient occlusion — direct SSAOPass parameter knobs ──────────────────
+//
+// All four sliders + the output selector talk straight to the SSAOPass
+// fields. Ranges are intentionally permissive (kernel radius up to 10 m,
+// max distance up to 10 m) so the look can be pushed to extremes.
+
+const aoEnabledEl = document.getElementById('ao-enabled');
+const aoKrEl      = document.getElementById('ao-kr');
+const aoMnEl      = document.getElementById('ao-mn');
+const aoMxEl      = document.getElementById('ao-mx');
+const aoOutSel    = document.getElementById('ao-output');
+const aoKrOut     = document.getElementById('ao-kr-out');
+const aoMnOut     = document.getElementById('ao-mn-out');
+const aoMxOut     = document.getElementById('ao-mx-out');
+const aoResetBtn  = document.getElementById('ao-reset');
+
+const AO_DEFAULTS = {
+  enabled: true, kernelRadius: 0.20, minDistance: 0.0005, maxDistance: 0.05, output: 0,
+};
+
+const aoOutputModes = [
+  SSAOPass.OUTPUT.Default,
+  SSAOPass.OUTPUT.SSAO,
+  SSAOPass.OUTPUT.Blur,
+  SSAOPass.OUTPUT.Beauty,
+  SSAOPass.OUTPUT.Depth,
+  SSAOPass.OUTPUT.Normal,
+];
+
+function fmtFixed(v, digits) {
+  // Compact display: trim trailing zeros after the decimal.
+  return parseFloat(v).toFixed(digits).replace(/\.?0+$/, '');
 }
-applyAO(parseFloat(aoEl.value));
-aoEl.addEventListener('input', () => applyAO(parseFloat(aoEl.value)));
+
+function syncAOLabels() {
+  aoKrOut.textContent = fmtFixed(aoKrEl.value, 3) + ' m';
+  aoMnOut.textContent = fmtFixed(aoMnEl.value, 5) + ' m';
+  aoMxOut.textContent = fmtFixed(aoMxEl.value, 4) + ' m';
+}
+
+function applyAO() {
+  ssaoPass.enabled      = aoEnabledEl.checked;
+  ssaoPass.kernelRadius = parseFloat(aoKrEl.value);
+  ssaoPass.minDistance  = parseFloat(aoMnEl.value);
+  ssaoPass.maxDistance  = parseFloat(aoMxEl.value);
+  ssaoPass.output       = aoOutputModes[parseInt(aoOutSel.value, 10)] ?? aoOutputModes[0];
+  syncAOLabels();
+}
+
+[aoEnabledEl, aoKrEl, aoMnEl, aoMxEl, aoOutSel].forEach(elx =>
+  elx.addEventListener('input', applyAO)
+);
+
+aoResetBtn.addEventListener('click', () => {
+  aoEnabledEl.checked = AO_DEFAULTS.enabled;
+  aoKrEl.value        = AO_DEFAULTS.kernelRadius;
+  aoMnEl.value        = AO_DEFAULTS.minDistance;
+  aoMxEl.value        = AO_DEFAULTS.maxDistance;
+  aoOutSel.value      = String(AO_DEFAULTS.output);
+  applyAO();
+});
+
+applyAO();
 
 // ── Side-view drag handlers ──────────────────────────────────────────────
 //
