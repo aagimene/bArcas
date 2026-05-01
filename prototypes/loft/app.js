@@ -784,6 +784,18 @@ const sideSvg    = document.getElementById('side-view');
 const sectionSvg = document.getElementById('section-view');
 
 // Side view scale constants — also used by drag-handler coordinate math.
+// Return the deck-top n value for any station kind.
+// For interior stations: the last control point's n.
+// For endpoint stations: project the stemProfile's top point onto the local
+// up direction (localNx, localNz) at that station's spine position.
+function deckNOf(st, spine, localNx, localNz) {
+  if (st.kind === 'endpoint') {
+    const last = st.stemProfile[st.stemProfile.length - 1];
+    return last.dx * localNx + last.dz * localNz;
+  }
+  return st.points[st.points.length - 1].n;
+}
+
 const SIDE_SCALE_X = 100; // px/m horizontal
 const SIDE_SCALE_Z = 200; // px/m vertical (exaggerated so rocker is visible)
 
@@ -814,16 +826,17 @@ function renderSideView() {
     const sp = spineAt(spine, s);
     keelPath.push({ x: sp.p.x, z: sp.p.z });
     let sheerN;
-    if (s <= stations[0].s) sheerN = stations[0].points[stations[0].points.length - 1].n;
-    else if (s >= stations[stations.length - 1].s) sheerN = stations[stations.length - 1].points.slice(-1)[0].n;
+    if (s <= stations[0].s) sheerN = deckNOf(stations[0], spine, -sp.tz, sp.tx);
+    else if (s >= stations[stations.length - 1].s) sheerN = deckNOf(stations[stations.length - 1], spine, -sp.tz, sp.tx);
     else {
       sheerN = 0;
       for (let j = 0; j < stations.length - 1; j++) {
         const a = stations[j], b = stations[j + 1];
         if (s >= a.s && s <= b.s) {
           const t  = (s - a.s) / (b.s - a.s);
-          const aN = a.points[a.points.length - 1].n;
-          const bN = b.points[b.points.length - 1].n;
+          // Sample spine local frame once for both aN and bN (approximation: same frame at this s)
+          const aN = deckNOf(a, spine, -sp.tz, sp.tx);
+          const bN = deckNOf(b, spine, -sp.tz, sp.tx);
           sheerN   = aN + t * (bN - aN);
           break;
         }
@@ -995,7 +1008,7 @@ function renderSectionView() {
 
   const station    = state.stations[state.selectedStation];
   const isEndpoint = station.kind === 'endpoint';
-  const lastIdx    = station.points.length - 1;
+  const lastIdx    = isEndpoint ? 1 : station.points.length - 1;
 
   // Centerline (b = 0).
   sectionSvg.appendChild(el('line', {
@@ -1040,10 +1053,9 @@ function renderSectionView() {
     sectionSvg.appendChild(el('path', { class: 'section-mirror', d: portPath }));
   }
 
-  // Control points. Lock the keel (idx 0) at every station — it must sit
-  // on the spine by the global model rule. The deck-end (last idx) and
-  // every centerline point on stem stations are b-locked but n-draggable.
-  station.points.forEach((p, i) => {
+  // Control points — interior stations only. Endpoints are edited in the
+  // side view via the stem sheer profile; no ctrl-pt elements here.
+  if (!isEndpoint) station.points.forEach((p, i) => {
     const isKeel       = i === 0;
     const isCenterline = isEndpoint || i === lastIdx;          // b locked to 0
     const cls = (isKeel ? 'keel ' : '') + (isCenterline ? 'centerline ' : '');
@@ -1057,13 +1069,13 @@ function renderSectionView() {
       class: ('ctrl-pt ' + cls + (p.chine ? 'chine' : '')).trim(),
       'data-drag': 'ctrl', 'data-idx': String(i),
     }));
-  });
+  }); // end if (!isEndpoint) forEach
 
   // Hint text — different for endpoints vs middle stations.
   if (isEndpoint) {
     sectionSvg.appendChild(el('text', {
       x: 0, y: 110, class: 'label', 'text-anchor': 'middle',
-    }, 'stem · drag the deck point up / down'));
+    }, 'stem station — edit sheer profile in the side view'));
   } else if (station.points.length <= 5) {
     sectionSvg.appendChild(el('text', {
       x: 0, y: 110, class: 'label', 'text-anchor': 'middle',
@@ -1543,6 +1555,7 @@ sectionSvg.addEventListener('pointermove', (e) => {
   if (!sectionDrag) return;
   const i       = sectionDrag.idx;
   const station = state.stations[state.selectedStation];
+  if (!station || station.kind === 'endpoint') return;
   if (i === 0) return; // keel locked at (0, 0) by the global rule
   const lastIdx      = station.points.length - 1;
   const isEndpoint   = station.kind === 'endpoint';
