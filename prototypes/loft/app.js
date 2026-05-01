@@ -106,9 +106,21 @@ function stationsPlaceholder() {
     };
   });
   return [
-    { s: 0, kind: 'endpoint', points: defaultStem(DEFAULT_DECK_N) },
+    { s: 0, kind: 'endpoint', stemProfile: defaultStemProfile() },
     ...interior,
-    { s: 1, kind: 'endpoint', points: defaultStem(DEFAULT_DECK_N) },
+    { s: 1, kind: 'endpoint', stemProfile: defaultStemProfile() },
+  ];
+}
+
+// Stem sheer profile: an ordered list of offsets (dx, dz) relative to the
+// spine endpoint at that station. dx is longitudinal offset (+ toward bow),
+// dz is vertical offset (+ upward). The bottom point is always (0, 0) —
+// locked to the spine. The deck point is directly above by default. Adding
+// intermediate points curves the stem profile in X-Z (visible in side view).
+function defaultStemProfile() {
+  return [
+    { dx: 0, dz: 0 },            // keel-end — locked on spine
+    { dx: 0, dz: DEFAULT_DECK_N },// deck-end — editable
   ];
 }
 
@@ -125,15 +137,29 @@ function defaultSection(halfBeam, deckN) {
   ];
 }
 
-// Stem: two centerline points. The bow/stern collapse to a vertical edge
-// in the centerline plane (kayak prow). Keel point stays at n=0 (on the
-// spine) by the same global rule as middle stations; only the deck-end's
-// n is meant to be draggable in the section editor.
-function defaultStem(deckN) {
-  return [
-    { b: 0, n: 0,     chine: false }, // keel-end (on spine, locked)
-    { b: 0, n: deckN, chine: false }, // deck-end (draggable in n)
-  ];
+// Convert a stem sheer profile to a sampled (b=0, n) section for the loft
+// pipeline. Each profile point (dx, dz) is an offset from the spine
+// endpoint; n is computed by projecting onto the local-up direction
+// (localNx, localNz), which is the spine tangent rotated 90° in X-Z.
+function stemProfileToSection(stemProfile, localNx, localNz, N) {
+  // Dense-sample the natural cubic through the profile in (dx, dz) space.
+  const dense = sampleSpline(stemProfile, 'dx', 'dz', 24);
+  const arc = [0];
+  for (let i = 1; i < dense.length; i++)
+    arc.push(arc[i - 1] + Math.hypot(dense[i].x - dense[i - 1].x, dense[i].y - dense[i - 1].y));
+  const total = arc[arc.length - 1] || 1;
+  const samples = [];
+  for (let k = 0; k < N; k++) {
+    const target = (k / (N - 1)) * total;
+    let lo = 0;
+    while (lo < dense.length - 1 && arc[lo + 1] < target) lo++;
+    const hi = Math.min(dense.length - 1, lo + 1);
+    const t  = arc[hi] === arc[lo] ? 0 : (target - arc[lo]) / (arc[hi] - arc[lo]);
+    const dx = dense[lo].x + t * (dense[hi].x - dense[lo].x);
+    const dz = dense[lo].y + t * (dense[hi].y - dense[lo].y);
+    samples.push({ b: 0, n: dx * localNx + dz * localNz });
+  }
+  return samples;
 }
 
 // ── Geometry helpers (shared placeholders for now) ───────────────────────
@@ -317,7 +343,13 @@ function buildLoft(state) {
   // at s = 0 and s = 1, so we don't need synthetic degenerate endpoints.
   const stationsSorted = state.stations.slice().sort((a, b) => a.s - b.s);
   const ss             = stationsSorted.map(st => st.s);
-  const stationSamples = stationsSorted.map(st => sampleSection(st.points, N));
+  const stationSamples = stationsSorted.map(st => {
+    if (st.kind === 'endpoint') {
+      const { tx, tz } = spineAt(spine, st.s);
+      return stemProfileToSection(st.stemProfile, -tz, tx, N);
+    }
+    return sampleSection(st.points, N);
+  });
 
   // Per-transverse-index splines b_k(s), n_k(s).
   const bSplines = new Array(N);
@@ -388,10 +420,9 @@ function buildLoft(state) {
   const stationRows = stationsSorted.map((st, idx) => {
     const { p, tx, tz } = spineAt(spine, st.s);
     const nx = -tz, nz = tx;
-    const samp = stationSamples[idx];
     return {
       kind: st.kind,
-      points: samp.map(({ b, n }) => ({
+      points: stationSamples[idx].map(({ b, n }) => ({
         x: p.x + n * nx, y: b, z: p.z + n * nz,
       })),
     };
@@ -412,7 +443,15 @@ function sectionAtS(state, s, numPoints = 7) {
   const N_DENSE = 96;
   const stationsSorted = state.stations.slice().sort((a, b) => a.s - b.s);
   const ss             = stationsSorted.map(st => st.s);
-  const stationSamples = stationsSorted.map(st => sampleSection(st.points, N_DENSE));
+  const spSampled      = sampledSpine(state.spine, 64);
+  const spineObj       = { ctrl: state.spine, sampled: spSampled };
+  const stationSamples = stationsSorted.map(st => {
+    if (st.kind === 'endpoint') {
+      const { tx, tz } = spineAt(spineObj, st.s);
+      return stemProfileToSection(st.stemProfile, -tz, tx, N_DENSE);
+    }
+    return sampleSection(st.points, N_DENSE);
+  });
 
   // Evaluate per-transverse-index splines at this s.
   const dense = new Array(N_DENSE);
@@ -903,6 +942,47 @@ function renderSideView() {
     x: xOf(state.spine.paddler.x), y: yOf(state.spine.paddler.z) - 12,
     class: 'label paddler-label', 'text-anchor': 'middle',
   }, 'paddler'));
+
+  // ── Stem sheer profile overlay (visible when an endpoint is selected) ──
+  const selSt = state.stations[state.selectedStation];
+  if (selSt && selSt.kind === 'endpoint') {
+    const { p: ep } = spineAt(spine, selSt.s);
+
+    // World-space profile points.
+    const profileWorld = selSt.stemProfile.map(pt => ({
+      x: ep.x + pt.dx, z: ep.z + pt.dz,
+    }));
+
+    // Draw the dense-sampled stem curve.
+    const denseStem = sampleSpline(selSt.stemProfile, 'dx', 'dz', 24);
+    sideSvg.appendChild(el('path', {
+      class: 'stem-curve',
+      d: 'M ' + denseStem.map(p => `${xOf(ep.x + p.x).toFixed(2)} ${yOf(ep.z + p.y).toFixed(2)}`).join(' L '),
+    }));
+
+    // Control points with hit halos.
+    profileWorld.forEach((wp, i) => {
+      const isKeel = i === 0;
+      sideSvg.appendChild(el('circle', {
+        cx: xOf(wp.x), cy: yOf(wp.z), r: 14,
+        class: 'stem-hit' + (isKeel ? ' keel' : ''),
+        'data-drag': 'stem-pt', 'data-idx': String(i),
+      }));
+      sideSvg.appendChild(el('circle', {
+        cx: xOf(wp.x), cy: yOf(wp.z), r: 4.5,
+        class: 'stem-pt' + (isKeel ? ' keel' : ''),
+        'data-drag': 'stem-pt', 'data-idx': String(i),
+      }));
+    });
+
+    // Hint along the side.
+    sideSvg.appendChild(el('text', {
+      x: xOf(ep.x) + (selSt.s === 0 ? -6 : 6),
+      y: yOf(ep.z + DEFAULT_DECK_N / 2),
+      class: 'label stem-hint',
+      'text-anchor': selSt.s === 0 ? 'end' : 'start',
+    }, 'sheer profile'));
+  }
 }
 
 // Section-view scale constants — also used by drag-handler coordinate math.
@@ -932,14 +1012,24 @@ function renderSectionView() {
   }, 'keel (n = 0, on spine)'));
 
   if (isEndpoint) {
-    // Stem station: just two centerline points connected by a vertical
-    // line on the centerline. No port mirror needed (b = 0 throughout).
-    const a = station.points[0], c = station.points[lastIdx];
+    // Stem station: the sheer profile is edited in the side view (orange
+    // dots). Here we just show the projected local-frame outline (a nearly
+    // vertical line at b=0) and direct the user to the side view.
+    const spSampled = sampledSpine(state.spine, 64);
+    const { tx, tz } = spineAt({ ctrl: state.spine, sampled: spSampled }, station.s);
+    const localNx = -tz, localNz = tx;
+    const nVals = station.stemProfile.map(pt => pt.dx * localNx + pt.dz * localNz);
+    const nMin = Math.min(...nVals), nMax = Math.max(...nVals);
     sectionSvg.appendChild(el('line', {
-      x1: bOf(0), y1: nOf(a.n),
-      x2: bOf(0), y2: nOf(c.n),
+      x1: bOf(0), y1: nOf(nMin), x2: bOf(0), y2: nOf(nMax),
       class: 'section-curve',
     }));
+    sectionSvg.appendChild(el('text', {
+      x: 0, y: nOf(nMax) - 12, class: 'label', 'text-anchor': 'middle',
+    }, `deck n ≈ ${nMax.toFixed(3)} m`));
+    sectionSvg.appendChild(el('text', {
+      x: 0, y: 110, class: 'label', 'text-anchor': 'middle',
+    }, 'stem station — edit sheer profile in the side view'));
   } else {
     // Closed-loop section: dense spline through all points (starts and
     // ends at b = 0 — the keel and deck centerlines).
@@ -1007,7 +1097,8 @@ function renderStationList() {
     }
     const pips = document.createElement('span');
     pips.className = 'pips';
-    pips.textContent = '●'.repeat(Math.min(st.points.length, 9));
+    const ptCount = st.kind === 'endpoint' ? st.stemProfile.length : st.points.length;
+    pips.textContent = '●'.repeat(Math.min(ptCount, 9));
     li.append(name, pips);
     li.addEventListener('click', () => selectStation(i));
     stationsOl.appendChild(li);
@@ -1298,7 +1389,18 @@ sideSvg.addEventListener('pointermove', (e) => {
   const wz = -y / SIDE_SCALE_Z;
   drag.moved = true;
 
-  if (drag.kind.startsWith('anchor-') || drag.kind.startsWith('handle-')) {
+  if (drag.kind === 'stem-pt') {
+    const i  = drag.idx;
+    if (i === 0) return; // keel locked on spine
+    const st = state.stations[state.selectedStation];
+    if (!st || st.kind !== 'endpoint') return;
+    const spSampled = sampledSpine(state.spine, 64);
+    const { p: ep } = spineAt({ ctrl: state.spine, sampled: spSampled }, st.s);
+    st.stemProfile[i] = { dx: wx - ep.x, dz: wz - ep.z };
+    drag.moved = true;
+    renderSideView();
+    rebuildHull();
+  } else if (drag.kind.startsWith('anchor-') || drag.kind.startsWith('handle-')) {
     const sp = state.spine;
     if (drag.kind === 'anchor-stern') {
       sp.stern.x = wx; sp.stern.z = wz;
@@ -1360,6 +1462,64 @@ function endDrag(e) {
 }
 sideSvg.addEventListener('pointerup',     endDrag);
 sideSvg.addEventListener('pointercancel', endDrag);
+
+// ── Stem sheer profile editing (side view) ───────────────────────────────
+//
+// Click empty space near the stem to add a control point.
+// Right-click a stem-pt to delete (keel protected; min 2 points).
+// Drag a stem-pt to move it in (dx, dz) space.
+
+sideSvg.addEventListener('click', (e) => {
+  if (e.button !== 0) return;
+  const st = state.stations[state.selectedStation];
+  if (!st || st.kind !== 'endpoint') return;
+  if (e.target.closest('[data-drag]')) return;
+  if (drag && drag.moved) return;
+
+  const { x, y } = svgToLocal(sideSvg, e);
+  const wx = x / SIDE_SCALE_X, wz = -y / SIDE_SCALE_Z;
+
+  const spSampled = sampledSpine(state.spine, 64);
+  const spineObj  = { ctrl: state.spine, sampled: spSampled };
+  const { p: ep } = spineAt(spineObj, st.s);
+  const dx = wx - ep.x, dz = wz - ep.z;
+
+  // Only add if click is near the existing stem curve.
+  const pts = st.stemProfile;
+  let minDist = Infinity;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const ddx = b.dx - a.dx, ddz = b.dz - a.dz;
+    const lenSq = ddx * ddx + ddz * ddz;
+    let t = lenSq > 0 ? ((dx - a.dx) * ddx + (dz - a.dz) * ddz) / lenSq : 0;
+    t = Math.max(0, Math.min(1, t));
+    const px = a.dx + t * ddx, pz = a.dz + t * ddz;
+    minDist = Math.min(minDist, Math.hypot(dx - px, dz - pz));
+  }
+  const hitRadius = 0.12; // metres — snap zone
+  if (minDist > hitRadius) return;
+
+  // Insert in correct sorted order by dz.
+  let insertIdx = pts.findIndex(p => p.dz > dz);
+  if (insertIdx <= 0) insertIdx = 1;               // never before keel (0)
+  if (insertIdx >= pts.length) insertIdx = pts.length - 1; // never after deck
+  pts.splice(insertIdx, 0, { dx, dz });
+  renderSideView();
+  rebuildHull();
+});
+
+sideSvg.addEventListener('contextmenu', (e) => {
+  const target = e.target.closest('[data-drag="stem-pt"]');
+  if (!target) return;
+  e.preventDefault();
+  const i  = +target.dataset.idx;
+  const st = state.stations[state.selectedStation];
+  if (!st || st.kind !== 'endpoint') return;
+  if (i === 0 || st.stemProfile.length <= 2) return; // protect keel + min 2
+  st.stemProfile.splice(i, 1);
+  renderSideView();
+  rebuildHull();
+});
 
 // ── Cross-section drag / add / delete handlers ───────────────────────────
 //
