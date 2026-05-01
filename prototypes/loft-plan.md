@@ -167,7 +167,8 @@ Each phase is a self-contained commit, shippable to GitHub Pages.
 | C | Cross-section editor wired up; station selection works across panes |
 | D | Add / remove station, with seed-from-current-loft on add |
 | E | Closed topology — bow / stern stem-line stations (2 centerline points each), closed-loop sections with a flat default deck, centerline-locked deck-end on every station |
-| F | Hard-chine flags + longitudinal chine handling + sharp-edge shading in 3D |
+| F | Sheer editor — stem stations get an X-Z profile editor (bottom point on rocker, add/move control points above it to shape the bow/stern outline from the side) |
+| G | Hard-chine flags + longitudinal chine handling + sharp-edge shading in 3D |
 | G | 3D view polish: smooth shading, lighting, station bands, camera reset, sheer overlay in side view |
 
 A–C carry most of the work; D–G are layered polish.

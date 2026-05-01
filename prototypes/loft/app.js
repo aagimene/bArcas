@@ -34,16 +34,57 @@ const state = {
   stations: stationsPlaceholder(),
 };
 
+// ── Rocker spine: cubic Bézier with explicit tangent handles ─────────────
+//
+// The spine is two cubic Bézier segments joined at the paddler position:
+//
+//   Seg 1 (stern → paddler):  [stern, stern+sternHandle, paddler-dir*aftLen, paddler]
+//   Seg 2 (paddler → bow):    [paddler, paddler+dir*foreLen, bow+bowHandle,  bow]
+//
+// "dir" is the unit vector at angle `paddlerAngle`. The two paddler handles
+// are anti-parallel (same direction, independent lengths), giving C¹
+// continuity with different fore/aft curve bias — the key design knob for
+// rocker profile.  Stern and bow each have one free handle that controls
+// how the curve arrives at / departs from the tip.
+//
+// sternHandle / bowHandle are stored as vectors (dx, dz) from their anchor.
+// That matches the "drag handle endpoint" UX.
+
 function spinePlaceholder(L) {
-  // Mild rocker: keel-line dips ~0.04 m at midship.
   const half = L / 2;
-  return [
-    { x: -half,        z:  0.04 }, // stern point
-    { x: -half * 0.6,  z: -0.02 },
-    { x:  0,           z: -0.04 },
-    { x:  half * 0.6,  z: -0.02 },
-    { x:  half,        z:  0.04 }, // bow point
-  ];
+  return {
+    stern:         { x: -half,  z:  0.04 },
+    sternHandle:   { dx: half * 0.35, dz: -0.03 },  // outgoing from stern, aims at paddler
+
+    paddler:       { x:  0,     z: -0.04 },          // seat / lowest point
+    paddlerAngle:  0,                                 // tangent direction (radians)
+    paddlerAftLen: half * 0.35,                       // handle length toward stern
+    paddlerForeLen:half * 0.35,                       // handle length toward bow
+
+    bow:           { x:  half,  z:  0.04 },
+    bowHandle:     { dx: -half * 0.35, dz: -0.03 },  // incoming to bow, from paddler direction
+  };
+}
+
+// Compute the four Bézier control-point positions from the spine model.
+function spineHandles(sp) {
+  const dir = { x: Math.cos(sp.paddlerAngle), z: Math.sin(sp.paddlerAngle) };
+  return {
+    sCtrl: { x: sp.stern.x   + sp.sternHandle.dx,           z: sp.stern.z   + sp.sternHandle.dz },
+    pAft:  { x: sp.paddler.x - dir.x * sp.paddlerAftLen,    z: sp.paddler.z - dir.z * sp.paddlerAftLen },
+    pFore: { x: sp.paddler.x + dir.x * sp.paddlerForeLen,   z: sp.paddler.z + dir.z * sp.paddlerForeLen },
+    bCtrl: { x: sp.bow.x     + sp.bowHandle.dx,             z: sp.bow.z     + sp.bowHandle.dz },
+  };
+}
+
+// Point on a cubic Bézier at parameter t. Returns {x, y} where y = z,
+// matching the {x, y} convention used throughout the sampled-spine pipeline.
+function cubicBezierPt(p0, p1, p2, p3, t) {
+  const u = 1 - t;
+  return {
+    x: u*u*u*p0.x + 3*u*u*t*p1.x + 3*u*t*t*p2.x + t*t*t*p3.x,
+    y: u*u*u*p0.z + 3*u*u*t*p1.z + 3*u*t*t*p2.z + t*t*t*p3.z,
+  };
 }
 
 function stationsPlaceholder() {
@@ -140,17 +181,20 @@ function sampleSpline(points, xKey, yKey, samplesPerSpan = 16) {
   return out;
 }
 
-// Sample the spine in (X, Z) and accumulate arc length for parameterization.
-function sampledSpine(spine, samplesPerSpan = 32) {
-  const pts = sampleSpline(spine, 'x', 'z', samplesPerSpan);
+// Sample the Bézier rocker spine and accumulate arc length for
+// parameterization. `steps` is split evenly over the two segments.
+function sampledSpine(sp, steps = 64) {
+  const { sCtrl, pAft, pFore, bCtrl } = spineHandles(sp);
+  const half = Math.ceil(steps / 2);
+  const pts  = [];
+  for (let i = 0; i <= half; i++)
+    pts.push(cubicBezierPt(sp.stern,   sCtrl, pAft,   sp.paddler, i / half));
+  for (let i = 1; i <= half; i++)
+    pts.push(cubicBezierPt(sp.paddler, pFore, bCtrl,  sp.bow,     i / half));
   const arc = [0];
-  for (let i = 1; i < pts.length; i++) {
-    const dx = pts[i].x - pts[i - 1].x;
-    const dy = pts[i].y - pts[i - 1].y;
-    arc.push(arc[i - 1] + Math.hypot(dx, dy));
-  }
-  const total = arc[arc.length - 1];
-  return { pts, arc, total };
+  for (let i = 1; i < pts.length; i++)
+    arc.push(arc[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+  return { pts, arc, total: arc[arc.length - 1] };
 }
 
 // Look up the (X, Z) point and tangent at normalized arc length s ∈ [0, 1].
@@ -765,24 +809,57 @@ function renderSideView() {
     d: 'M ' + keelPath.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.z).toFixed(2)}`).join(' L '),
   }));
 
-  // Spine control polyline.
+  // ── Bézier rocker spine ──────────────────────────────────────────────
+  const sp = state.spine;
+  const h  = spineHandles(sp);
+
+  // Handle lines (anchor → handle endpoint) drawn before the curve so the
+  // curve renders on top.
+  for (const [ax, az, hx, hz] of [
+    [sp.stern.x,   sp.stern.z,   h.sCtrl.x, h.sCtrl.z],
+    [sp.paddler.x, sp.paddler.z, h.pAft.x,  h.pAft.z ],
+    [sp.paddler.x, sp.paddler.z, h.pFore.x, h.pFore.z],
+    [sp.bow.x,     sp.bow.z,     h.bCtrl.x, h.bCtrl.z],
+  ]) {
+    sideSvg.appendChild(el('line', {
+      x1: xOf(ax), y1: yOf(az), x2: xOf(hx), y2: yOf(hz),
+      class: 'handle-line',
+    }));
+  }
+
+  // Actual Bézier curve (rendered from sampled points — already computed).
   sideSvg.appendChild(el('path', {
     class: 'spine-line',
-    d: 'M ' + state.spine.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.z).toFixed(2)}`).join(' L '),
+    d: 'M ' + sampled.pts.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.y).toFixed(2)}`).join(' L '),
   }));
-  // Spine control points (with invisible halo for easy hit-testing).
-  state.spine.forEach((p, i) => {
+
+  // Handle endpoint dots (small).
+  const handleDots = [
+    ['handle-stern',       h.sCtrl],
+    ['handle-paddler-aft', h.pAft ],
+    ['handle-paddler-fore',h.pFore],
+    ['handle-bow',         h.bCtrl],
+  ];
+  for (const [id, p] of handleDots) {
+    sideSvg.appendChild(el('circle', { cx: xOf(p.x), cy: yOf(p.z), r: 10, class: 'handle-hit', 'data-drag': id }));
+    sideSvg.appendChild(el('circle', { cx: xOf(p.x), cy: yOf(p.z), r: 3.5, class: 'spine-handle', 'data-drag': id }));
+  }
+
+  // Anchor points (large): stern, paddler, bow.
+  const anchorDots = [
+    ['anchor-stern',   sp.stern  ],
+    ['anchor-paddler', sp.paddler],
+    ['anchor-bow',     sp.bow    ],
+  ];
+  for (const [id, p] of anchorDots) {
+    const isPaddler = id === 'anchor-paddler';
+    sideSvg.appendChild(el('circle', { cx: xOf(p.x), cy: yOf(p.z), r: 14, class: 'spine-hit', 'data-drag': id }));
     sideSvg.appendChild(el('circle', {
-      cx: xOf(p.x), cy: yOf(p.z), r: 12,
-      class: 'spine-hit',
-      'data-drag': 'spine', 'data-idx': String(i),
+      cx: xOf(p.x), cy: yOf(p.z), r: 5,
+      class: 'spine-anchor' + (isPaddler ? ' paddler' : ''),
+      'data-drag': id,
     }));
-    sideSvg.appendChild(el('circle', {
-      cx: xOf(p.x), cy: yOf(p.z), r: 4.2,
-      class: 'spine-pt',
-      'data-drag': 'spine', 'data-idx': String(i),
-    }));
-  });
+  }
 
   // Station markers along the spine — also draggable along arc length.
   // Bow / stern (kind 'endpoint') are visually represented by the spine
@@ -816,14 +893,16 @@ function renderSideView() {
 
   // Endpoint labels follow the actual spine endpoints (which are the same
   // draggable spine control points as any other).
-  const sternX = state.spine[0].x;
-  const bowX   = state.spine[state.spine.length - 1].x;
   sideSvg.appendChild(el('text', {
-    x: xOf(sternX), y: yOf(0) + 22, class: 'label', 'text-anchor': 'middle',
+    x: xOf(state.spine.stern.x), y: yOf(0) + 22, class: 'label', 'text-anchor': 'middle',
   }, 'stern'));
   sideSvg.appendChild(el('text', {
-    x: xOf(bowX), y: yOf(0) + 22, class: 'label', 'text-anchor': 'middle',
+    x: xOf(state.spine.bow.x), y: yOf(0) + 22, class: 'label', 'text-anchor': 'middle',
   }, 'bow'));
+  sideSvg.appendChild(el('text', {
+    x: xOf(state.spine.paddler.x), y: yOf(state.spine.paddler.z) - 12,
+    class: 'label paddler-label', 'text-anchor': 'middle',
+  }, 'paddler'));
 }
 
 // Section-view scale constants — also used by drag-handler coordinate math.
@@ -1044,12 +1123,20 @@ syncStationButtons();
 // Length slider — proportionally rescales the spine X coordinates so the
 // user's interior rocker shape is preserved (just stretched/compressed).
 lengthEl.addEventListener('input', () => {
-  const newL = parseFloat(lengthEl.value);
-  const last = state.spine.length - 1;
-  const currentL = state.spine[last].x - state.spine[0].x;
+  const newL     = parseFloat(lengthEl.value);
+  const currentL = state.spine.bow.x - state.spine.stern.x;
   if (currentL > 0) {
     const ratio = newL / currentL;
-    for (const p of state.spine) p.x *= ratio;
+    const sp = state.spine;
+    sp.stern.x          *= ratio;
+    sp.paddler.x         *= ratio;
+    sp.bow.x             *= ratio;
+    sp.sternHandle.dx    *= ratio;
+    sp.bowHandle.dx      *= ratio;
+    sp.paddlerAftLen     *= ratio;
+    sp.paddlerForeLen    *= ratio;
+    // Z values and handle dz are intentionally not scaled — rocker depth
+    // shouldn't stretch with hull length.
   }
   state.length = newL;
   lengthOut.textContent = newL.toFixed(2) + ' m';
@@ -1211,17 +1298,40 @@ sideSvg.addEventListener('pointermove', (e) => {
   const wz = -y / SIDE_SCALE_Z;
   drag.moved = true;
 
-  if (drag.kind === 'spine') {
-    const i    = drag.idx;
-    const last = state.spine.length - 1;
-    // Endpoints are free to move in X (set hull length); interior points
-    // are clamped between their neighbors so the spine stays monotonic.
-    let nx = wx;
-    if (i > 0)    nx = Math.max(nx, state.spine[i - 1].x + 0.02);
-    if (i < last) nx = Math.min(nx, state.spine[i + 1].x - 0.02);
-    state.spine[i].x = nx;
-    state.spine[i].z = wz;
-    state.length = state.spine[last].x - state.spine[0].x;
+  if (drag.kind.startsWith('anchor-') || drag.kind.startsWith('handle-')) {
+    const sp = state.spine;
+    if (drag.kind === 'anchor-stern') {
+      sp.stern.x = wx; sp.stern.z = wz;
+    } else if (drag.kind === 'anchor-bow') {
+      sp.bow.x = wx; sp.bow.z = wz;
+    } else if (drag.kind === 'anchor-paddler') {
+      // Clamp paddler X strictly between stern and bow so arc-length
+      // parameterization stays monotonic.
+      sp.paddler.x = Math.max(sp.stern.x + 0.05, Math.min(sp.bow.x - 0.05, wx));
+      sp.paddler.z = wz;
+    } else if (drag.kind === 'handle-stern') {
+      sp.sternHandle.dx = wx - sp.stern.x;
+      sp.sternHandle.dz = wz - sp.stern.z;
+    } else if (drag.kind === 'handle-bow') {
+      sp.bowHandle.dx = wx - sp.bow.x;
+      sp.bowHandle.dz = wz - sp.bow.z;
+    } else if (drag.kind === 'handle-paddler-fore') {
+      const dx = wx - sp.paddler.x, dz = wz - sp.paddler.z;
+      const len = Math.hypot(dx, dz);
+      if (len > 0.01) {
+        sp.paddlerAngle   = Math.atan2(dz, dx);
+        sp.paddlerForeLen = len;
+      }
+    } else if (drag.kind === 'handle-paddler-aft') {
+      const dx = wx - sp.paddler.x, dz = wz - sp.paddler.z;
+      const len = Math.hypot(dx, dz);
+      if (len > 0.01) {
+        // Aft handle points in -dir, so angle is flipped.
+        sp.paddlerAngle  = Math.atan2(-dz, -dx);
+        sp.paddlerAftLen = len;
+      }
+    }
+    state.length = sp.bow.x - sp.stern.x;
     lengthEl.value = state.length.toFixed(2);
     lengthOut.textContent = state.length.toFixed(2) + ' m';
     renderSideView();
