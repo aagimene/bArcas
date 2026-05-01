@@ -14,6 +14,12 @@ import { SSAOPass }       from 'three/addons/postprocessing/SSAOPass.js';
 import { ShaderPass }     from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass }     from 'three/addons/postprocessing/OutputPass.js';
 
+// ── Constants ────────────────────────────────────────────────────────────
+// Declared before state so stationsPlaceholder() can reference them without
+// hitting the temporal dead zone.
+
+const DEFAULT_DECK_N = 0.30; // default deck-top height above keel, metres
+
 // ── State ────────────────────────────────────────────────────────────────
 
 const state = {
@@ -39,11 +45,6 @@ function spinePlaceholder(L) {
     { x:  half,        z:  0.04 }, // bow point
   ];
 }
-
-// Default deck height (n) at the centerline. The default look is a nearly
-// flat top deck across the boat, so all stations get the same deck-n and
-// the deckline appears flat in the side view.
-const DEFAULT_DECK_N = 0.30;
 
 function stationsPlaceholder() {
   // Sections (kind 'interior') are closed loops in the local (b, n) frame:
