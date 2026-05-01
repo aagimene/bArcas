@@ -325,8 +325,16 @@ main {
 #section-view .ctrl-pt.keel {
   fill: #2563eb; stroke: white; cursor: not-allowed;
 }
-#section-view .ctrl-hit       { fill: transparent; cursor: grab; }
-#section-view .ctrl-hit.keel  { cursor: not-allowed; pointer-events: none; }
+#section-view .ctrl-pt.centerline {
+  fill: #93c5fd; stroke: #1e3a8a; cursor: ns-resize;
+}
+#section-view .ctrl-pt.centerline.keel {
+  fill: #2563eb; stroke: white; cursor: not-allowed;
+}
+#section-view .ctrl-hit               { fill: transparent; cursor: grab; }
+#section-view .ctrl-hit.centerline    { cursor: ns-resize; }
+#section-view .ctrl-hit.keel,
+#section-view .ctrl-hit.centerline.keel { cursor: not-allowed; pointer-events: none; }
 
 /* ── Footer ──────────────────────────────────────────────────── */
 

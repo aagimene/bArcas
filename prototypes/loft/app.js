@@ -19,7 +19,7 @@ import { OutputPass }     from 'three/addons/postprocessing/OutputPass.js';
 const state = {
   length: 5.2,
   loftRes: 'med',
-  selectedStation: 2,   // index into stations[]
+  selectedStation: 3,   // index into stations[] — midship of the default 5+2 layout
   // Spine: 2D control points in (X, Z). Endpoints are the bow/stern; interior
   // points shape the rocker. Phase A: hand-tuned placeholder, not editable.
   spine: spinePlaceholder(5.2),
@@ -40,34 +40,57 @@ function spinePlaceholder(L) {
   ];
 }
 
+// Default deck height (n) at the centerline. The default look is a nearly
+// flat top deck across the boat, so all stations get the same deck-n and
+// the deckline appears flat in the side view.
+const DEFAULT_DECK_N = 0.30;
+
 function stationsPlaceholder() {
-  // 5 interior stations evenly spaced in normalized arc length, each with
-  // a U-shape body section that gets fuller at midship and tapers at ends.
-  // Sections stored starboard-only (b ≥ 0). Sample count varies by station
-  // to demonstrate the per-section reparameterization story.
-  const stationParams = [0.15, 0.32, 0.50, 0.68, 0.85];
-  return stationParams.map((s, i) => {
-    // Beam scales with a smooth fish-form taper, depth roughly constant.
-    const taper = Math.sin(Math.PI * s);          // 0 at ends, 1 at midship
-    const beam  = 0.16 + 0.14 * taper;            // half-beam (b max), m
-    const depth = 0.18 + 0.05 * taper;            // depth, m
+  // Sections (kind 'interior') are closed loops in the local (b, n) frame:
+  // first point at (b=0, n=0) is the keel-on-centerline, last point at
+  // (b=0, n=deck) is the deck-on-centerline. Mirror to port closes the
+  // hull both top and bottom along Y = 0.
+  //
+  // Bow / stern (kind 'endpoint') are stems — just the two centerline
+  // points (keel and deck). With b=0 throughout the section the loft
+  // collapses to a vertical edge at each end of the boat.
+  const interiorParams = [0.15, 0.32, 0.50, 0.68, 0.85];
+  const interior = interiorParams.map((s) => {
+    const taper    = Math.sin(Math.PI * s);            // 0 at ends, 1 at midship
+    const halfBeam = 0.18 + 0.12 * taper;
     return {
-      s,
-      points: defaultSection(beam, depth),
+      s, kind: 'interior',
+      points: defaultSection(halfBeam, DEFAULT_DECK_N),
     };
   });
+  return [
+    { s: 0, kind: 'endpoint', points: defaultStem(DEFAULT_DECK_N) },
+    ...interior,
+    { s: 1, kind: 'endpoint', points: defaultStem(DEFAULT_DECK_N) },
+  ];
 }
 
-function defaultSection(halfBeam, depth) {
-  // Symmetric U-shape, starboard half only (b ≥ 0). Local "up" n̂ points
-  // from the spine (keel) into the hull, so n = 0 is the keel and n grows
-  // upward to the gunwale at n = depth.
+// Closed-loop section: starboard half from keel-centerline up the side to
+// the deck-centerline. The mirrored port half makes the full closed cross
+// section. First and last points are constrained to the centerline (b=0).
+function defaultSection(halfBeam, deckN) {
   return [
-    { b: 0,                n: 0,                chine: false }, // keel (on spine)
-    { b: halfBeam * 0.45,  n: depth * 0.05,     chine: false },
-    { b: halfBeam * 0.85,  n: depth * 0.35,     chine: false },
-    { b: halfBeam,         n: depth * 0.80,     chine: false },
-    { b: halfBeam * 0.97,  n: depth,            chine: false }, // gunwale
+    { b: 0,                n: 0,             chine: false }, // keel (centerline)
+    { b: halfBeam * 0.55,  n: 0.04,          chine: false },
+    { b: halfBeam,         n: 0.16,          chine: false }, // beam-max
+    { b: halfBeam * 0.55,  n: deckN - 0.03,  chine: false },
+    { b: 0,                n: deckN,         chine: false }, // deck (centerline)
+  ];
+}
+
+// Stem: two centerline points. The bow/stern collapse to a vertical edge
+// in the centerline plane (kayak prow). Keel point stays at n=0 (on the
+// spine) by the same global rule as middle stations; only the deck-end's
+// n is meant to be draggable in the section editor.
+function defaultStem(deckN) {
+  return [
+    { b: 0, n: 0,     chine: false }, // keel-end (on spine, locked)
+    { b: 0, n: deckN, chine: false }, // deck-end (draggable in n)
   ];
 }
 
@@ -245,14 +268,11 @@ function buildLoft(state) {
   const N = res.N, M = res.M;
 
   // Sort stations by s (defensive — UI may not enforce ordering during drag).
+  // state.stations now includes the bow & stern as 2-point stem stations
+  // at s = 0 and s = 1, so we don't need synthetic degenerate endpoints.
   const stationsSorted = state.stations.slice().sort((a, b) => a.s - b.s);
-
-  // All knots: degenerate endpoints + interior stations.
-  const ss            = [0, ...stationsSorted.map(st => st.s), 1];
-  const stationSamples = ss.map((_, i) => {
-    if (i === 0 || i === ss.length - 1) return new Array(N).fill({ b: 0, n: 0 });
-    return sampleSection(stationsSorted[i - 1].points, N);
-  });
+  const ss             = stationsSorted.map(st => st.s);
+  const stationSamples = stationsSorted.map(st => sampleSection(st.points, N));
 
   // Per-transverse-index splines b_k(s), n_k(s).
   const bSplines = new Array(N);
@@ -316,16 +336,20 @@ function buildLoft(state) {
     }
   }
 
-  // Also project interior-station rows to world for the side-view tick
-  // marks and 3D station bands (they're computed at the actual station s,
-  // not at the M-grid sample positions).
+  // Also project each station to world coords for 3D station bands +
+  // side-view ticks. We tag each row with its station kind so renderers
+  // can skip the bow / stern entries (those are degenerate stem-lines
+  // already represented by the spine endpoints).
   const stationRows = stationsSorted.map((st, idx) => {
     const { p, tx, tz } = spineAt(spine, st.s);
     const nx = -tz, nz = tx;
-    const samp = stationSamples[idx + 1];
-    return samp.map(({ b, n }) => ({
-      x: p.x + n * nx, y: b, z: p.z + n * nz,
-    }));
+    const samp = stationSamples[idx];
+    return {
+      kind: st.kind,
+      points: samp.map(({ b, n }) => ({
+        x: p.x + n * nx, y: b, z: p.z + n * nz,
+      })),
+    };
   });
 
   return { positions, indices, rows, stationRows, spine, N, M };
@@ -342,11 +366,8 @@ function buildLoft(state) {
 function sectionAtS(state, s, numPoints = 7) {
   const N_DENSE = 96;
   const stationsSorted = state.stations.slice().sort((a, b) => a.s - b.s);
-  const ss = [0, ...stationsSorted.map(st => st.s), 1];
-  const stationSamples = ss.map((_, i) => {
-    if (i === 0 || i === ss.length - 1) return new Array(N_DENSE).fill({ b: 0, n: 0 });
-    return sampleSection(stationsSorted[i - 1].points, N_DENSE);
-  });
+  const ss             = stationsSorted.map(st => st.s);
+  const stationSamples = stationsSorted.map(st => sampleSection(st.points, N_DENSE));
 
   // Evaluate per-transverse-index splines at this s.
   const dense = new Array(N_DENSE);
@@ -378,9 +399,11 @@ function sectionAtS(state, s, numPoints = 7) {
       chine: false,
     };
   }
-  // Anchor the keel point at exactly (0, 0) — by definition of the model
-  // (cf. cross-section editor: the first point is locked to the spine).
+  // Anchor: keel point at (0, 0) (locked to the spine, model-wide rule);
+  // deck-end at b = 0 (centerline closure on top).
   points[0] = { b: 0, n: 0, chine: false };
+  const last = numPoints - 1;
+  points[last] = { b: 0, n: points[last].n, chine: false };
   return points;
 }
 
@@ -517,10 +540,15 @@ function rebuildHull() {
     new THREE.Vector3( half, 0, 0),
   ]);
 
-  // Station bands: each interior station as a thin loop following its
-  // section at its actual s, both starboard and port halves.
+  // Station bands: each interior station as a thin closed loop following
+  // its section at its actual s, both starboard and port halves. Bow /
+  // stern (kind 'endpoint') are degenerate stem lines already shown by
+  // the spine endpoints in the side view, so we skip drawing bands for
+  // them in the 3D view.
   const N = loft.N;
-  loft.stationRows.forEach((row, idx) => {
+  loft.stationRows.forEach((entry, idx) => {
+    if (entry.kind === 'endpoint') return;
+    const row = entry.points;
     const isSelected = idx === state.selectedStation;
     const color = isSelected ? 0xfde68a : 0xb45309;
     const opacity = isSelected ? 1.0 : 0.6;
@@ -756,7 +784,13 @@ function renderSideView() {
   });
 
   // Station markers along the spine — also draggable along arc length.
+  // Bow / stern (kind 'endpoint') are visually represented by the spine
+  // endpoint control points themselves, so we skip drawing extra ticks
+  // there. Numbering shows interior position only (1..n_interior).
+  let interiorIdx = 0;
   state.stations.forEach((st, i) => {
+    if (st.kind === 'endpoint') return;
+    interiorIdx += 1;
     const sp = spineAt(spine, st.s);
     const isSel = i === state.selectedStation;
     sideSvg.appendChild(el('line', {
@@ -764,7 +798,6 @@ function renderSideView() {
       x2: xOf(sp.p.x), y2: yOf(sp.p.z) + 6,
       class: 'station' + (isSel ? ' selected' : ''),
     }));
-    // Hit halo (transparent, large) for grabbing the station tick.
     sideSvg.appendChild(el('circle', {
       cx: xOf(sp.p.x), cy: yOf(sp.p.z) - 12, r: 14,
       class: 'station-hit',
@@ -777,7 +810,7 @@ function renderSideView() {
     }));
     sideSvg.appendChild(el('text', {
       x: xOf(sp.p.x), y: yOf(sp.p.z) - 18, class: 'station-label',
-    }, String(i + 1)));
+    }, String(interiorIdx)));
   });
 
   // Endpoint labels follow the actual spine endpoints (which are the same
@@ -800,7 +833,9 @@ function renderSectionView() {
   const bOf = (b) => b * SECTION_SCALE;
   const nOf = (n) => -n * SECTION_SCALE; // n is up; SVG y down
 
-  const station = state.stations[state.selectedStation];
+  const station    = state.stations[state.selectedStation];
+  const isEndpoint = station.kind === 'endpoint';
+  const lastIdx    = station.points.length - 1;
 
   // Centerline (b = 0).
   sectionSvg.appendChild(el('line', {
@@ -816,32 +851,50 @@ function renderSectionView() {
     x: 320, y: nOf(0) + 11, class: 'label', 'text-anchor': 'end',
   }, 'keel (n = 0, on spine)'));
 
-  // Sample dense curves for both halves.
-  const dense = sampleSpline(station.points, 'b', 'n', 24);
-  const stbdPath = 'M ' + dense.map(p => `${bOf(p.x).toFixed(2)} ${nOf(p.y).toFixed(2)}`).join(' L ');
-  const portPath = 'M ' + dense.map(p => `${bOf(-p.x).toFixed(2)} ${nOf(p.y).toFixed(2)}`).join(' L ');
-  sectionSvg.appendChild(el('path', { class: 'section-curve',  d: stbdPath }));
-  sectionSvg.appendChild(el('path', { class: 'section-mirror', d: portPath }));
+  if (isEndpoint) {
+    // Stem station: just two centerline points connected by a vertical
+    // line on the centerline. No port mirror needed (b = 0 throughout).
+    const a = station.points[0], c = station.points[lastIdx];
+    sectionSvg.appendChild(el('line', {
+      x1: bOf(0), y1: nOf(a.n),
+      x2: bOf(0), y2: nOf(c.n),
+      class: 'section-curve',
+    }));
+  } else {
+    // Closed-loop section: dense spline through all points (starts and
+    // ends at b = 0 — the keel and deck centerlines).
+    const dense = sampleSpline(station.points, 'b', 'n', 24);
+    const stbdPath = 'M ' + dense.map(p => `${bOf( p.x).toFixed(2)} ${nOf(p.y).toFixed(2)}`).join(' L ');
+    const portPath = 'M ' + dense.map(p => `${bOf(-p.x).toFixed(2)} ${nOf(p.y).toFixed(2)}`).join(' L ');
+    sectionSvg.appendChild(el('path', { class: 'section-curve',  d: stbdPath }));
+    sectionSvg.appendChild(el('path', { class: 'section-mirror', d: portPath }));
+  }
 
-  // Control points (starboard half) — draggable, except the keel which is
-  // locked at (0, 0) (it must sit on the spine, by definition of the model).
+  // Control points. Lock the keel (idx 0) at every station — it must sit
+  // on the spine by the global model rule. The deck-end (last idx) and
+  // every centerline point on stem stations are b-locked but n-draggable.
   station.points.forEach((p, i) => {
-    const isKeel = i === 0;
-    // Hit halo for easy grabbing on touch / pen.
+    const isKeel       = i === 0;
+    const isCenterline = isEndpoint || i === lastIdx;          // b locked to 0
+    const cls = (isKeel ? 'keel ' : '') + (isCenterline ? 'centerline ' : '');
     sectionSvg.appendChild(el('circle', {
       cx: bOf(p.b), cy: nOf(p.n), r: 14,
-      class: 'ctrl-hit' + (isKeel ? ' keel' : ''),
+      class: ('ctrl-hit ' + cls).trim(),
       'data-drag': 'ctrl', 'data-idx': String(i),
     }));
     sectionSvg.appendChild(el('circle', {
       cx: bOf(p.b), cy: nOf(p.n), r: 4.2,
-      class: 'ctrl-pt' + (p.chine ? ' chine' : '') + (isKeel ? ' keel' : ''),
+      class: ('ctrl-pt ' + cls + (p.chine ? 'chine' : '')).trim(),
       'data-drag': 'ctrl', 'data-idx': String(i),
     }));
   });
 
-  // Hint text near the keel for new users.
-  if (station.points.length <= 5) {
+  // Hint text — different for endpoints vs middle stations.
+  if (isEndpoint) {
+    sectionSvg.appendChild(el('text', {
+      x: 0, y: 110, class: 'label', 'text-anchor': 'middle',
+    }, 'stem · drag the deck point up / down'));
+  } else if (station.points.length <= 5) {
     sectionSvg.appendChild(el('text', {
       x: 0, y: 110, class: 'label', 'text-anchor': 'middle',
     }, 'click to add · right-click a point to delete'));
@@ -859,12 +912,19 @@ const stationCount = document.querySelector('.station-count');
 
 function renderStationList() {
   stationsOl.innerHTML = '';
+  let interiorIdx = 0;
   state.stations.forEach((st, i) => {
     const li = document.createElement('li');
-    li.className = (i === state.selectedStation) ? 'selected' : '';
+    li.className = (i === state.selectedStation ? 'selected ' : '') +
+                   (st.kind === 'endpoint' ? 'endpoint' : '');
     li.dataset.idx = String(i);
     const name = document.createElement('span');
-    name.textContent = `St ${i + 1}  s = ${st.s.toFixed(2)}`;
+    if (st.kind === 'endpoint') {
+      name.textContent = (i === 0) ? 'Stern · s = 0.00' : 'Bow · s = 1.00';
+    } else {
+      interiorIdx += 1;
+      name.textContent = `St ${interiorIdx}  ·  s = ${st.s.toFixed(2)}`;
+    }
     const pips = document.createElement('span');
     pips.className = 'pips';
     pips.textContent = '●'.repeat(Math.min(st.points.length, 9));
@@ -872,16 +932,28 @@ function renderStationList() {
     li.addEventListener('click', () => selectStation(i));
     stationsOl.appendChild(li);
   });
-  stationCount.textContent = `${state.stations.length} of ${state.stations.length}`;
+  const interiorCount = state.stations.length - 2;
+  stationCount.textContent = `${interiorCount} interior · 2 ends`;
+}
+
+function stationLabelFor(i) {
+  const st = state.stations[i];
+  if (!st) return '';
+  if (st.kind === 'endpoint') return (i === 0) ? 'Stern' : 'Bow';
+  // Interior label: count interior stations preceding this index.
+  let n = 0;
+  for (let j = 0; j <= i; j++) if (state.stations[j].kind !== 'endpoint') n += 1;
+  return String(n);
 }
 
 function selectStation(i) {
   state.selectedStation = ((i % state.stations.length) + state.stations.length) % state.stations.length;
-  stationLabel.textContent = String(state.selectedStation + 1);
+  stationLabel.textContent = stationLabelFor(state.selectedStation);
   renderStationList();
   renderSectionView();
   renderSideView();
   rebuildHull();
+  syncStationButtons();
 }
 
 document.getElementById('prev-station').addEventListener('click', () => selectStation(state.selectedStation - 1));
@@ -902,12 +974,17 @@ document.getElementById('next-station').addEventListener('click', () => selectSt
 // the surface slightly — that's the natural consequence of fewer pinned
 // sections, not a bug.
 
-const MAX_STATIONS = 9;
-const MIN_STATIONS = 2;
+// Bounds are on *interior* stations only — bow / stern are always present.
+const MAX_INTERIOR = 9;
+const MIN_INTERIOR = 2;
+
+function interiorCount() { return state.stations.length - 2; }
 
 function addStation() {
-  if (state.stations.length >= MAX_STATIONS) return;
-  const sortedSs = [0, ...state.stations.map(st => st.s).slice().sort((a, b) => a - b), 1];
+  if (interiorCount() >= MAX_INTERIOR) return;
+  // Largest gap between adjacent station knots (state.stations already
+  // includes s = 0 stern and s = 1 bow as real entries).
+  const sortedSs = state.stations.map(st => st.s).slice().sort((a, b) => a - b);
   let maxGap = 0, gapStart = 0;
   for (let i = 0; i < sortedSs.length - 1; i++) {
     const g = sortedSs[i + 1] - sortedSs[i];
@@ -916,13 +993,12 @@ function addStation() {
   const newS = gapStart + maxGap / 2;
   const points = sectionAtS(state, newS);
 
-  // Insert in sorted order (state.stations is kept sorted by s).
   state.stations.sort((a, b) => a.s - b.s);
   let insertIdx = state.stations.findIndex(st => st.s > newS);
   if (insertIdx === -1) insertIdx = state.stations.length;
-  state.stations.splice(insertIdx, 0, { s: newS, points });
+  state.stations.splice(insertIdx, 0, { s: newS, kind: 'interior', points });
   state.selectedStation = insertIdx;
-  stationLabel.textContent = String(state.selectedStation + 1);
+  stationLabel.textContent = stationLabelFor(state.selectedStation);
 
   renderStationList();
   renderSideView();
@@ -932,10 +1008,13 @@ function addStation() {
 }
 
 function removeStation() {
-  if (state.stations.length <= MIN_STATIONS) return;
-  state.stations.splice(state.selectedStation, 1);
+  const idx = state.selectedStation;
+  const st  = state.stations[idx];
+  if (!st || st.kind === 'endpoint') return;
+  if (interiorCount() <= MIN_INTERIOR) return;
+  state.stations.splice(idx, 1);
   state.selectedStation = Math.min(state.selectedStation, state.stations.length - 1);
-  stationLabel.textContent = String(state.selectedStation + 1);
+  stationLabel.textContent = stationLabelFor(state.selectedStation);
 
   renderStationList();
   renderSideView();
@@ -954,8 +1033,10 @@ addStationBtn.addEventListener('click', addStation);
 removeStationBtn.addEventListener('click', removeStation);
 
 function syncStationButtons() {
-  addStationBtn.disabled    = state.stations.length >= MAX_STATIONS;
-  removeStationBtn.disabled = state.stations.length <= MIN_STATIONS;
+  addStationBtn.disabled = interiorCount() >= MAX_INTERIOR;
+  const sel = state.stations[state.selectedStation];
+  removeStationBtn.disabled =
+    interiorCount() <= MIN_INTERIOR || (sel && sel.kind === 'endpoint');
 }
 syncStationButtons();
 
@@ -1189,14 +1270,23 @@ sectionSvg.addEventListener('pointerdown', (e) => {
 
 sectionSvg.addEventListener('pointermove', (e) => {
   if (!sectionDrag) return;
-  const i = sectionDrag.idx;
-  if (i === 0) return; // keel locked
-  const { x, y } = svgToLocal(sectionSvg, e);
-  const b = Math.max(0, x / SECTION_SCALE);
-  const n = -y / SECTION_SCALE;
+  const i       = sectionDrag.idx;
   const station = state.stations[state.selectedStation];
-  station.points[i].b = b;
-  station.points[i].n = n;
+  if (i === 0) return; // keel locked at (0, 0) by the global rule
+  const lastIdx      = station.points.length - 1;
+  const isEndpoint   = station.kind === 'endpoint';
+  const isCenterline = isEndpoint || i === lastIdx;
+  const { x, y } = svgToLocal(sectionSvg, e);
+  const n = -y / SECTION_SCALE;
+  if (isCenterline) {
+    // Centerline-locked: only n is editable; b stays at 0 so the deck
+    // closes along the centerline plane.
+    station.points[i].b = 0;
+    station.points[i].n = n;
+  } else {
+    station.points[i].b = Math.max(0, x / SECTION_SCALE);
+    station.points[i].n = n;
+  }
   sectionDrag.moved = true;
   renderSectionView();
   rebuildHull();
@@ -1212,33 +1302,40 @@ function endSectionDrag() {
 sectionSvg.addEventListener('pointerup',     endSectionDrag);
 sectionSvg.addEventListener('pointercancel', endSectionDrag);
 
-// Click empty space to add a new control point.
+// Click empty space to add a new control point. Disabled for endpoint
+// (stem) stations — those are 2 points by spec. Disabled for clicks on
+// the port mirror (it's read-only).
 sectionSvg.addEventListener('click', (e) => {
-  // Skip if click landed on a control point (drag/right-click handle those).
   if (e.target.closest('[data-drag]')) return;
-  // Skip if a drag actually moved (defensive — pointerup fires click after).
   if (sectionDrag && sectionDrag.moved) return;
+  const station = state.stations[state.selectedStation];
+  if (station.kind === 'endpoint') return;
   const { x, y } = svgToLocal(sectionSvg, e);
   const b = x / SECTION_SCALE;
   const n = -y / SECTION_SCALE;
-  if (b < 0) return; // ignore clicks on the port mirror — it's read-only
-  const station = state.stations[state.selectedStation];
+  if (b < 0) return;
   const insertIdx = nearestSegmentInsertIdx(station.points, b, n);
+  // nearestSegmentInsertIdx already returns a value in [1, points.length-1],
+  // so the keel (0) and deck-end (last) are never displaced.
   station.points.splice(insertIdx, 0, { b, n, chine: false });
   renderStationList();
   renderSectionView();
   rebuildHull();
 });
 
-// Right-click a control point to delete it. Keel (idx 0) is protected, and
-// we keep at least 3 points so the natural-cubic spline stays valid.
+// Right-click a control point to delete it. Keel (idx 0) and deck-end
+// (last idx) are protected on every station; bow / stern stems are
+// fully protected. Sections must keep at least 3 points so the natural
+// cubic spline still resolves.
 sectionSvg.addEventListener('contextmenu', (e) => {
   const target = e.target.closest('[data-drag]');
   if (!target) return;
   e.preventDefault();
   const i = +target.dataset.idx;
   const station = state.stations[state.selectedStation];
-  if (i === 0 || station.points.length <= 3) return;
+  if (station.kind === 'endpoint') return;
+  if (i === 0 || i === station.points.length - 1) return;
+  if (station.points.length <= 3) return;
   station.points.splice(i, 1);
   renderStationList();
   renderSectionView();
@@ -1270,7 +1367,7 @@ function nearestSegmentInsertIdx(points, clickB, clickN) {
 // ── Initial render ───────────────────────────────────────────────────────
 
 lengthOut.textContent = state.length.toFixed(2) + ' m';
-stationLabel.textContent = String(state.selectedStation + 1);
+stationLabel.textContent = stationLabelFor(state.selectedStation);
 renderStationList();
 renderSideView();
 renderSectionView();
