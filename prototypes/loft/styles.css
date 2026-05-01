@@ -297,7 +297,7 @@ main {
 #side-view .handle-hit    { fill: transparent; cursor: grab; }
 #side-view .paddler-label { fill: #b45309; font: 9px -apple-system, sans-serif; }
 
-/* ── Stem sheer profile overlay ─────────────────────────────────────── */
+/* ── Bow / stern sheer profile overlay ──────────────────────────────── */
 #side-view .stem-curve   { fill: none; stroke: #f59e0b; stroke-width: 2; stroke-linecap: round; pointer-events: none; }
 #side-view .stem-pt      { fill: #f59e0b; stroke: white; stroke-width: 1.2; cursor: grab; }
 #side-view .stem-pt.keel { fill: #2563eb; cursor: not-allowed; }
@@ -305,6 +305,17 @@ main {
 #side-view .stem-hit     { fill: transparent; cursor: grab; }
 #side-view .stem-hit.keel { cursor: not-allowed; pointer-events: none; }
 #side-view .stem-hint    { fill: #d97706; font: 8px -apple-system, sans-serif; opacity: 0.75; }
+
+/* startS marker (where the sheer joins the rocker) */
+#side-view .sheer-start  { stroke: #14b8a6; stroke-width: 2; pointer-events: none; }
+#side-view .sheer-start-hit { fill: transparent; cursor: ew-resize; }
+
+/* sheer station tick (a closed-loop section placed along the sheer) */
+#side-view .sheer-station { stroke: #f59e0b; stroke-width: 1.6; pointer-events: none; }
+#side-view .sheer-station.selected { stroke: #b45309; stroke-width: 2.2; }
+#side-view .sheer-station-tick     { fill: #f59e0b; stroke: white; stroke-width: 0.8; cursor: ew-resize; }
+#side-view .sheer-station-tick.selected { fill: #b45309; }
+#side-view .sheer-station-hit      { fill: transparent; cursor: ew-resize; }
 #side-view .station    { stroke: #f59e0b; stroke-width: 1.6; pointer-events: none; }
 #side-view .station.selected { stroke: #b45309; stroke-width: 2.2; }
 #side-view .station-tick {
