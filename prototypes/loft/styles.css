@@ -313,13 +313,13 @@ main {
 /* Deck / top-line curve — green */
 #side-view .deck-curve        { fill: none; stroke: #16a34a; stroke-width: 2; stroke-linecap: round; pointer-events: none; }
 
-/* Sheer control points: bow = orange, stern = purple */
-#side-view .sheer-ctrl-bow      { fill: #f97316; stroke: white; stroke-width: 1.2; cursor: grab; }
-#side-view .sheer-ctrl-bow.keel { fill: #2563eb; cursor: not-allowed; }
-#side-view .sheer-ctrl-stern      { fill: #7c3aed; stroke: white; stroke-width: 1.2; cursor: grab; }
-#side-view .sheer-ctrl-stern.keel { fill: #2563eb; cursor: not-allowed; }
-#side-view .stem-hit       { fill: transparent; cursor: grab; }
-#side-view .stem-hit.keel  { cursor: not-allowed; pointer-events: none; }
+/* Sheer keel control points: bow = orange, stern = purple.
+   .tip = convergence/tip point, slightly larger, ring style */
+#side-view .sheer-ctrl-bow       { fill: #f97316; stroke: white; stroke-width: 1.2; cursor: grab; }
+#side-view .sheer-ctrl-bow.tip   { fill: white; stroke: #f97316; stroke-width: 2.2; cursor: grab; }
+#side-view .sheer-ctrl-stern     { fill: #7c3aed; stroke: white; stroke-width: 1.2; cursor: grab; }
+#side-view .sheer-ctrl-stern.tip { fill: white; stroke: #7c3aed; stroke-width: 2.2; cursor: grab; }
+#side-view .stem-hit { fill: transparent; cursor: grab; }
 
 /* Deck line control points — green diamond */
 #side-view .deck-ctrl        { fill: #16a34a; stroke: white; stroke-width: 1.2; cursor: grab; }
@@ -371,16 +371,24 @@ main {
 #section-view .ctrl-pt.keel {
   fill: #2563eb; stroke: white; cursor: not-allowed;
 }
+#section-view .ctrl-pt.deck {
+  fill: #16a34a; stroke: white; cursor: not-allowed;
+}
 #section-view .ctrl-pt.centerline {
   fill: #93c5fd; stroke: #1e3a8a; cursor: ns-resize;
 }
 #section-view .ctrl-pt.centerline.keel {
   fill: #2563eb; stroke: white; cursor: not-allowed;
 }
+#section-view .ctrl-pt.centerline.deck {
+  fill: #16a34a; stroke: white; cursor: not-allowed;
+}
 #section-view .ctrl-hit               { fill: transparent; cursor: grab; }
 #section-view .ctrl-hit.centerline    { cursor: ns-resize; }
 #section-view .ctrl-hit.keel,
 #section-view .ctrl-hit.centerline.keel { cursor: not-allowed; pointer-events: none; }
+#section-view .ctrl-hit.deck,
+#section-view .ctrl-hit.centerline.deck { cursor: not-allowed; pointer-events: none; }
 
 /* ── Footer ──────────────────────────────────────────────────── */
 

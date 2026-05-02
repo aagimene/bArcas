@@ -110,19 +110,24 @@ function stationsPlaceholder() {
   });
 }
 
-// Default sheer profile: a curve in (dx, dz) offsets relative to the
-// rocker point at startS. The bottom (dx=0, dz=0) is on the rocker; the
-// top is the bow / stern tip — by default directly above by DEFAULT_DECK_N.
-// `stations` is an array of closed-loop cross-sections placed along the
-// sheer profile (parameter t ∈ (0, 1), 0 = on rocker, 1 = at tip).
-function defaultSheer(end) {
+// Sheer end: the bow / stern section that tapers from the last rocker
+// cross-section to a single tip point. The "sheer keel line" is a natural
+// cubic spline from the rocker junction (derived from startS, not stored)
+// through any interior control points to the tip — the convergence point
+// shared with the deck-line endpoint. Stations are closed-loop cross-
+// sections, keel locked on the sheer keel line, deck from the global deck
+// line. t ∈ (0, 1) on a station: 0 = junction, 1 = tip.
+function defaultSheer(end, L = 5.2) {
+  const half = L / 2;
+  // Tip starts directly above the spine endpoint at deck height.
   return {
-    startS:  end === 'stern' ? 0.0 : 1.0,    // parameter on the rocker where the sheer joins
-    profile: [
-      { dx: 0, dz: 0 },                       // start (always (0, 0) — on rocker(startS))
-      { dx: 0, dz: DEFAULT_DECK_N },          // tip
-    ],
-    stations: [],                             // sheer cross-sections (loops along the profile)
+    startS: end === 'stern' ? 0.0 : 1.0,
+    tip: {
+      x: end === 'stern' ? -half : half,
+      z: 0.04 + DEFAULT_DECK_N,   // spine endpoint z ≈ 0.04 + deck height
+    },
+    keelInteriorPts: [],           // world-space (x, z) interior ctrl pts of sheer keel
+    stations: [],
   };
 }
 
@@ -143,12 +148,10 @@ function defaultDeckLine() {
   };
 }
 
-// Compute the stern/bow tip world position (locked end of the deck line).
-function sheerTip(state, spSampled, end) {
-  const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
-  const { p: ep } = spineAt({ ctrl: state.spine, sampled: spSampled }, sheer.startS);
-  const last = sheer.profile[sheer.profile.length - 1];
-  return { x: ep.x + last.dx, z: ep.z + last.dz };
+// The stern/bow tip is stored directly on the sheer end as .tip.
+// spSampled parameter kept for call-site compatibility.
+function sheerTip(state, _spSampled, end) {
+  return (end === 'bow' ? state.bowSheer : state.sternSheer).tip;
 }
 
 // Build a natural-cubic spline evaluator f(x) → z for the deck line,
@@ -174,26 +177,26 @@ function deckNFromLine(keelPx, keelPz, tx, deckEval) {
 
 // Update every station's deck-end (last) control-point n from the deck
 // line. Called after any spine / sheer / deck-line change so the section
-// editor and the loft always see consistent data.
+// editor and the loft always see consistent data. The deck-end is locked
+// in the section editor; this is the only place it is written.
 function reconcileDeckPoints(state) {
   const spSampled = sampledSpine(state.spine, 64);
   const spineObj  = { ctrl: state.spine, sampled: spSampled };
   const deckEval  = buildDeckSpline(state, spSampled);
 
+  // Interior (rocker) stations — keel on rocker.
   state.stations.forEach(st => {
     const { p, tx } = spineAt(spineObj, st.s);
     st.points[st.points.length - 1].n = deckNFromLine(p.x, p.z, tx, deckEval);
   });
 
-  // Sheer stations: locate each one's world position by sampling the
-  // sheer profile, then look up the deck line at that X.
-  const lengths = compositeLengths(state);
-  for (const [end, sheer] of [['bow', state.bowSheer], ['stern', state.sternSheer]]) {
+  // Sheer-end stations — keel on the sheer keel line.
+  for (const end of ['bow', 'stern']) {
+    const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
+    const keelSampled = sampledSheerKeel(state, end, spSampled);
     sheer.stations.forEach(sst => {
-      const { p } = sampleSheerSegment(state, lengths, end, sst.t);
-      // tx ≈ 1 for the cross-section's world frame at the sheer (we use
-      // a vertical projection here since sheer stations aren't lofted).
-      sst.points[sst.points.length - 1].n = deckNFromLine(p.x, p.z, 1, deckEval);
+      const { p, tx } = sampleAlong(keelSampled, sst.t);
+      sst.points[sst.points.length - 1].n = deckNFromLine(p.x, p.z, tx, deckEval);
     });
   }
 }
@@ -208,30 +211,8 @@ function defaultSection(halfBeam, deckN) {
   ];
 }
 
-// Convert a stem sheer profile to a sampled (b=0, n) section for the loft
-// pipeline. Each profile point (dx, dz) is an offset from the spine
-// endpoint; n is computed by projecting onto the local-up direction
-// (localNx, localNz), which is the spine tangent rotated 90° in X-Z.
-function stemProfileToSection(stemProfile, localNx, localNz, N) {
-  // Dense-sample the natural cubic through the profile in (dx, dz) space.
-  const dense = sampleSpline(stemProfile, 'dx', 'dz', 24);
-  const arc = [0];
-  for (let i = 1; i < dense.length; i++)
-    arc.push(arc[i - 1] + Math.hypot(dense[i].x - dense[i - 1].x, dense[i].y - dense[i - 1].y));
-  const total = arc[arc.length - 1] || 1;
-  const samples = [];
-  for (let k = 0; k < N; k++) {
-    const target = (k / (N - 1)) * total;
-    let lo = 0;
-    while (lo < dense.length - 1 && arc[lo + 1] < target) lo++;
-    const hi = Math.min(dense.length - 1, lo + 1);
-    const t  = arc[hi] === arc[lo] ? 0 : (target - arc[lo]) / (arc[hi] - arc[lo]);
-    const dx = dense[lo].x + t * (dense[hi].x - dense[lo].x);
-    const dz = dense[lo].y + t * (dense[hi].y - dense[lo].y);
-    samples.push({ b: 0, n: dx * localNx + dz * localNz });
-  }
-  return samples;
-}
+// (stemProfileToSection removed — sheer ends now use world-space keel lines
+//  and closed-loop cross-sections, not profile-projected b=0 slices.)
 
 // ── Geometry helpers (shared placeholders for now) ───────────────────────
 
@@ -343,96 +324,139 @@ function sampleSection(section, N) {
   return out;
 }
 
-// ── Composite spine: stern sheer + rocker + bow sheer ───────────────────
+// ── Composite spine: stern keel + rocker + bow keel ─────────────────────
 //
-// The boat's longitudinal "spine" for cross-section placement is a
-// composite of three curves walked tip-to-tip:
+// The loft spine is a three-segment composite:
 //
-//   stern tip ← (stern sheer reversed) ← rocker(sternSheer.startS) →
-//   rocker(bowSheer.startS) → (bow sheer) → bow tip
+//   stern tip  ← stern sheer keel (reversed) ← rocker(sternStartS)
+//   → rocker(bowStartS) → bow sheer keel → bow tip
 //
-// Cross-sections (interior + sheer stations) all live on this composite,
-// and the loft samples it at M arc-length-uniform points S ∈ [0, 1] to
-// generate the longitudinal mesh rows. Within each segment the local
-// up direction is the segment tangent rotated 90° in X-Z.
+// S ∈ [0, sternFrac]       = stern sheer-end keel (tip → junction)
+// S ∈ [sternFrac, 1-bowFrac] = main hull rocker
+// S ∈ [1-bowFrac, 1]       = bow sheer-end keel (junction → tip)
+//
+// sternFrac / bowFrac are arc-length fractions of the total composite.
 
-// Sample a sheer profile (list of {dx, dz}) into pts/arc/total.
-function sampledSheerProfile(profile, samplesPerSpan = 24) {
-  if (profile.length < 2) {
-    return { pts: [{ x: 0, y: 0 }], arc: [0], total: 0 };
-  }
-  const pts = sampleSpline(profile, 'dx', 'dz', samplesPerSpan);
+// Build and sample the sheer-end keel line:
+//   [junction (derived from rocker(startS)), ...keelInteriorPts, tip]
+// Returns {pts:[{x,y}], arc, total} where pts[i].y = world Z.
+function sampledSheerKeel(state, end, spSampled) {
+  const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
+  const { p: jp } = spineAt({ ctrl: state.spine, sampled: spSampled }, sheer.startS);
+  const allPts = [
+    { x: jp.x,        z: jp.z },
+    ...sheer.keelInteriorPts,
+    sheer.tip,
+  ];
+  const pts = sampleSpline(allPts, 'x', 'z', 24);  // parametric natural cubic
   const arc = [0];
-  for (let i = 1; i < pts.length; i++) {
+  for (let i = 1; i < pts.length; i++)
     arc.push(arc[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
-  }
   return { pts, arc, total: arc[arc.length - 1] };
 }
 
-// Cached lengths / samples for the loft's longitudinal axis. The loft
-// runs ALONG THE ROCKER between sternSheer.startS and bowSheer.startS;
-// the bow / stern sheer profiles do NOT extend the spine. Instead, the
-// boundary cross-sections at the rocker ends are *shaped* by the sheer
-// profile (b=0, n traces the sheer curve in the rocker's local frame).
-// This produces a vertical-ish stem at each end whose silhouette in the
-// centerline plane matches the sheer curve in the side view, and the
-// longitudinal mesh edges meet the sheer perpendicularly.
+// Evaluate a {pts, arc, total} sampled curve at arc-length fraction t ∈ [0,1].
+// Returns { p: {x, z}, tx, tz } — same format as spineAt.
+function sampleAlong(sampled, t) {
+  const { pts, arc, total } = sampled;
+  if (!pts.length) return { p: { x: 0, z: 0 }, tx: 1, tz: 0 };
+  if (total < 1e-9) return { p: { x: pts[0].x, z: pts[0].y }, tx: 1, tz: 0 };
+  const target = Math.max(0, Math.min(total, t * total));
+  let lo = 0, hi = arc.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (arc[mid] <= target) lo = mid; else hi = mid;
+  }
+  const frac = arc[hi] === arc[lo] ? 0 : (target - arc[lo]) / (arc[hi] - arc[lo]);
+  const p = {
+    x: pts[lo].x + frac * (pts[hi].x - pts[lo].x),
+    z: pts[lo].y + frac * (pts[hi].y - pts[lo].y),
+  };
+  const ddx = pts[hi].x - pts[lo].x;
+  const ddz = pts[hi].y - pts[lo].y;
+  const len = Math.hypot(ddx, ddz) || 1;
+  return { p, tx: ddx / len, tz: ddz / len };
+}
+
+// Arc length of the rocker between two normalized parameters.
+function rockerArcBetween(sampled, s0, s1) {
+  return sampled.total * Math.abs(s1 - s0);
+}
+
+// Pre-compute all lengths for the composite spine.
 function compositeLengths(state) {
   const rocSampled  = sampledSpine(state.spine, 64);
   const rocTotal    = rocSampled.total || 1e-9;
-  const sternStartS = Math.max(0,                     Math.min(1, state.sternSheer.startS));
-  const bowStartS   = Math.max(sternStartS + 0.05,    Math.min(1, state.bowSheer.startS));
-  const sternProfile = sampledSheerProfile(state.sternSheer.profile);
-  const bowProfile   = sampledSheerProfile(state.bowSheer.profile);
+  const sternStartS = Math.max(0,                  Math.min(1, state.sternSheer.startS));
+  const bowStartS   = Math.max(sternStartS + 0.05, Math.min(1, state.bowSheer.startS));
+
+  const sternKeelSampled = sampledSheerKeel(state, 'stern', rocSampled);
+  const bowKeelSampled   = sampledSheerKeel(state, 'bow',   rocSampled);
+
+  const sternLen = sternKeelSampled.total;
+  const mainLen  = rockerArcBetween(rocSampled, sternStartS, bowStartS);
+  const bowLen   = bowKeelSampled.total;
+  const totalLen = sternLen + mainLen + bowLen || 1e-9;
+
+  const sternFrac = sternLen / totalLen;
+  const bowFrac   = bowLen   / totalLen;
+
   return {
     rocSampled, rocTotal,
     sternStartS, bowStartS,
-    sternProfile, bowProfile,
+    sternKeelSampled, bowKeelSampled,
+    sternLen, mainLen, bowLen, totalLen,
+    sternFrac, bowFrac,
   };
 }
 
-// Composite-axis sample at S ∈ [0, 1] — pure rocker walk between
-// sternStartS and bowStartS.
+// Evaluate the composite spine at S ∈ [0, 1].
 function compositeAt(state, lengths, S) {
-  const rocS = lengths.sternStartS + S * (lengths.bowStartS - lengths.sternStartS);
+  S = Math.max(0, Math.min(1, S));
+  const { sternFrac, bowFrac } = lengths;
+
+  if (sternFrac > 1e-9 && S <= sternFrac) {
+    // Stern sheer end — walk backward: S=0 → tip (t=1), S=sternFrac → junction (t=0).
+    const r = sampleAlong(lengths.sternKeelSampled, 1 - S / sternFrac);
+    return { p: r.p, tx: -r.tx, tz: -r.tz };   // negate: walking junction→tip reversed
+  }
+  if (bowFrac > 1e-9 && S >= 1 - bowFrac) {
+    // Bow sheer end — walk forward: S=1-bowFrac → junction (t=0), S=1 → tip (t=1).
+    return sampleAlong(lengths.bowKeelSampled, (S - (1 - bowFrac)) / bowFrac);
+  }
+  // Main hull rocker.
+  const mainFrac = 1 - sternFrac - bowFrac;
+  const rocS = mainFrac > 1e-9
+    ? lengths.sternStartS + ((S - sternFrac) / mainFrac) * (lengths.bowStartS - lengths.sternStartS)
+    : (lengths.sternStartS + lengths.bowStartS) * 0.5;
   return spineAt({ ctrl: state.spine, sampled: lengths.rocSampled }, rocS);
 }
 
-// Composite-S parameter for an interior station at rocker s. Stations
-// outside the active rocker range (s ≤ sternStartS or s ≥ bowStartS) are
-// dropped from the loft (filtered in unifiedStations).
+// Composite-S for an interior (rocker) station at spine parameter s.
+// Maps s ∈ [sternStartS, bowStartS] → S ∈ [sternFrac, 1-bowFrac].
 function interiorStationS(s, lengths) {
   const span = lengths.bowStartS - lengths.sternStartS;
-  if (span <= 1e-9) return 0;
-  return (s - lengths.sternStartS) / span;
+  if (span <= 1e-9) return lengths.sternFrac;
+  const mainFrac = 1 - lengths.sternFrac - lengths.bowFrac;
+  return lengths.sternFrac + ((s - lengths.sternStartS) / span) * mainFrac;
 }
 
-// Sheer stations are not currently lofted (the rocker-only model places
-// boundary cross-sections at S=0 and S=1 from the sheer profile shape;
-// extra sheer stations would need a different topology). Return -1 so
-// they're excluded from the unified list. UI controls remain so the data
-// is preserved across edits — TODO is in loft-plan.md.
-function sheerStationS() { return -1; }
+// Composite-S for a sheer-end station at keel parameter t ∈ [0,1]
+// (0 = junction on rocker, 1 = tip).
+function sheerStationS(end, t, lengths) {
+  if (end === 'bow')
+    return (1 - lengths.bowFrac) + lengths.bowFrac * t;
+  // stern: S=0 → tip (t=1), S=sternFrac → junction (t=0)
+  return lengths.sternFrac * (1 - t);
+}
 
-// World position of a point along a sheer profile at parameter t (used
-// by the side view for sheer-station tick rendering — purely visual).
+// World position of a point along a sheer keel at parameter t ∈ [0,1].
+// Used for sheer-station tick rendering in the side view.
 function sampleSheerSegment(state, lengths, end, t) {
-  const sheer   = end === 'bow' ? state.bowSheer : state.sternSheer;
-  const startS  = end === 'bow' ? lengths.bowStartS : lengths.sternStartS;
-  const profile = end === 'bow' ? lengths.bowProfile : lengths.sternProfile;
-  const rPt     = spineAt({ ctrl: state.spine, sampled: lengths.rocSampled }, startS);
-  if (profile.total === 0) return { p: { x: rPt.p.x, z: rPt.p.z }, tx: rPt.tx, tz: rPt.tz };
-  const target = Math.max(0, Math.min(profile.total, t * profile.total));
-  let lo = 0, hi = profile.pts.length - 1;
-  while (hi - lo > 1) {
-    const mid = (lo + hi) >> 1;
-    if (profile.arc[mid] <= target) lo = mid; else hi = mid;
-  }
-  const r = profile.arc[hi] === profile.arc[lo]
-    ? 0 : (target - profile.arc[lo]) / (profile.arc[hi] - profile.arc[lo]);
-  const dx = profile.pts[lo].x + r * (profile.pts[hi].x - profile.pts[lo].x);
-  const dz = profile.pts[lo].y + r * (profile.pts[hi].y - profile.pts[lo].y);
-  return { p: { x: rPt.p.x + dx, z: rPt.p.z + dz }, tx: 1, tz: 0 };
+  return sampleAlong(
+    end === 'bow' ? lengths.bowKeelSampled : lengths.sternKeelSampled,
+    t,
+  );
 }
 
 // Natural cubic spline through (sₖ, vₖ) at non-uniform knots — used for
@@ -489,52 +513,41 @@ function naturalCubicNonUniform(ss, vs) {
   };
 }
 
-// Build the unified station list for the loft. The boundary stations at
-// S=0 and S=1 are NOT degenerate single-point tips — they're shaped by
-// the sheer profile (stemProfileToSection projects each (dx, dz) onto
-// the rocker's local frame, giving b=0, n varying along the sheer
-// curve). This means the stem at each end is a vertical-ish edge in
-// the centerline plane that follows the user-edited sheer shape; the
-// longitudinal mesh edges meet that shape perpendicularly.
+// Build the unified station list for the loft.
+// Order: stern tip (S=0) → stern sheer-end stations → interior rocker
+// stations → bow sheer-end stations → bow tip (S=1).
 function unifiedStations(state, lengths, N) {
   const out = [];
+  const { sternFrac, bowFrac } = lengths;
+  const tip0 = Array.from({ length: N }, () => ({ b: 0, n: 0 }));
+  const tip1 = Array.from({ length: N }, () => ({ b: 0, n: 0 }));
 
-  // Stern boundary at S=0 — section follows the stern sheer profile in
-  // the local frame at rocker(sternStartS).
-  {
-    const { tx, tz } = compositeAt(state, lengths, 0);
-    out.push({
-      S: 0, kind: 'sternBoundary',
-      samples: stemProfileToSection(state.sternSheer.profile, -tz, tx, N),
-    });
-  }
+  // S=0: stern tip — single degenerate point.
+  out.push({ S: 0, kind: 'tip', samples: tip0 });
 
-  // Interior rocker stations (only those inside [sternStartS, bowStartS]).
-  state.stations.forEach((st) => {
-    if (st.s <= lengths.sternStartS + 1e-6) return;
-    if (st.s >= lengths.bowStartS  - 1e-6) return;
-    out.push({
-      S: interiorStationS(st.s, lengths),
-      kind: 'interior',
-      samples: sampleSection(st.points, N),
-    });
+  // Stern sheer-end stations (t=0 = junction, t=1 = tip → S walks 0..sternFrac).
+  state.sternSheer.stations.forEach(sst => {
+    const S = sheerStationS('stern', sst.t, lengths);
+    if (S <= 1e-6 || S >= sternFrac - 1e-6) return;
+    out.push({ S, kind: 'sternSheer', samples: sampleSection(sst.points, N) });
   });
 
-  // Bow boundary at S=1 — section follows the bow sheer profile.
-  {
-    const { tx, tz } = compositeAt(state, lengths, 1);
-    out.push({
-      S: 1, kind: 'bowBoundary',
-      samples: stemProfileToSection(state.bowSheer.profile, -tz, tx, N),
-    });
-  }
+  // Interior rocker stations.
+  state.stations.forEach(st => {
+    if (st.s <= lengths.sternStartS + 1e-6) return;
+    if (st.s >= lengths.bowStartS   - 1e-6) return;
+    out.push({ S: interiorStationS(st.s, lengths), kind: 'interior', samples: sampleSection(st.points, N) });
+  });
 
-  // NOTE: sheer stations (state.bowSheer.stations / sternSheer.stations)
-  // are intentionally NOT included in the loft right now. The rocker-only
-  // axis can't accommodate cross-sections that lie along the sheer profile
-  // without distorting the boundary edges. They're preserved in state and
-  // visible as ticks in the side view; re-introducing them as loft knots
-  // is a TODO once a cleaner topology lands.
+  // Bow sheer-end stations.
+  state.bowSheer.stations.forEach(sst => {
+    const S = sheerStationS('bow', sst.t, lengths);
+    if (S <= 1 - bowFrac + 1e-6 || S >= 1 - 1e-6) return;
+    out.push({ S, kind: 'bowSheer', samples: sampleSection(sst.points, N) });
+  });
+
+  // S=1: bow tip — single degenerate point.
+  out.push({ S: 1, kind: 'tip', samples: tip1 });
 
   out.sort((a, b) => a.S - b.S);
   return out;
@@ -1016,18 +1029,16 @@ function renderSideView() {
 
   const lengths = compositeLengths(state);
 
-  // Helper: sample a sheer profile to world-space (X, Z) pts.
-  const sheerWorldPts = (end) => {
-    const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
-    const { p: ep } = spineAt(spine, sheer.startS);
-    const dense = sampleSpline(sheer.profile, 'dx', 'dz', 24);
-    return dense.map(p => ({ x: ep.x + p.x, z: ep.z + p.y }));
+  // Helper: dense world-space points of a sheer keel line.
+  const sheerKeelWorldPts = (end) => {
+    const kSampled = sampledSheerKeel(state, end, sampled);
+    return kSampled.pts.map(p => ({ x: p.x, z: p.y }));
   };
 
-  const sternSheerPts = sheerWorldPts('stern'); // keel-end → stern tip
-  const bowSheerPts   = sheerWorldPts('bow');   // keel-end → bow tip
-  const sternTipPt    = sternSheerPts[sternSheerPts.length - 1];
-  const bowTipPt      = bowSheerPts[bowSheerPts.length - 1];
+  const sternSheerPts = sheerKeelWorldPts('stern'); // junction → stern tip
+  const bowSheerPts   = sheerKeelWorldPts('bow');   // junction → bow tip
+  const sternTipPt    = state.sternSheer.tip;
+  const bowTipPt      = state.bowSheer.tip;
 
   // Rocker: sample the active portion (sternSheer.startS → bowSheer.startS)
   const rockerPts = [];
@@ -1070,12 +1081,12 @@ function renderSideView() {
     class: 'keel',
     d: 'M ' + rockerPts.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.z).toFixed(2)}`).join(' L '),
   }));
-  // 2. Stern sheer (purple)
+  // 2. Stern sheer keel (purple — junction up to stern tip)
   sideSvg.appendChild(el('path', {
     class: 'stern-sheer-curve',
     d: 'M ' + sternSheerPts.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.z).toFixed(2)}`).join(' L '),
   }));
-  // 3. Bow sheer (orange)
+  // 3. Bow sheer keel (orange — junction up to bow tip)
   sideSvg.appendChild(el('path', {
     class: 'bow-sheer-curve',
     d: 'M ' + bowSheerPts.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.z).toFixed(2)}`).join(' L '),
@@ -1180,32 +1191,42 @@ function renderSideView() {
     class: 'label paddler-label', 'text-anchor': 'middle',
   }, 'paddler'));
 
-  // ── Sheer profiles (bow + stern, always rendered + editable) ─────────
+  // ── Sheer keel lines (bow + stern, always rendered + editable) ───────
+  // Each sheer end has: junction (locked, = startS on rocker), interior
+  // keelPts (draggable), and tip (draggable, X-extremum constraint).
   for (const end of ['stern', 'bow']) {
     const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
     const ep    = spineAt(spine, sheer.startS).p;
-
-    // The dense sheer curve is already drawn above as bow-sheer-curve /
-    // stern-sheer-curve. Here we just render the editable control points.
-    // Per-end color: bow = orange (.sheer-ctrl-bow), stern = purple (.sheer-ctrl-stern).
     const ptClass = `sheer-ctrl-${end}`;
-    sheer.profile.forEach((pt, i) => {
-      const wx = ep.x + pt.dx, wz = ep.z + pt.dz;
-      const isKeel = i === 0;
+
+    // Interior keel control points.
+    sheer.keelInteriorPts.forEach((pt, i) => {
       sideSvg.appendChild(el('circle', {
-        cx: xOf(wx), cy: yOf(wz), r: 14,
-        class: 'stem-hit' + (isKeel ? ' keel' : ''),
-        'data-drag': `sheer-pt-${end}`, 'data-idx': String(i),
+        cx: xOf(pt.x), cy: yOf(pt.z), r: 14,
+        class: 'stem-hit',
+        'data-drag': `sheer-keel-${end}`, 'data-idx': String(i),
       }));
       sideSvg.appendChild(el('circle', {
-        cx: xOf(wx), cy: yOf(wz), r: 4.5,
-        class: ptClass + (isKeel ? ' keel' : ''),
-        'data-drag': `sheer-pt-${end}`, 'data-idx': String(i),
+        cx: xOf(pt.x), cy: yOf(pt.z), r: 4.5,
+        class: ptClass,
+        'data-drag': `sheer-keel-${end}`, 'data-idx': String(i),
       }));
     });
 
-    // startS marker on the rocker — drag along the rocker to change where
-    // the sheer joins. Rendered as a chunky vertical tick at rocker(startS).
+    // Tip — draggable, must be X extremum.
+    const tipIdx = sheer.keelInteriorPts.length;
+    sideSvg.appendChild(el('circle', {
+      cx: xOf(sheer.tip.x), cy: yOf(sheer.tip.z), r: 14,
+      class: 'stem-hit',
+      'data-drag': `sheer-keel-${end}`, 'data-idx': String(tipIdx),
+    }));
+    sideSvg.appendChild(el('circle', {
+      cx: xOf(sheer.tip.x), cy: yOf(sheer.tip.z), r: 6,
+      class: `${ptClass} tip`,
+      'data-drag': `sheer-keel-${end}`, 'data-idx': String(tipIdx),
+    }));
+
+    // Junction tick on the rocker — drag to move where the sheer end begins.
     sideSvg.appendChild(el('line', {
       x1: xOf(ep.x), y1: yOf(ep.z) + 10,
       x2: xOf(ep.x), y2: yOf(ep.z) - 10,
@@ -1218,14 +1239,11 @@ function renderSideView() {
       'data-drag': `sheer-start-${end}`,
     }));
 
-    // Sheer station ticks along the sheer profile.
+    // Sheer-end station ticks along the sheer keel.
     sheer.stations.forEach((sst, sIdx) => {
-      // Lookup the entry in the unified list to get its index for selection.
       const uniIdx = unified.findIndex(u =>
         u.kind === (end === 'bow' ? 'bowSheer' : 'sternSheer') && u.stationIdx === sIdx
       );
-      // World position along the sheer profile at parameter t.
-      const target = sst.t * (sampledSheerProfile(sheer.profile).total);
       const sp = sampleSheerSegment(state, lengths, end, sst.t);
       const isSel = uniIdx === state.selectedStation;
       sideSvg.appendChild(el('line', {
@@ -1326,7 +1344,7 @@ function renderSectionView() {
   }));
   sectionSvg.appendChild(el('text', {
     x: 320, y: nOf(0) + 11, class: 'label', 'text-anchor': 'end',
-  }, sel.kind === 'interior' ? 'keel (n = 0, on rocker)' : 'keel (n = 0, on sheer)'));
+  }, sel.kind === 'interior' ? 'keel (n = 0, on rocker)' : 'keel (n = 0, on sheer keel)'));
 
   // Closed-loop section.
   const dense = sampleSpline(station.points, 'b', 'n', 24);
@@ -1335,12 +1353,12 @@ function renderSectionView() {
   sectionSvg.appendChild(el('path', { class: 'section-curve',  d: stbdPath }));
   sectionSvg.appendChild(el('path', { class: 'section-mirror', d: portPath }));
 
-  // Control points (always — sheer stations and interior stations both
-  // are closed-loop b/n cross-sections with the same editing model).
+  // Control points. Keel (index 0) and deck-end (last) are locked.
   station.points.forEach((p, i) => {
     const isKeel       = i === 0;
-    const isCenterline = i === 0 || i === lastIdx;
-    const cls = (isKeel ? 'keel ' : '') + (isCenterline ? 'centerline ' : '');
+    const isDeck       = i === lastIdx;
+    const isCenterline = isKeel || isDeck;
+    const cls = (isKeel ? 'keel ' : '') + (isDeck ? 'deck ' : '') + (isCenterline ? 'centerline ' : '');
     sectionSvg.appendChild(el('circle', {
       cx: bOf(p.b), cy: nOf(p.n), r: 14,
       class: ('ctrl-hit ' + cls).trim(),
@@ -1711,14 +1729,27 @@ sideSvg.addEventListener('pointermove', (e) => {
     drag.moved = true;
     renderSideView();
     rebuildHull();
-  } else if (drag.kind === 'sheer-pt-bow' || drag.kind === 'sheer-pt-stern') {
-    const i = drag.idx;
-    if (i === 0) return; // keel-end locked on rocker
-    const end   = drag.kind === 'sheer-pt-bow' ? 'bow' : 'stern';
+  } else if (drag.kind === 'sheer-keel-bow' || drag.kind === 'sheer-keel-stern') {
+    const end   = drag.kind === 'sheer-keel-bow' ? 'bow' : 'stern';
     const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
-    const spSampled = sampledSpine(state.spine, 64);
-    const { p: ep } = spineAt({ ctrl: state.spine, sampled: spSampled }, sheer.startS);
-    sheer.profile[i] = { dx: wx - ep.x, dz: wz - ep.z };
+    const i = drag.idx;
+    const isTip = i === sheer.keelInteriorPts.length;
+    // Compute junction X for clamping
+    const spSampled2 = sampledSpine(state.spine, 64);
+    const { p: jp } = spineAt({ ctrl: state.spine, sampled: spSampled2 }, sheer.startS);
+    if (isTip) {
+      // Tip must be the X extremum: bow = rightmost, stern = leftmost.
+      const allX = [jp.x, ...sheer.keelInteriorPts.map(p => p.x)];
+      const clampedX = end === 'bow'
+        ? Math.max(wx, ...allX)
+        : Math.min(wx, ...allX);
+      sheer.tip = { x: clampedX, z: wz };
+    } else {
+      // Interior point: keep X between junction and tip.
+      const minX = end === 'bow' ? jp.x           : sheer.tip.x;
+      const maxX = end === 'bow' ? sheer.tip.x    : jp.x;
+      sheer.keelInteriorPts[i] = { x: Math.max(minX, Math.min(maxX, wx)), z: wz };
+    }
     drag.moved = true;
     renderSideView();
     rebuildHull();
@@ -1746,16 +1777,14 @@ sideSvg.addEventListener('pointermove', (e) => {
     const end   = sel.kind === 'bowSheer' ? 'bow' : 'stern';
     const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
     const spSampled = sampledSpine(state.spine, 64);
-    const { p: ep } = spineAt({ ctrl: state.spine, sampled: spSampled }, sheer.startS);
-    // Convert click to (dx, dz) in sheer-local space, then find nearest t along the sheer curve.
-    const sample = sampledSheerProfile(sheer.profile);
-    const dx = wx - ep.x, dz = wz - ep.z;
+    // Find nearest t along the sheer keel line (world-space, not offset-space).
+    const keelSmp = sampledSheerKeel(state, end, spSampled);
     let bestT = 0, bestDist = Infinity;
-    for (let i = 0; i < sample.pts.length; i++) {
-      const d = Math.hypot(dx - sample.pts[i].x, dz - sample.pts[i].y);
+    for (let i = 0; i < keelSmp.pts.length; i++) {
+      const d = Math.hypot(wx - keelSmp.pts[i].x, wz - keelSmp.pts[i].y);
       if (d < bestDist) {
         bestDist = d;
-        bestT = sample.total > 0 ? sample.arc[i] / sample.total : 0;
+        bestT = keelSmp.total > 0 ? keelSmp.arc[i] / keelSmp.total : 0;
       }
     }
     bestT = Math.max(0.05, Math.min(0.95, bestT));
@@ -1876,36 +1905,36 @@ sideSvg.addEventListener('click', (e) => {
     }
   }
 
-  // Compute the click's distance to each sheer profile and pick the closest.
-  let best = { dist: Infinity, end: null, dx: 0, dz: 0 };
+  // Click near a sheer keel curve → insert interior control point.
+  const spSampledC2 = sampledSpine(state.spine, 64);
+  let best = { dist: Infinity, end: null };
   for (const end of ['bow', 'stern']) {
-    const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
-    const { p: ep } = spineAt(spineObj, sheer.startS);
-    const dx = wx - ep.x, dz = wz - ep.z;
-    const pts = sheer.profile;
+    const kSampled = sampledSheerKeel(state, end, spSampledC2);
+    const kpts = kSampled.pts;
     let minDist = Infinity;
-    for (let i = 0; i < pts.length - 1; i++) {
-      const a = pts[i], b = pts[i + 1];
-      const ddx = b.dx - a.dx, ddz = b.dz - a.dz;
+    for (let i = 0; i < kpts.length - 1; i++) {
+      const a = kpts[i], b = kpts[i + 1];
+      const ddx = b.x - a.x, ddz = b.y - a.y;
       const lenSq = ddx * ddx + ddz * ddz;
-      let t = lenSq > 0 ? ((dx - a.dx) * ddx + (dz - a.dz) * ddz) / lenSq : 0;
+      let t = lenSq > 0 ? ((wx - a.x) * ddx + (wz - a.y) * ddz) / lenSq : 0;
       t = Math.max(0, Math.min(1, t));
-      const px = a.dx + t * ddx, pz = a.dz + t * ddz;
-      minDist = Math.min(minDist, Math.hypot(dx - px, dz - pz));
+      const px = a.x + t * ddx, pz = a.y + t * ddz;
+      minDist = Math.min(minDist, Math.hypot(wx - px, wz - pz));
     }
-    if (minDist < best.dist) {
-      best = { dist: minDist, end, dx, dz };
-    }
+    if (minDist < best.dist) best = { dist: minDist, end };
   }
   const HIT_RADIUS = 0.15;
   if (best.dist > HIT_RADIUS) return;
 
-  const sheer = best.end === 'bow' ? state.bowSheer : state.sternSheer;
-  const pts   = sheer.profile;
-  let insertIdx = pts.findIndex(p => p.dz > best.dz);
-  if (insertIdx <= 0)              insertIdx = 1;
-  if (insertIdx >= pts.length)     insertIdx = pts.length - 1;
-  pts.splice(insertIdx, 0, { dx: best.dx, dz: best.dz });
+  const sheerC = best.end === 'bow' ? state.bowSheer : state.sternSheer;
+  // Insert into keelInteriorPts in X order (bow: ascending, stern: descending).
+  if (best.end === 'bow') {
+    const insertIdx = sheerC.keelInteriorPts.findIndex(p => p.x > wx);
+    sheerC.keelInteriorPts.splice(insertIdx === -1 ? sheerC.keelInteriorPts.length : insertIdx, 0, { x: wx, z: wz });
+  } else {
+    const insertIdx = sheerC.keelInteriorPts.findIndex(p => p.x < wx);
+    sheerC.keelInteriorPts.splice(insertIdx === -1 ? sheerC.keelInteriorPts.length : insertIdx, 0, { x: wx, z: wz });
+  }
   renderSideView();
   rebuildHull();
 });
@@ -1923,15 +1952,15 @@ sideSvg.addEventListener('contextmenu', (e) => {
     rebuildHull();
     return;
   }
-  // Sheer-pt delete
-  const target = e.target.closest('[data-drag^="sheer-pt-"]');
+  // Sheer keel interior point delete (tip = last index, protected).
+  const target = e.target.closest('[data-drag^="sheer-keel-"]');
   if (!target) return;
   e.preventDefault();
   const i   = +target.dataset.idx;
-  const end = target.dataset.drag === 'sheer-pt-bow' ? 'bow' : 'stern';
+  const end = target.dataset.drag === 'sheer-keel-bow' ? 'bow' : 'stern';
   const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
-  if (i === 0 || sheer.profile.length <= 2) return;
-  sheer.profile.splice(i, 1);
+  if (i >= sheer.keelInteriorPts.length) return; // can't delete tip
+  sheer.keelInteriorPts.splice(i, 1);
   renderSideView();
   rebuildHull();
 });
@@ -1960,9 +1989,9 @@ sectionSvg.addEventListener('pointermove', (e) => {
   if (!sel) return;
   const station = sel.ref;
   const i       = sectionDrag.idx;
-  if (i === 0) return; // keel locked at (0, 0) by the global rule
-  const lastIdx      = station.points.length - 1;
-  const isCenterline = i === lastIdx;
+  const lastIdx = station.points.length - 1;
+  if (i === 0 || i === lastIdx) return; // keel and deck-end both locked
+  const isCenterline = i === lastIdx;   // (never true now, kept for safety)
   const { x, y } = svgToLocal(sectionSvg, e);
   const n = -y / SECTION_SCALE;
   if (isCenterline) {
