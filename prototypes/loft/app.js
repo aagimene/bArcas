@@ -185,11 +185,15 @@ function reconcileDeckPoints(state) {
     st.points[st.points.length - 1].n = deckNFromLine(p.x, p.z, tx, deckEval);
   });
 
+  // Sheer stations: locate each one's world position by sampling the
+  // sheer profile, then look up the deck line at that X.
   const lengths = compositeLengths(state);
   for (const [end, sheer] of [['bow', state.bowSheer], ['stern', state.sternSheer]]) {
     sheer.stations.forEach(sst => {
-      const { p, tx } = compositeAt(state, lengths, sheerStationS(end, sst.t, lengths));
-      sst.points[sst.points.length - 1].n = deckNFromLine(p.x, p.z, tx, deckEval);
+      const { p } = sampleSheerSegment(state, lengths, end, sst.t);
+      // tx ≈ 1 for the cross-section's world frame at the sheer (we use
+      // a vertical projection here since sheer stations aren't lofted).
+      sst.points[sst.points.length - 1].n = deckNFromLine(p.x, p.z, 1, deckEval);
     });
   }
 }
@@ -365,36 +369,59 @@ function sampledSheerProfile(profile, samplesPerSpan = 24) {
   return { pts, arc, total: arc[arc.length - 1] };
 }
 
-// Bundle of cached arc lengths for the composite spine.
+// Cached lengths / samples for the loft's longitudinal axis. The loft
+// runs ALONG THE ROCKER between sternSheer.startS and bowSheer.startS;
+// the bow / stern sheer profiles do NOT extend the spine. Instead, the
+// boundary cross-sections at the rocker ends are *shaped* by the sheer
+// profile (b=0, n traces the sheer curve in the rocker's local frame).
+// This produces a vertical-ish stem at each end whose silhouette in the
+// centerline plane matches the sheer curve in the side view, and the
+// longitudinal mesh edges meet the sheer perpendicularly.
 function compositeLengths(state) {
   const rocSampled  = sampledSpine(state.spine, 64);
   const rocTotal    = rocSampled.total || 1e-9;
-  const sternStartS = Math.max(0, Math.min(1, state.sternSheer.startS));
-  const bowStartS   = Math.max(sternStartS + 0.05, Math.min(1, state.bowSheer.startS));
+  const sternStartS = Math.max(0,                     Math.min(1, state.sternSheer.startS));
+  const bowStartS   = Math.max(sternStartS + 0.05,    Math.min(1, state.bowSheer.startS));
   const sternProfile = sampledSheerProfile(state.sternSheer.profile);
   const bowProfile   = sampledSheerProfile(state.bowSheer.profile);
-  const L_rocker = (bowStartS - sternStartS) * rocTotal;
-  const L_stern  = sternProfile.total;
-  const L_bow    = bowProfile.total;
-  const L_total  = L_stern + L_rocker + L_bow || 1e-9;
   return {
-    rocSampled, rocTotal, sternStartS, bowStartS,
+    rocSampled, rocTotal,
+    sternStartS, bowStartS,
     sternProfile, bowProfile,
-    L_stern, L_rocker, L_bow, L_total,
   };
 }
 
-// Sample a sheer segment at parameter t ∈ [0, 1] (0 = on rocker, 1 = tip).
-// Returns world {p:{x,z}, tx, tz} where (tx, tz) is the unit tangent of
-// the composite spine through that point (reversed for the stern segment
-// because the composite walks stern sheer in reverse: tip → rocker).
-function sampleSheerSegment(state, lengths, end /* 'bow' | 'stern' */, t) {
+// Composite-axis sample at S ∈ [0, 1] — pure rocker walk between
+// sternStartS and bowStartS.
+function compositeAt(state, lengths, S) {
+  const rocS = lengths.sternStartS + S * (lengths.bowStartS - lengths.sternStartS);
+  return spineAt({ ctrl: state.spine, sampled: lengths.rocSampled }, rocS);
+}
+
+// Composite-S parameter for an interior station at rocker s. Stations
+// outside the active rocker range (s ≤ sternStartS or s ≥ bowStartS) are
+// dropped from the loft (filtered in unifiedStations).
+function interiorStationS(s, lengths) {
+  const span = lengths.bowStartS - lengths.sternStartS;
+  if (span <= 1e-9) return 0;
+  return (s - lengths.sternStartS) / span;
+}
+
+// Sheer stations are not currently lofted (the rocker-only model places
+// boundary cross-sections at S=0 and S=1 from the sheer profile shape;
+// extra sheer stations would need a different topology). Return -1 so
+// they're excluded from the unified list. UI controls remain so the data
+// is preserved across edits — TODO is in loft-plan.md.
+function sheerStationS() { return -1; }
+
+// World position of a point along a sheer profile at parameter t (used
+// by the side view for sheer-station tick rendering — purely visual).
+function sampleSheerSegment(state, lengths, end, t) {
+  const sheer   = end === 'bow' ? state.bowSheer : state.sternSheer;
   const startS  = end === 'bow' ? lengths.bowStartS : lengths.sternStartS;
   const profile = end === 'bow' ? lengths.bowProfile : lengths.sternProfile;
   const rPt     = spineAt({ ctrl: state.spine, sampled: lengths.rocSampled }, startS);
-  if (profile.total === 0) {
-    return { p: { x: rPt.p.x, z: rPt.p.z }, tx: rPt.tx, tz: rPt.tz };
-  }
+  if (profile.total === 0) return { p: { x: rPt.p.x, z: rPt.p.z }, tx: rPt.tx, tz: rPt.tz };
   const target = Math.max(0, Math.min(profile.total, t * profile.total));
   let lo = 0, hi = profile.pts.length - 1;
   while (hi - lo > 1) {
@@ -405,46 +432,7 @@ function sampleSheerSegment(state, lengths, end /* 'bow' | 'stern' */, t) {
     ? 0 : (target - profile.arc[lo]) / (profile.arc[hi] - profile.arc[lo]);
   const dx = profile.pts[lo].x + r * (profile.pts[hi].x - profile.pts[lo].x);
   const dz = profile.pts[lo].y + r * (profile.pts[hi].y - profile.pts[lo].y);
-  // Tangent direction along the profile, sheer-from-rocker → tip.
-  const ddx = profile.pts[hi].x - profile.pts[lo].x;
-  const ddz = profile.pts[hi].y - profile.pts[lo].y;
-  const len = Math.hypot(ddx, ddz) || 1;
-  let tx = ddx / len, tz = ddz / len;
-  if (end === 'stern') { tx = -tx; tz = -tz; } // composite walks stern in reverse
-  return { p: { x: rPt.p.x + dx, z: rPt.p.z + dz }, tx, tz };
-}
-
-// Sample the composite spine at S ∈ [0, 1].
-function compositeAt(state, lengths, S) {
-  const distance = S * lengths.L_total;
-  if (distance <= lengths.L_stern) {
-    const t = lengths.L_stern > 0 ? 1 - distance / lengths.L_stern : 1;
-    return sampleSheerSegment(state, lengths, 'stern', t);
-  }
-  if (distance <= lengths.L_stern + lengths.L_rocker) {
-    const rDist  = distance - lengths.L_stern;
-    const rocS   = lengths.sternStartS + rDist / lengths.rocTotal;
-    return spineAt({ ctrl: state.spine, sampled: lengths.rocSampled }, rocS);
-  }
-  const sDist = distance - lengths.L_stern - lengths.L_rocker;
-  const t     = lengths.L_bow > 0 ? sDist / lengths.L_bow : 0;
-  return sampleSheerSegment(state, lengths, 'bow', t);
-}
-
-// Composite-S parameter for an interior station at rocker s.
-function interiorStationS(s, lengths) {
-  const rDist = (s - lengths.sternStartS) * lengths.rocTotal;
-  return (lengths.L_stern + rDist) / lengths.L_total;
-}
-
-// Composite-S parameter for a sheer station at parameter t along its sheer.
-// For bow: t=0 (on rocker) → S=L_stern+L_rocker; t=1 (tip) → S=1.
-// For stern: t=0 (on rocker) → S=L_stern; t=1 (tip) → S=0.
-function sheerStationS(end, t, lengths) {
-  if (end === 'bow') {
-    return (lengths.L_stern + lengths.L_rocker + t * lengths.L_bow) / lengths.L_total;
-  }
-  return (1 - t) * lengths.L_stern / lengths.L_total;
+  return { p: { x: rPt.p.x + dx, z: rPt.p.z + dz }, tx: 1, tz: 0 };
 }
 
 // Natural cubic spline through (sₖ, vₖ) at non-uniform knots — used for
@@ -501,24 +489,25 @@ function naturalCubicNonUniform(ss, vs) {
   };
 }
 
-// Build the unified station list: synthetic tips at S=0 and S=1, all
-// interior stations (clamped to active rocker range), and all sheer
-// stations from bow + stern. Each entry has { S, kind, samples }.
+// Build the unified station list for the loft. The boundary stations at
+// S=0 and S=1 are NOT degenerate single-point tips — they're shaped by
+// the sheer profile (stemProfileToSection projects each (dx, dz) onto
+// the rocker's local frame, giving b=0, n varying along the sheer
+// curve). This means the stem at each end is a vertical-ish edge in
+// the centerline plane that follows the user-edited sheer shape; the
+// longitudinal mesh edges meet that shape perpendicularly.
 function unifiedStations(state, lengths, N) {
   const out = [];
 
-  // Stern tip: degenerate, all (b=0, n=0).
-  const tipSamples = new Array(N).fill({ b: 0, n: 0 });
-  out.push({ S: 0, kind: 'tip', samples: tipSamples });
-
-  // Stern sheer stations (interior of the stern segment).
-  state.sternSheer.stations.forEach((st) => {
+  // Stern boundary at S=0 — section follows the stern sheer profile in
+  // the local frame at rocker(sternStartS).
+  {
+    const { tx, tz } = compositeAt(state, lengths, 0);
     out.push({
-      S: sheerStationS('stern', st.t, lengths),
-      kind: 'sternSheer',
-      samples: sampleSection(st.points, N),
+      S: 0, kind: 'sternBoundary',
+      samples: stemProfileToSection(state.sternSheer.profile, -tz, tx, N),
     });
-  });
+  }
 
   // Interior rocker stations (only those inside [sternStartS, bowStartS]).
   state.stations.forEach((st) => {
@@ -531,17 +520,21 @@ function unifiedStations(state, lengths, N) {
     });
   });
 
-  // Bow sheer stations.
-  state.bowSheer.stations.forEach((st) => {
+  // Bow boundary at S=1 — section follows the bow sheer profile.
+  {
+    const { tx, tz } = compositeAt(state, lengths, 1);
     out.push({
-      S: sheerStationS('bow', st.t, lengths),
-      kind: 'bowSheer',
-      samples: sampleSection(st.points, N),
+      S: 1, kind: 'bowBoundary',
+      samples: stemProfileToSection(state.bowSheer.profile, -tz, tx, N),
     });
-  });
+  }
 
-  // Bow tip.
-  out.push({ S: 1, kind: 'tip', samples: tipSamples });
+  // NOTE: sheer stations (state.bowSheer.stations / sternSheer.stations)
+  // are intentionally NOT included in the loft right now. The rocker-only
+  // axis can't accommodate cross-sections that lie along the sheer profile
+  // without distorting the boundary edges. They're preserved in state and
+  // visible as ticks in the side view; re-introducing them as loft knots
+  // is a TODO once a cleaner topology lands.
 
   out.sort((a, b) => a.S - b.S);
   return out;
