@@ -42,6 +42,9 @@ const state = {
   // draggable. Each station's deck-end n is derived from this line, so
   // moving the deck line reshapes every station's top at once.
   deckLine: defaultDeckLine(),
+  // Loft mesh overlay in side view
+  showLoftMesh: false,
+  meshOpacity: 0.3,
 };
 
 // ── Rocker spine: cubic Bézier with explicit tangent handles ─────────────
@@ -1286,6 +1289,46 @@ function renderSideView() {
       ...(locked ? {} : { 'data-drag': 'deck-pt', 'data-idx': String(idx) }),
     }));
   });
+
+  // ── Loft mesh overlay (if enabled) ───────────────────────────────────
+  if (state.showLoftMesh && lastLoft) {
+    const opacity = state.meshOpacity / 100;
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('style', `opacity: ${opacity}`);
+
+    // Draw wireframe from the loft mesh (M×N quad grid in 3D).
+    // Project orthographically to side view (drop Y coordinate).
+    if (lastLoft.rows && lastLoft.rows.length > 0) {
+      // Draw longitudinal lines (M direction).
+      for (let m = 0; m < lastLoft.rows.length; m++) {
+        const row = lastLoft.rows[m];
+        if (row.length < 2) continue;
+        const pts = row.map(v => `${xOf(v.x).toFixed(2)} ${yOf(v.z).toFixed(2)}`);
+        const path = el('path', {
+          class: 'loft-mesh-line',
+          d: 'M ' + pts.join(' L '),
+        });
+        group.appendChild(path);
+      }
+      // Draw transverse lines (N direction).
+      for (let n = 0; n < (lastLoft.rows[0]?.length || 0); n++) {
+        const pts = [];
+        for (let m = 0; m < lastLoft.rows.length; m++) {
+          if (n < lastLoft.rows[m].length) {
+            pts.push(`${xOf(lastLoft.rows[m][n].x).toFixed(2)} ${yOf(lastLoft.rows[m][n].z).toFixed(2)}`);
+          }
+        }
+        if (pts.length >= 2) {
+          const path = el('path', {
+            class: 'loft-mesh-line',
+            d: 'M ' + pts.join(' L '),
+          });
+          group.appendChild(path);
+        }
+      }
+    }
+    sideSvg.appendChild(group);
+  }
 }
 
 // Build the unified station list for the UI (interior + sheer; not the
@@ -1581,6 +1624,22 @@ hullMaterial.color.set(colorOutEl.value);
 insideColorUniform.value.set(colorInEl.value);
 colorOutEl.addEventListener('input', () => hullMaterial.color.set(colorOutEl.value));
 colorInEl .addEventListener('input', () => insideColorUniform.value.set(colorInEl.value));
+
+// ── Loft mesh overlay controls ────────────────────────────────────────────
+const showMeshEl = document.getElementById('show-mesh');
+const meshOpacityEl = document.getElementById('mesh-opacity');
+const meshOpacityOut = document.getElementById('mesh-opacity-out');
+
+showMeshEl.addEventListener('change', () => {
+  state.showLoftMesh = showMeshEl.checked;
+  renderSideView();
+});
+
+meshOpacityEl.addEventListener('input', () => {
+  state.meshOpacity = parseFloat(meshOpacityEl.value);
+  meshOpacityOut.textContent = state.meshOpacity.toFixed(0) + '%';
+  renderSideView();
+});
 
 // ── Ambient occlusion — direct SSAOPass parameter knobs ──────────────────
 //

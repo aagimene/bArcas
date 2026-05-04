@@ -17,7 +17,7 @@
 <body>
 
 <header>
-  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · taut-keel</span>
+  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · flowing-mesh</span>
   <h1>Loft</h1>
   <p class="subtitle">
     Design a 3D kayak hull from a curved spine (rocker) and a set of cross-sections, lofted live.
@@ -84,6 +84,16 @@
           </select>
         </label>
         <button type="button" id="ao-reset" class="ao-reset">reset to defaults</button>
+      </details>
+      <details class="mesh-details">
+        <summary>Loft mesh overlay</summary>
+        <label class="mesh-toggle">
+          <input type="checkbox" id="show-mesh">
+          Show wireframe
+        </label>
+        <label>opacity <output id="mesh-opacity-out">30%</output>
+          <input type="range" id="mesh-opacity" min="0" max="100" step="5" value="30">
+        </label>
       </details>
       <div class="station-list">
         <div class="station-list-header">
