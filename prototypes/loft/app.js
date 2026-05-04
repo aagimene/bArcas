@@ -807,6 +807,8 @@ const hullWireMaterial = new THREE.LineBasicMaterial({ color: 0x475569, transpar
 const bandGroup = new THREE.Group();
 scene.add(bandGroup);
 
+let lastLoft = null; // updated by rebuildHull(); read by renderSideView()
+
 function rebuildHull() {
   // Sync all station deck-ends to the deck line before lofting.
   reconcileDeckPoints(state);
@@ -860,10 +862,11 @@ function rebuildHull() {
     bandGroup.add(new THREE.Line(g, mat));
   });
 
+  lastLoft = loft;
   return loft;
 }
 
-let lastLoft = rebuildHull();
+rebuildHull(); // populates lastLoft
 
 // ── Post-processing: ambient occlusion ───────────────────────────────────
 //
@@ -1476,8 +1479,8 @@ function selectStation(i) {
   stationLabel.textContent = stationLabelFor(state.selectedStation);
   renderStationList();
   renderSectionView();
-  renderSideView();
   rebuildHull();
+  renderSideView();
   syncStationButtons();
 }
 
@@ -1540,10 +1543,10 @@ function addStation() {
   }
 
   stationLabel.textContent = stationLabelFor(state.selectedStation);
+  rebuildHull();
   renderStationList();
   renderSideView();
   renderSectionView();
-  rebuildHull();
   syncStationButtons();
 }
 
@@ -1563,10 +1566,10 @@ function removeStation() {
   state.selectedStation = Math.min(state.selectedStation, total - 1);
   stationLabel.textContent = stationLabelFor(state.selectedStation);
 
+  rebuildHull();
   renderStationList();
   renderSideView();
   renderSectionView();
-  rebuildHull();
   syncStationButtons();
 }
 
@@ -1607,8 +1610,8 @@ lengthEl.addEventListener('input', () => {
   }
   state.length = newL;
   lengthOut.textContent = newL.toFixed(2) + ' m';
-  renderSideView();
   rebuildHull();
+  renderSideView();
 });
 
 loftResEl.addEventListener('change', () => {
@@ -1786,8 +1789,8 @@ sideSvg.addEventListener('pointermove', (e) => {
     if (idx < 0) return; // locked endpoint
     state.deckLine.points[idx] = { x: wx, z: wz };
     drag.moved = true;
-    renderSideView();
     rebuildHull();
+    renderSideView();
   } else if (drag.kind === 'sheer-keel-bow' || drag.kind === 'sheer-keel-stern') {
     const end   = drag.kind === 'sheer-keel-bow' ? 'bow' : 'stern';
     const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
@@ -1810,8 +1813,8 @@ sideSvg.addEventListener('pointermove', (e) => {
       sheer.keelInteriorPts[i] = { x: Math.max(minX, Math.min(maxX, wx)), z: wz };
     }
     drag.moved = true;
-    renderSideView();
     rebuildHull();
+    renderSideView();
   } else if (drag.kind === 'sheer-start-bow' || drag.kind === 'sheer-start-stern') {
     // Drag the join point along the rocker.
     const end   = drag.kind === 'sheer-start-bow' ? 'bow' : 'stern';
@@ -1827,8 +1830,8 @@ sideSvg.addEventListener('pointermove', (e) => {
       sheer.startS = Math.max(0.0, Math.min(state.bowSheer.startS - 0.1, newS));
     }
     drag.moved = true;
-    renderSideView();
     rebuildHull();
+    renderSideView();
   } else if (drag.kind === 'sheer-station') {
     // Drag a sheer station along its sheer profile.
     const sel   = listAllStations(state)[drag.idx];
@@ -1856,9 +1859,9 @@ sideSvg.addEventListener('pointermove', (e) => {
       e.kind === sel.kind && e.stationIdx === newIdx
     );
     drag.moved = true;
+    rebuildHull();
     renderSideView();
     renderStationList();
-    rebuildHull();
   } else if (drag.kind.startsWith('anchor-') || drag.kind.startsWith('handle-')) {
     const sp = state.spine;
     if (drag.kind === 'anchor-stern') {
@@ -1895,8 +1898,8 @@ sideSvg.addEventListener('pointermove', (e) => {
     state.length = sp.bow.x - sp.stern.x;
     lengthEl.value = state.length.toFixed(2);
     lengthOut.textContent = state.length.toFixed(2) + ' m';
-    renderSideView();
     rebuildHull();
+    renderSideView();
   } else if (drag.kind === 'station') {
     // Interior station drag along the rocker. drag.idx is the unified index.
     const sel = listAllStations(state)[drag.idx];
@@ -1914,8 +1917,8 @@ sideSvg.addEventListener('pointermove', (e) => {
       ? hi : Math.min(hi, state.stations[stationIdx + 1].s - 0.02);
     state.stations[stationIdx].s = Math.max(minS, Math.min(maxS, s));
     renderStationList();
-    renderSideView();
     rebuildHull();
+    renderSideView();
   }
 });
 
@@ -1958,8 +1961,8 @@ sideSvg.addEventListener('click', (e) => {
       const insertIdx = state.deckLine.points.findIndex(p => p.x > wx);
       if (insertIdx === -1) state.deckLine.points.push({ x: wx, z: wz });
       else state.deckLine.points.splice(insertIdx, 0, { x: wx, z: wz });
-      renderSideView();
       rebuildHull();
+      renderSideView();
       return;
     }
   }
@@ -1994,8 +1997,8 @@ sideSvg.addEventListener('click', (e) => {
     const insertIdx = sheerC.keelInteriorPts.findIndex(p => p.x < wx);
     sheerC.keelInteriorPts.splice(insertIdx === -1 ? sheerC.keelInteriorPts.length : insertIdx, 0, { x: wx, z: wz });
   }
-  renderSideView();
   rebuildHull();
+  renderSideView();
 });
 
 sideSvg.addEventListener('contextmenu', (e) => {
@@ -2007,8 +2010,8 @@ sideSvg.addEventListener('contextmenu', (e) => {
     if (idx < 0 || state.deckLine.points.length <= 1) return;
     state.deckLine.points.splice(idx, 1);
     // Re-index isn't needed — we use natural array index
-    renderSideView();
     rebuildHull();
+    renderSideView();
     return;
   }
   // Sheer keel interior point delete (tip = last index, protected).
@@ -2020,8 +2023,8 @@ sideSvg.addEventListener('contextmenu', (e) => {
   const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
   if (i >= sheer.keelInteriorPts.length) return; // can't delete tip
   sheer.keelInteriorPts.splice(i, 1);
-  renderSideView();
   rebuildHull();
+  renderSideView();
 });
 
 // ── Cross-section drag / add / delete handlers ───────────────────────────
@@ -2062,8 +2065,8 @@ sectionSvg.addEventListener('pointermove', (e) => {
   }
   sectionDrag.moved = true;
   renderSectionView();
-  renderSideView();
   rebuildHull();
+  renderSideView();
 });
 
 function endSectionDrag() {
@@ -2093,8 +2096,8 @@ sectionSvg.addEventListener('click', (e) => {
   station.points.splice(insertIdx, 0, { b, n, chine: false });
   renderStationList();
   renderSectionView();
-  renderSideView();
   rebuildHull();
+  renderSideView();
 });
 
 // Right-click a control point to delete it. Keel (idx 0) and deck-end
@@ -2114,8 +2117,8 @@ sectionSvg.addEventListener('contextmenu', (e) => {
   station.points.splice(i, 1);
   renderStationList();
   renderSectionView();
-  renderSideView();
   rebuildHull();
+  renderSideView();
 });
 
 // Find the index at which a new (b, n) should be inserted into a section's
