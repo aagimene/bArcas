@@ -2062,6 +2062,7 @@ sectionSvg.addEventListener('pointermove', (e) => {
   }
   sectionDrag.moved = true;
   renderSectionView();
+  renderSideView();
   rebuildHull();
 });
 
@@ -2092,6 +2093,7 @@ sectionSvg.addEventListener('click', (e) => {
   station.points.splice(insertIdx, 0, { b, n, chine: false });
   renderStationList();
   renderSectionView();
+  renderSideView();
   rebuildHull();
 });
 
@@ -2112,6 +2114,7 @@ sectionSvg.addEventListener('contextmenu', (e) => {
   station.points.splice(i, 1);
   renderStationList();
   renderSectionView();
+  renderSideView();
   rebuildHull();
 });
 
