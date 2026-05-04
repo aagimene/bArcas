@@ -174,28 +174,11 @@ function buildDeckSpline(state, spSampled) {
 // the spine tangent direction at that point. n is the projection of the
 // keel→deck vector onto the local up direction (tx ≈ 1 for mild rocker,
 // so n ≈ deckZ − keelZ for typical kayaks).
-// Find the deck-end n such that the deck centerline point in world space
-// lies exactly on the deck line. Solves:
-//   f(n) = keelZ + n·tx − deckEval(keelX − n·tz) = 0
-// via Newton iteration (~3–5 steps to float convergence).
-function deckNFromLine(keelPx, keelPz, tx, tz, deckEval) {
-  // Initial guess: ignore X-drift (exact when tz = 0).
-  let n = tx > 1e-4
-    ? (deckEval(keelPx) - keelPz) / tx
-    : Math.max(0.05, deckEval(keelPx) - keelPz);
-
-  for (let iter = 0; iter < 8; iter++) {
-    const wx = keelPx - n * tz;
-    const f  = keelPz + n * tx - deckEval(wx);
-    if (Math.abs(f) < 1e-9) break;
-    // Derivative: f'(n) = tx + tz · deckEval'(wx), estimated numerically.
-    const h   = 1e-5;
-    const dDeck = (deckEval(wx + h) - deckEval(wx - h)) / (2 * h);
-    const fp  = tx + tz * dDeck;
-    if (Math.abs(fp) < 1e-12) break;
-    n -= f / fp;
-  }
-  return Math.max(0.05, n);
+// Deck-end n stored in station data: world-Z height of deck above keel.
+// buildLoft applies a per-row scale so the rendered deck always hits the
+// deck line exactly; this value only needs to give a plausible spline shape.
+function deckNFromLine(keelPx, keelPz, deckEval) {
+  return Math.max(0.05, deckEval(keelPx) - keelPz);
 }
 
 // Update every station's deck-end (last) control-point n from the deck
@@ -209,8 +192,8 @@ function reconcileDeckPoints(state) {
 
   // Interior (rocker) stations — keel on rocker.
   state.stations.forEach(st => {
-    const { p, tx, tz } = spineAt(spineObj, st.s);
-    st.points[st.points.length - 1].n = deckNFromLine(p.x, p.z, tx, tz, deckEval);
+    const { p } = spineAt(spineObj, st.s);
+    st.points[st.points.length - 1].n = deckNFromLine(p.x, p.z, deckEval);
   });
 
   // Sheer-end stations — keel on the sheer keel line.
@@ -218,8 +201,8 @@ function reconcileDeckPoints(state) {
     const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
     const keelSampled = sampledSheerKeel(state, end, spSampled);
     sheer.stations.forEach(sst => {
-      const { p, tx, tz } = sampleAlong(keelSampled, sst.t);
-      sst.points[sst.points.length - 1].n = deckNFromLine(p.x, p.z, tx, tz, deckEval);
+      const { p } = sampleAlong(keelSampled, sst.t);
+      sst.points[sst.points.length - 1].n = deckNFromLine(p.x, p.z, deckEval);
     });
   }
 }
@@ -596,7 +579,7 @@ function buildLoft(state) {
     nSplines[k] = naturalCubicNonUniform(ss, samps.map(samp => samp[k].n));
   }
 
-  // Build the deck spline once so the per-row Newton solve below can use it.
+  // Build the deck spline once for per-row boundary enforcement.
   const deckEvalLoft = buildDeckSpline(state, sampledSpine(state.spine, 64));
 
   // Sample at M longitudinal positions along the composite spine.
@@ -604,18 +587,27 @@ function buildLoft(state) {
   for (let i = 0; i < M; i++) {
     const S = i / (M - 1);
     const { p, tx, tz } = compositeAt(state, lengths, S);
-    const nx = -tz, nz = tx;
+    const nx = -tz, nz = tx;   // local "up" direction in the X-Z plane
+
+    // Per-row n-scale: stretch all n values so the deck-end hits the deck
+    // line in world Z. nSplines[N-1] is the deck-end index. In world space:
+    //   worldDeckZ = p.z + nDeckInterp × tx
+    // Target from the deck line: targetDeckZ = deckEvalLoft(p.x)
+    // Scale so world deck Z = target:  nScale = (target − p.z) / (nDeckInterp × tx)
+    // Applied to every k preserves the cross-section's proportional shape.
+    const nDeckInterp  = nSplines[N - 1](S);
+    const worldDeckInterp = p.z + nDeckInterp * nz;   // nz = tx
+    const targetDeckZ  = deckEvalLoft(p.x);
+    const nScale = (worldDeckInterp - p.z > 1e-4)
+      ? Math.max(0, (targetDeckZ - p.z) / (worldDeckInterp - p.z))
+      : 1;
+
     const row = new Array(N);
-    // Interior section points — interpolated via the (b, n) splines.
-    for (let k = 0; k < N - 1; k++) {
+    for (let k = 0; k < N; k++) {
       const b = bSplines[k](S);
-      const n = nSplines[k](S);
+      const n = nSplines[k](S) * nScale;
       row[k] = { x: p.x + n * nx, y: b, z: p.z + n * nz };
     }
-    // Deck-end (k = N-1, b = 0): Newton-solve so the world position lies
-    // exactly on the deck line at every row, regardless of slope.
-    const n_deck = deckNFromLine(p.x, p.z, tx, tz, deckEvalLoft);
-    row[N - 1] = { x: p.x + n_deck * nx, y: 0, z: p.z + n_deck * nz };
     rows[i] = row;
   }
 
