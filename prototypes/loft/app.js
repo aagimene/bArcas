@@ -174,8 +174,28 @@ function buildDeckSpline(state, spSampled) {
 // the spine tangent direction at that point. n is the projection of the
 // keel→deck vector onto the local up direction (tx ≈ 1 for mild rocker,
 // so n ≈ deckZ − keelZ for typical kayaks).
-function deckNFromLine(keelPx, keelPz, tx, deckEval) {
-  return Math.max(0.05, (deckEval(keelPx) - keelPz) * tx);
+// Find the deck-end n such that the deck centerline point in world space
+// lies exactly on the deck line. Solves:
+//   f(n) = keelZ + n·tx − deckEval(keelX − n·tz) = 0
+// via Newton iteration (~3–5 steps to float convergence).
+function deckNFromLine(keelPx, keelPz, tx, tz, deckEval) {
+  // Initial guess: ignore X-drift (exact when tz = 0).
+  let n = tx > 1e-4
+    ? (deckEval(keelPx) - keelPz) / tx
+    : Math.max(0.05, deckEval(keelPx) - keelPz);
+
+  for (let iter = 0; iter < 8; iter++) {
+    const wx = keelPx - n * tz;
+    const f  = keelPz + n * tx - deckEval(wx);
+    if (Math.abs(f) < 1e-9) break;
+    // Derivative: f'(n) = tx + tz · deckEval'(wx), estimated numerically.
+    const h   = 1e-5;
+    const dDeck = (deckEval(wx + h) - deckEval(wx - h)) / (2 * h);
+    const fp  = tx + tz * dDeck;
+    if (Math.abs(fp) < 1e-12) break;
+    n -= f / fp;
+  }
+  return Math.max(0.05, n);
 }
 
 // Update every station's deck-end (last) control-point n from the deck
@@ -189,8 +209,8 @@ function reconcileDeckPoints(state) {
 
   // Interior (rocker) stations — keel on rocker.
   state.stations.forEach(st => {
-    const { p, tx } = spineAt(spineObj, st.s);
-    st.points[st.points.length - 1].n = deckNFromLine(p.x, p.z, tx, deckEval);
+    const { p, tx, tz } = spineAt(spineObj, st.s);
+    st.points[st.points.length - 1].n = deckNFromLine(p.x, p.z, tx, tz, deckEval);
   });
 
   // Sheer-end stations — keel on the sheer keel line.
@@ -198,8 +218,8 @@ function reconcileDeckPoints(state) {
     const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
     const keelSampled = sampledSheerKeel(state, end, spSampled);
     sheer.stations.forEach(sst => {
-      const { p, tx } = sampleAlong(keelSampled, sst.t);
-      sst.points[sst.points.length - 1].n = deckNFromLine(p.x, p.z, tx, deckEval);
+      const { p, tx, tz } = sampleAlong(keelSampled, sst.t);
+      sst.points[sst.points.length - 1].n = deckNFromLine(p.x, p.z, tx, tz, deckEval);
     });
   }
 }
@@ -576,6 +596,9 @@ function buildLoft(state) {
     nSplines[k] = naturalCubicNonUniform(ss, samps.map(samp => samp[k].n));
   }
 
+  // Build the deck spline once so the per-row Newton solve below can use it.
+  const deckEvalLoft = buildDeckSpline(state, sampledSpine(state.spine, 64));
+
   // Sample at M longitudinal positions along the composite spine.
   const rows = new Array(M);
   for (let i = 0; i < M; i++) {
@@ -583,11 +606,16 @@ function buildLoft(state) {
     const { p, tx, tz } = compositeAt(state, lengths, S);
     const nx = -tz, nz = tx;
     const row = new Array(N);
-    for (let k = 0; k < N; k++) {
+    // Interior section points — interpolated via the (b, n) splines.
+    for (let k = 0; k < N - 1; k++) {
       const b = bSplines[k](S);
       const n = nSplines[k](S);
       row[k] = { x: p.x + n * nx, y: b, z: p.z + n * nz };
     }
+    // Deck-end (k = N-1, b = 0): Newton-solve so the world position lies
+    // exactly on the deck line at every row, regardless of slope.
+    const n_deck = deckNFromLine(p.x, p.z, tx, tz, deckEvalLoft);
+    row[N - 1] = { x: p.x + n_deck * nx, y: 0, z: p.z + n_deck * nz };
     rows[i] = row;
   }
 
