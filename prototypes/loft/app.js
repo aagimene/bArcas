@@ -123,17 +123,19 @@ function stationsPlaceholder() {
 function defaultSheer(end, L = 5.2) {
   const half = L / 2;
   const tipZ = 0.04 + DEFAULT_DECK_N;
-  // startS: halfway between the outermost rocker position (0 or 1) and the
-  // nearest interior station (0.15 / 0.85) so the sheer end has a visible span.
-  // One interior keel control point gives a gentle outward bow to the profile.
   const sign = end === 'stern' ? -1 : 1;
+  // One interior keel control point gives a gentle outward bow to the profile.
+  // One station co-located at ~t=0.45 (approximately at the control point
+  // along the sheer keel arc) so the sheer end is immediately editable.
   return {
     startS: end === 'stern' ? 0.075 : 0.925,
     tip: { x: sign * half, z: tipZ },
     keelInteriorPts: [
       { x: sign * half * 0.94, z: tipZ * 0.28 },
     ],
-    stations: [],
+    stations: [
+      { t: 0.45, points: defaultSection(0.12) },
+    ],
   };
 }
 
