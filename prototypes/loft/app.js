@@ -560,81 +560,60 @@ function unifiedStations(state, lengths, N) {
   return out;
 }
 
-// Loft mesh. Cross-sections are placed along the *composite* spine
-// (stern sheer + rocker + bow sheer). For each transverse index k, fit a
-// natural cubic spline in (b_k, n_k) over composite-S knots; sample at
-// M longitudinal positions and project through the local frame at each S.
+// Loft mesh. No longitudinal interpolation: each station's cross-section
+// is projected directly into world space and adjacent stations are connected
+// with ruled quad strips. Tips are degenerate (all N points at one world
+// position) so the hull naturally closes to a point at bow and stern.
 function buildLoft(state) {
   const lengths = compositeLengths(state);
-  const res = { low: { N: 32, M: 24 }, med: { N: 64, M: 36 }, high: { N: 128, M: 64 } }[state.loftRes];
-  const N = res.N, M = res.M;
+  const N = { low: 32, med: 64, high: 128 }[state.loftRes];
 
   const allSt = unifiedStations(state, lengths, N);
-  const ss    = allSt.map(st => st.S);
-  const samps = allSt.map(st => st.samples);
+  const M     = allSt.length;   // one row per station
 
-  const bSplines = new Array(N);
-  const nSplines = new Array(N);
-  for (let k = 0; k < N; k++) {
-    bSplines[k] = naturalCubicNonUniform(ss, samps.map(samp => samp[k].b));
-    nSplines[k] = naturalCubicNonUniform(ss, samps.map(samp => samp[k].n));
-  }
-
-  // Sample at M longitudinal positions along the composite spine.
-  const rows = new Array(M);
-  for (let i = 0; i < M; i++) {
-    const S = i / (M - 1);
-    const { p, tx, tz } = compositeAt(state, lengths, S);
+  // Project each station's (b, n) samples into world space.
+  const rows = allSt.map(st => {
+    const { p, tx, tz } = compositeAt(state, lengths, st.S);
     const nx = -tz, nz = tx;
-    const row = new Array(N);
-    for (let k = 0; k < N; k++) {
-      const b = bSplines[k](S);
-      const n = nSplines[k](S);
-      row[k] = { x: p.x + n * nx, y: b, z: p.z + n * nz };
-    }
-    rows[i] = row;
-  }
+    return st.samples.map(({ b, n }) => ({
+      x: p.x + n * nx, y: b, z: p.z + n * nz,
+    }));
+  });
 
-  // Starboard mesh + port mirror.
+  // Starboard mesh + port mirror — ruled quad strips between adjacent rows.
   const positions = [];
   const indices   = [];
-  for (let i = 0; i < M; i++) {
-    for (let k = 0; k < N; k++) {
+  for (let i = 0; i < M; i++)
+    for (let k = 0; k < N; k++)
       positions.push(rows[i][k].x, rows[i][k].z, rows[i][k].y);
-    }
-  }
+
   for (let i = 0; i < M - 1; i++) {
     for (let k = 0; k < N - 1; k++) {
-      const a = i * N + k;
-      const b = i * N + k + 1;
-      const c = (i + 1) * N + k;
-      const d = (i + 1) * N + k + 1;
+      const a = i * N + k, b = i * N + k + 1;
+      const c = (i + 1) * N + k, d = (i + 1) * N + k + 1;
       indices.push(a, c, b);
       indices.push(b, c, d);
     }
   }
+
   const stbdVertCount = M * N;
-  for (let i = 0; i < M; i++) {
-    for (let k = 0; k < N; k++) {
+  for (let i = 0; i < M; i++)
+    for (let k = 0; k < N; k++)
       positions.push(rows[i][k].x, rows[i][k].z, -rows[i][k].y);
-    }
-  }
+
   for (let i = 0; i < M - 1; i++) {
     for (let k = 0; k < N - 1; k++) {
-      const a = stbdVertCount + i * N + k;
-      const b = stbdVertCount + i * N + k + 1;
-      const c = stbdVertCount + (i + 1) * N + k;
-      const d = stbdVertCount + (i + 1) * N + k + 1;
+      const a = stbdVertCount + i * N + k, b = stbdVertCount + i * N + k + 1;
+      const c = stbdVertCount + (i + 1) * N + k, d = stbdVertCount + (i + 1) * N + k + 1;
       indices.push(a, b, c);
       indices.push(b, d, c);
     }
   }
 
-  // Per-station world-frame rows for 3D bands and side-view ticks.
-  // Filter out the synthetic tip entries (kind === 'tip').
+  // Per-station world-frame rows for 3D bands and side-view overlay.
   const stationRows = allSt
     .filter(st => st.kind !== 'tip')
-    .map((st) => {
+    .map(st => {
       const { p, tx, tz } = compositeAt(state, lengths, st.S);
       const nx = -tz, nz = tx;
       return {
