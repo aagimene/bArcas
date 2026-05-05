@@ -43,8 +43,8 @@ const state = {
   // moving the deck line reshapes every station's top at once.
   deckLine: defaultDeckLine(),
   // Loft mesh overlay in side view
-  showLoftMesh: false,
-  meshOpacity: 0.3,
+  showLoftMesh: true,
+  meshOpacity: 70,
 };
 
 // ── Rocker spine: cubic Bézier with explicit tangent handles ─────────────
@@ -122,14 +122,17 @@ function stationsPlaceholder() {
 // line. t ∈ (0, 1) on a station: 0 = junction, 1 = tip.
 function defaultSheer(end, L = 5.2) {
   const half = L / 2;
-  // Tip starts directly above the spine endpoint at deck height.
+  const tipZ = 0.04 + DEFAULT_DECK_N;
+  // startS: halfway between the outermost rocker position (0 or 1) and the
+  // nearest interior station (0.15 / 0.85) so the sheer end has a visible span.
+  // One interior keel control point gives a gentle outward bow to the profile.
+  const sign = end === 'stern' ? -1 : 1;
   return {
-    startS: end === 'stern' ? 0.0 : 1.0,
-    tip: {
-      x: end === 'stern' ? -half : half,
-      z: 0.04 + DEFAULT_DECK_N,   // spine endpoint z ≈ 0.04 + deck height
-    },
-    keelInteriorPts: [],           // world-space (x, z) interior ctrl pts of sheer keel
+    startS: end === 'stern' ? 0.075 : 0.925,
+    tip: { x: sign * half, z: tipZ },
+    keelInteriorPts: [
+      { x: sign * half * 0.94, z: tipZ * 0.28 },
+    ],
     stations: [],
   };
 }
@@ -741,32 +744,30 @@ const fillLight = new THREE.DirectionalLight(0xc7d2fe, 0.55);
 fillLight.position.set(-2, 1, -2);
 scene.add(fillLight);
 
+// Grid planes live in their own scene so they are rendered AFTER the AO
+// composer pass and appear correctly in every output mode (Normal, SSAO, etc).
+const gridScene = new THREE.Scene();
+
 // Horizontal reference grid at Z = 0 (waterline plane).
-// Three.js Y is up here, so the grid sits in the X-Z (Three.js) plane = the
-// X-Y (world) plane = the waterline. Light lines on dark bg.
 const grid = new THREE.GridHelper(8, 16, 0xe2e8f0, 0x64748b);
 grid.position.y = 0;
 grid.material.transparent = true;
 grid.material.opacity = 0.85;
-scene.add(grid);
+gridScene.add(grid);
 
-// Centerline plane grid (the boat's longitudinal-vertical bisecting plane).
-// In Three.js terms this is the X-Y plane at z = 0. Build it by rotating a
-// horizontal GridHelper 90° about X. Slightly cooler color so the two
-// reference planes are distinguishable at a glance.
+// Centerline plane grid (longitudinal-vertical bisecting plane).
 const centerGrid = new THREE.GridHelper(6, 12, 0xa5b4fc, 0x475569);
 centerGrid.rotation.x = Math.PI / 2;
 centerGrid.material.transparent = true;
 centerGrid.material.opacity = 0.6;
-centerGrid.position.y = 0; // straddles the waterline
-scene.add(centerGrid);
+centerGrid.position.y = 0;
+gridScene.add(centerGrid);
 
-// Bright centerline at the intersection of the two grid planes — runs along
-// the length of the boat at (Y_three=0, Z_three=0).
+// Bright centerline at the intersection of the two grid planes.
 const centerlineMat  = new THREE.LineBasicMaterial({ color: 0xfbbf24 });
 const centerlineGeom = new THREE.BufferGeometry();
 const centerlineLine = new THREE.Line(centerlineGeom, centerlineMat);
-scene.add(centerlineLine);
+gridScene.add(centerlineLine);
 
 // Hull mesh group.
 const hullGroup = new THREE.Group();
@@ -973,11 +974,17 @@ const resizeObserver = new ResizeObserver(() => {
 });
 resizeObserver.observe(threeHost);
 
-// Render loop.
+// Render loop. Grid scene rendered after the composer so it appears on top
+// in every AO output mode (Normal, SSAO, etc). clearDepth() preserves the
+// color output while allowing grid lines to depth-test against each other.
 function animate() {
   requestAnimationFrame(animate);
   controls.update();
   composer.render();
+  renderer.autoClear = false;
+  renderer.clearDepth();
+  renderer.render(gridScene, camera);
+  renderer.autoClear = true;
 }
 animate();
 
@@ -1636,6 +1643,11 @@ const showMeshEl = document.getElementById('show-mesh');
 const meshOpacityEl = document.getElementById('mesh-opacity');
 const meshOpacityOut = document.getElementById('mesh-opacity-out');
 
+// Sync controls to state defaults.
+showMeshEl.checked         = state.showLoftMesh;
+meshOpacityEl.value        = state.meshOpacity;
+meshOpacityOut.textContent = state.meshOpacity.toFixed(0) + '%';
+
 showMeshEl.addEventListener('change', () => {
   state.showLoftMesh = showMeshEl.checked;
   renderSideView();
@@ -1669,12 +1681,12 @@ const aoResetBtn  = document.getElementById('ao-reset');
 // crevices even with pow-amplified contrast. See loft-plan.md "TODO" for
 // the planned fix. Users can still flip it on in the AO panel.
 const AO_DEFAULTS = {
-  enabled: false,
+  enabled:      true,
   kernelRadius: 0.2,
   minDistance:  0.00001,
   maxDistance:  0.5,
   contrast:     4.0,
-  output:       0,
+  output:       5,   // Normal — colored normal vectors
 };
 
 const aoOutputModes = [
