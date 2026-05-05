@@ -174,12 +174,25 @@ function buildDeckSpline(state, spSampled) {
 // the spine tangent direction at that point. n is the projection of the
 // keel→deck vector onto the local up direction (tx ≈ 1 for mild rocker,
 // so n ≈ deckZ − keelZ for typical kayaks).
-// Derive the deck-end n for a station given its keel world position and
-// the spine tangent direction at that point. n is the projection of the
-// keel→deck vector onto the local up direction (tx ≈ 1 for mild rocker,
-// so n ≈ deckZ − keelZ for typical kayaks).
-function deckNFromLine(keelPx, keelPz, tx, deckEval) {
-  return Math.max(0.05, (deckEval(keelPx) - keelPz) * tx);
+// Find n such that the spine-normal ray from the keel point exactly hits
+// the deck line:  keelZ + n·tx = deckEval(keelX − n·tz)
+// For a horizontal spine (tz=0) this reduces to n = deckZ − keelZ.
+// For a sloped spine the ray moves in X as it climbs, so we Newton-iterate.
+// Converges in 3–4 steps for any realistic hull geometry.
+function deckNFromLine(keelPx, keelPz, tx, tz, deckEval) {
+  let n = tx > 1e-4
+    ? (deckEval(keelPx) - keelPz) / tx   // good starting guess
+    : Math.max(0.05, deckEval(keelPx) - keelPz);
+  for (let i = 0; i < 6; i++) {
+    const wx = keelPx - n * tz;
+    const f  = keelPz + n * tx - deckEval(wx);
+    if (Math.abs(f) < 1e-8) break;
+    const h  = 1e-5;
+    const df = tx + tz * (deckEval(wx + h) - deckEval(wx - h)) / (2 * h);
+    if (Math.abs(df) < 1e-12) break;
+    n -= f / df;
+  }
+  return Math.max(0.01, n);
 }
 
 // Update every station's control points when the deck or rocker changes.
@@ -204,8 +217,8 @@ function reconcileDeckPoints(state) {
 
   // Interior (rocker) stations — keel on rocker.
   state.stations.forEach(st => {
-    const { p, tx } = spineAt(spineObj, st.s);
-    applyScale(st.points, deckNFromLine(p.x, p.z, tx, deckEval));
+    const { p, tx, tz } = spineAt(spineObj, st.s);
+    applyScale(st.points, deckNFromLine(p.x, p.z, tx, tz, deckEval));
   });
 
   // Sheer-end stations — keel on the sheer keel line.
@@ -213,8 +226,8 @@ function reconcileDeckPoints(state) {
     const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
     const keelSampled = sampledSheerKeel(state, end, spSampled);
     sheer.stations.forEach(sst => {
-      const { p, tx } = sampleAlong(keelSampled, sst.t);
-      applyScale(sst.points, deckNFromLine(p.x, p.z, tx, deckEval));
+      const { p, tx, tz } = sampleAlong(keelSampled, sst.t);
+      applyScale(sst.points, deckNFromLine(p.x, p.z, tx, tz, deckEval));
     });
   }
 }
