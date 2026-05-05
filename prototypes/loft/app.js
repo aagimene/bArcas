@@ -174,11 +174,12 @@ function buildDeckSpline(state, spSampled) {
 // the spine tangent direction at that point. n is the projection of the
 // keel→deck vector onto the local up direction (tx ≈ 1 for mild rocker,
 // so n ≈ deckZ − keelZ for typical kayaks).
-// Deck-end n stored in station data: world-Z height of deck above keel.
-// buildLoft applies a per-row scale so the rendered deck always hits the
-// deck line exactly; this value only needs to give a plausible spline shape.
-function deckNFromLine(keelPx, keelPz, deckEval) {
-  return Math.max(0.05, deckEval(keelPx) - keelPz);
+// Derive the deck-end n for a station given its keel world position and
+// the spine tangent direction at that point. n is the projection of the
+// keel→deck vector onto the local up direction (tx ≈ 1 for mild rocker,
+// so n ≈ deckZ − keelZ for typical kayaks).
+function deckNFromLine(keelPx, keelPz, tx, deckEval) {
+  return Math.max(0.05, (deckEval(keelPx) - keelPz) * tx);
 }
 
 // Update every station's deck-end (last) control-point n from the deck
@@ -192,8 +193,8 @@ function reconcileDeckPoints(state) {
 
   // Interior (rocker) stations — keel on rocker.
   state.stations.forEach(st => {
-    const { p } = spineAt(spineObj, st.s);
-    st.points[st.points.length - 1].n = deckNFromLine(p.x, p.z, deckEval);
+    const { p, tx } = spineAt(spineObj, st.s);
+    st.points[st.points.length - 1].n = deckNFromLine(p.x, p.z, tx, deckEval);
   });
 
   // Sheer-end stations — keel on the sheer keel line.
@@ -201,8 +202,8 @@ function reconcileDeckPoints(state) {
     const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
     const keelSampled = sampledSheerKeel(state, end, spSampled);
     sheer.stations.forEach(sst => {
-      const { p } = sampleAlong(keelSampled, sst.t);
-      sst.points[sst.points.length - 1].n = deckNFromLine(p.x, p.z, deckEval);
+      const { p, tx } = sampleAlong(keelSampled, sst.t);
+      sst.points[sst.points.length - 1].n = deckNFromLine(p.x, p.z, tx, deckEval);
     });
   }
 }
@@ -579,33 +580,16 @@ function buildLoft(state) {
     nSplines[k] = naturalCubicNonUniform(ss, samps.map(samp => samp[k].n));
   }
 
-  // Build the deck spline once for per-row boundary enforcement.
-  const deckEvalLoft = buildDeckSpline(state, sampledSpine(state.spine, 64));
-
   // Sample at M longitudinal positions along the composite spine.
   const rows = new Array(M);
   for (let i = 0; i < M; i++) {
     const S = i / (M - 1);
     const { p, tx, tz } = compositeAt(state, lengths, S);
-    const nx = -tz, nz = tx;   // local "up" direction in the X-Z plane
-
-    // Per-row n-scale: stretch all n values so the deck-end hits the deck
-    // line in world Z. nSplines[N-1] is the deck-end index. In world space:
-    //   worldDeckZ = p.z + nDeckInterp × tx
-    // Target from the deck line: targetDeckZ = deckEvalLoft(p.x)
-    // Scale so world deck Z = target:  nScale = (target − p.z) / (nDeckInterp × tx)
-    // Applied to every k preserves the cross-section's proportional shape.
-    const nDeckInterp  = nSplines[N - 1](S);
-    const worldDeckInterp = p.z + nDeckInterp * nz;   // nz = tx
-    const targetDeckZ  = deckEvalLoft(p.x);
-    const nScale = (worldDeckInterp - p.z > 1e-4)
-      ? Math.max(0, (targetDeckZ - p.z) / (worldDeckInterp - p.z))
-      : 1;
-
+    const nx = -tz, nz = tx;
     const row = new Array(N);
     for (let k = 0; k < N; k++) {
       const b = bSplines[k](S);
-      const n = nSplines[k](S) * nScale;
+      const n = nSplines[k](S);
       row[k] = { x: p.x + n * nx, y: b, z: p.z + n * nz };
     }
     rows[i] = row;
