@@ -109,7 +109,7 @@ function stationsPlaceholder() {
   return interiorParams.map((s) => {
     const taper    = Math.sin(Math.PI * s);
     const halfBeam = 0.18 + 0.12 * taper;
-    return { s, kind: 'interior', points: defaultSection(halfBeam, DEFAULT_DECK_N) };
+    return { s, kind: 'interior', points: defaultSection(halfBeam) };
   });
 }
 
@@ -195,50 +195,26 @@ function deckNFromLine(keelPx, keelPz, tx, tz, deckEval) {
   return Math.max(0.01, n);
 }
 
-// Update every station's control points when the deck or rocker changes.
-// Each point's n is stored in a proportional coordinate where 0 = keel and
-// 1 = deck. When the keel-to-deck span changes at a station, all n values
-// scale so every point keeps its proportional height. Points outside [0,1]
-// (above deck or below keel) scale the same way.
+// Snap every station's deck-end (last point) to exactly n=1.0.
+// With normalized storage, no scaling is needed — the physical deck height
+// is applied per-row in buildLoft when projecting to world space.
 function reconcileDeckPoints(state) {
-  const spSampled = sampledSpine(state.spine, 64);
-  const spineObj  = { ctrl: state.spine, sampled: spSampled };
-  const deckEval  = buildDeckSpline(state, spSampled);
-
-  function applyScale(points, newDeckN) {
-    const last     = points.length - 1;
-    const oldDeckN = points[last].n;
-    if (oldDeckN > 1e-4) {
-      const scale = newDeckN / oldDeckN;
-      points.forEach(pt => { pt.n *= scale; });
-    }
-    points[last].n = newDeckN; // snap deck-end to exact value
-  }
-
-  // Interior (rocker) stations — keel on rocker.
-  state.stations.forEach(st => {
-    const { p, tx, tz } = spineAt(spineObj, st.s);
-    applyScale(st.points, deckNFromLine(p.x, p.z, tx, tz, deckEval));
-  });
-
-  // Sheer-end stations — keel on the sheer keel line.
-  for (const end of ['bow', 'stern']) {
-    const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
-    const keelSampled = sampledSheerKeel(state, end, spSampled);
-    sheer.stations.forEach(sst => {
-      const { p, tx, tz } = sampleAlong(keelSampled, sst.t);
-      applyScale(sst.points, deckNFromLine(p.x, p.z, tx, tz, deckEval));
-    });
-  }
+  const snapDeck = (points) => { points[points.length - 1].n = 1.0; };
+  state.stations.forEach(st => snapDeck(st.points));
+  state.bowSheer.stations.forEach(st  => snapDeck(st.points));
+  state.sternSheer.stations.forEach(st => snapDeck(st.points));
 }
 
-function defaultSection(halfBeam, deckN) {
+// n values are normalized: 0 = keel, 1 = deck. Values outside [0,1] are
+// valid (e.g. n=1.5 is 50% above the deck line). buildLoft multiplies by
+// the physical deck height at each station when projecting to world space.
+function defaultSection(halfBeam) {
   return [
-    { b: 0,                n: 0,             chine: false }, // keel (centerline)
-    { b: halfBeam * 0.55,  n: 0.04,          chine: false },
-    { b: halfBeam,         n: 0.16,          chine: false }, // beam-max
-    { b: halfBeam * 0.55,  n: deckN - 0.03,  chine: false },
-    { b: 0,                n: deckN,         chine: false }, // deck (centerline)
+    { b: 0,               n: 0,    chine: false }, // keel (centerline)
+    { b: halfBeam * 0.55, n: 0.13, chine: false },
+    { b: halfBeam,        n: 0.53, chine: false }, // beam-max
+    { b: halfBeam * 0.55, n: 0.90, chine: false },
+    { b: 0,               n: 1.0,  chine: false }, // deck (centerline)
   ];
 }
 
@@ -592,16 +568,26 @@ function buildLoft(state) {
   const lengths = compositeLengths(state);
   const N = { low: 32, med: 64, high: 128 }[state.loftRes];
 
+  // Deck spline needed to convert normalized n → physical metres per station.
+  const spSampled   = sampledSpine(state.spine, 64);
+  const deckEvalLoft = buildDeckSpline(state, spSampled);
+
   const allSt = unifiedStations(state, lengths, N);
   const M     = allSt.length;   // one row per station
 
-  // Project each station's (b, n) samples into world space.
+  // Project each station's (b, nNorm) samples into world space.
+  // nNorm is stored as a fraction of the deck height (0=keel, 1=deck);
+  // multiply by deckN_phys to get the physical local-frame distance.
   const rows = allSt.map(st => {
     const { p, tx, tz } = compositeAt(state, lengths, st.S);
     const nx = -tz, nz = tx;
-    return st.samples.map(({ b, n }) => ({
-      x: p.x + n * nx, y: b, z: p.z + n * nz,
-    }));
+    const deckN_phys = (st.kind === 'tip')
+      ? 0
+      : deckNFromLine(p.x, p.z, tx, tz, deckEvalLoft);
+    return st.samples.map(({ b, n }) => {
+      const nPhys = n * deckN_phys;
+      return { x: p.x + nPhys * nx, y: b, z: p.z + nPhys * nz };
+    });
   });
 
   // Starboard mesh + port mirror — ruled quad strips between adjacent rows.
@@ -707,9 +693,8 @@ function sectionAtS(state, sOrParam, numPoints = 7, kind = 'interior', end = nul
   }
   // Anchor: keel point at (0, 0) (locked to the spine, model-wide rule);
   // deck-end at b = 0 (centerline closure on top).
-  points[0] = { b: 0, n: 0, chine: false };
-  const last = numPoints - 1;
-  points[last] = { b: 0, n: points[last].n, chine: false };
+  points[0] = { b: 0, n: 0,   chine: false }; // keel
+  points[numPoints - 1] = { b: 0, n: 1.0, chine: false }; // deck
   return points;
 }
 
@@ -1362,7 +1347,8 @@ function listAllStations(state) {
 }
 
 // Section-view scale constants — also used by drag-handler coordinate math.
-const SECTION_SCALE = 600; // px/m
+const SECTION_SCALE   = 600; // px/m  (b axis — physical metres)
+const SECTION_SCALE_N = SECTION_SCALE * DEFAULT_DECK_N; // px/unit (n axis — normalised)
 
 // Look up the currently selected station object (interior or sheer).
 function selectedStationObj() {
@@ -1373,7 +1359,7 @@ function selectedStationObj() {
 function renderSectionView() {
   sectionSvg.innerHTML = '';
   const bOf = (b) => b * SECTION_SCALE;
-  const nOf = (n) => -n * SECTION_SCALE;
+  const nOf = (n) => -n * SECTION_SCALE_N;
 
   const sel = selectedStationObj();
   if (!sel) {
@@ -1397,7 +1383,15 @@ function renderSectionView() {
   }));
   sectionSvg.appendChild(el('text', {
     x: 320, y: nOf(0) + 11, class: 'label', 'text-anchor': 'end',
-  }, sel.kind === 'interior' ? 'keel (n = 0, on rocker)' : 'keel (n = 0, on sheer keel)'));
+  }, 'keel (n = 0)'));
+
+  // Deck reference (n = 1).
+  sectionSvg.appendChild(el('line', {
+    x1: -340, y1: nOf(1), x2: 340, y2: nOf(1), class: 'axis deck-axis',
+  }));
+  sectionSvg.appendChild(el('text', {
+    x: 320, y: nOf(1) - 4, class: 'label', 'text-anchor': 'end',
+  }, 'deck (n = 1)'));
 
   // Closed-loop section.
   const dense = sampleSpline(station.points, 'b', 'n', 24);
@@ -2062,7 +2056,7 @@ sectionSvg.addEventListener('pointermove', (e) => {
   if (i === 0 || i === lastIdx) return; // keel and deck-end both locked
   const isCenterline = i === lastIdx;   // (never true now, kept for safety)
   const { x, y } = svgToLocal(sectionSvg, e);
-  const n = -y / SECTION_SCALE;
+  const n = -y / SECTION_SCALE_N;
   if (isCenterline) {
     station.points[i].b = 0;
     station.points[i].n = n;
@@ -2097,7 +2091,7 @@ sectionSvg.addEventListener('click', (e) => {
   const station = sel.ref;
   const { x, y } = svgToLocal(sectionSvg, e);
   const b = x / SECTION_SCALE;
-  const n = -y / SECTION_SCALE;
+  const n = -y / SECTION_SCALE_N;
   if (b < 0) return;
   const insertIdx = nearestSegmentInsertIdx(station.points, b, n);
   station.points.splice(insertIdx, 0, { b, n, chine: false });

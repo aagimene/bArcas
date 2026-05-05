@@ -383,7 +383,8 @@ main {
 
 /* ── SVG: cross-section ──────────────────────────────────────── */
 
-#section-view .axis { stroke: #cbd5e1; stroke-width: 0.5; }
+#section-view .axis           { stroke: #cbd5e1; stroke-width: 0.5; }
+#section-view .axis.deck-axis { stroke: #16a34a; stroke-dasharray: 4 3; }
 #section-view .water { stroke: #94a3b8; stroke-dasharray: 4 4; stroke-width: 0.7; }
 #section-view .label { font: 9px -apple-system, sans-serif; fill: #64748b; }
 #section-view .section-curve  { fill: none; stroke: #1f2937; stroke-width: 1.8; }
