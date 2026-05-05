@@ -626,12 +626,14 @@ function buildLoft(state) {
     .map(st => {
       const { p, tx, tz } = compositeAt(state, lengths, st.S);
       const nx = -tz, nz = tx;
+      const deckN_phys = deckNFromLine(p.x, p.z, tx, tz, deckEvalLoft);
       return {
         kind: st.kind,
         S: st.S,
-        points: st.samples.map(({ b, n }) => ({
-          x: p.x + n * nx, y: b, z: p.z + n * nz,
-        })),
+        points: st.samples.map(({ b, n }) => {
+          const nPhys = n * deckN_phys;
+          return { x: p.x + nPhys * nx, y: b, z: p.z + nPhys * nz };
+        }),
       };
     });
 
