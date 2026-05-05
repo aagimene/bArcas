@@ -182,19 +182,30 @@ function deckNFromLine(keelPx, keelPz, tx, deckEval) {
   return Math.max(0.05, (deckEval(keelPx) - keelPz) * tx);
 }
 
-// Update every station's deck-end (last) control-point n from the deck
-// line. Called after any spine / sheer / deck-line change so the section
-// editor and the loft always see consistent data. The deck-end is locked
-// in the section editor; this is the only place it is written.
+// Update every station's control points when the deck or rocker changes.
+// Each point's n is stored in a proportional coordinate where 0 = keel and
+// 1 = deck. When the keel-to-deck span changes at a station, all n values
+// scale so every point keeps its proportional height. Points outside [0,1]
+// (above deck or below keel) scale the same way.
 function reconcileDeckPoints(state) {
   const spSampled = sampledSpine(state.spine, 64);
   const spineObj  = { ctrl: state.spine, sampled: spSampled };
   const deckEval  = buildDeckSpline(state, spSampled);
 
+  function applyScale(points, newDeckN) {
+    const last     = points.length - 1;
+    const oldDeckN = points[last].n;
+    if (oldDeckN > 1e-4) {
+      const scale = newDeckN / oldDeckN;
+      points.forEach(pt => { pt.n *= scale; });
+    }
+    points[last].n = newDeckN; // snap deck-end to exact value
+  }
+
   // Interior (rocker) stations — keel on rocker.
   state.stations.forEach(st => {
     const { p, tx } = spineAt(spineObj, st.s);
-    st.points[st.points.length - 1].n = deckNFromLine(p.x, p.z, tx, deckEval);
+    applyScale(st.points, deckNFromLine(p.x, p.z, tx, deckEval));
   });
 
   // Sheer-end stations — keel on the sheer keel line.
@@ -203,7 +214,7 @@ function reconcileDeckPoints(state) {
     const keelSampled = sampledSheerKeel(state, end, spSampled);
     sheer.stations.forEach(sst => {
       const { p, tx } = sampleAlong(keelSampled, sst.t);
-      sst.points[sst.points.length - 1].n = deckNFromLine(p.x, p.z, tx, deckEval);
+      applyScale(sst.points, deckNFromLine(p.x, p.z, tx, deckEval));
     });
   }
 }
