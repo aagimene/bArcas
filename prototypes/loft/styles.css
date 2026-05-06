@@ -38,31 +38,30 @@ header .subtitle.note strong { color: #e2e8f0; }
 
 main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
-  grid-template-rows: minmax(360px, 50vh) minmax(280px, 1fr);
+  grid-template-columns: 260px minmax(0, 1fr) 280px;
+  grid-template-rows: minmax(300px, 55vh) minmax(220px, 1fr);
   grid-template-areas:
-    "three  controls"
-    "side   section";
+    "top    three    controls"
+    "section side   controls";
   gap: 0.75rem;
   padding: 0.75rem;
-  max-width: 1600px;
+  max-width: 1700px;
   margin: 0 auto;
 }
+.pane-top      { grid-area: top; }
 .pane-3d       { grid-area: three; }
-.pane-controls { grid-area: controls; }
-.pane-side     { grid-area: side; }
+.pane-controls { grid-area: controls; grid-row: 1 / 3; }
 .pane-section  { grid-area: section; }
+.pane-side     { grid-area: side; }
 
-@media (max-width: 880px) {
+@media (max-width: 1000px) {
   main {
     grid-template-columns: 1fr;
-    grid-template-rows: 280px auto auto auto;
+    grid-template-rows: 220px 280px auto auto auto;
     grid-template-areas:
-      "three"
-      "controls"
-      "side"
-      "section";
+      "top" "three" "controls" "section" "side";
   }
+  .pane-controls { grid-row: auto; }
 }
 
 .pane {
@@ -347,6 +346,13 @@ main {
 /* Deck / top-line curve — green */
 #side-view .deck-curve        { fill: none; stroke: #16a34a; stroke-width: 2; stroke-linecap: round; pointer-events: none; }
 #side-view .loft-mesh-line         { fill: none; stroke: #9ca3af; stroke-width: 0.8; pointer-events: none; }
+/* Top view */
+#top-view { width: 100%; flex: 1; overflow: visible; }
+#top-view .water { stroke: #94a3b8; stroke-width: 0.5; stroke-dasharray: 6 4; }
+#top-view .silhouette { fill: #fdf6e3; stroke: none; opacity: 0.6; }
+#top-view .station { stroke: #92400e; stroke-width: 1.4; pointer-events: none; }
+#top-view .station.selected { stroke: #fbbf24; stroke-width: 2.5; }
+#top-view .station-hit { fill: transparent; cursor: pointer; }
 #side-view .bow-top-sheer-curve    { fill: none; stroke: #f97316; stroke-width: 1.6; stroke-dasharray: 5 3; pointer-events: none; }
 #side-view .stern-top-sheer-curve  { fill: none; stroke: #7c3aed; stroke-width: 1.6; stroke-dasharray: 5 3; pointer-events: none; }
 #side-view .sheer-top-ctrl-bow     { fill: white; stroke: #f97316; stroke-width: 2.2; cursor: grab; }

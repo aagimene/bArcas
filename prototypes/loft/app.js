@@ -18,7 +18,8 @@ import { OutputPass }     from 'three/addons/postprocessing/OutputPass.js';
 // Declared before state so stationsPlaceholder() can reference them without
 // hitting the temporal dead zone.
 
-const DEFAULT_DECK_N = 0.30; // default deck-top height above keel, metres
+const DEFAULT_DECK_N    = 0.30; // default deck-top height above keel, metres
+const DEFAULT_HALF_BEAM = 0.30; // reference half-beam for display scale
 
 // ── State ────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,8 @@ const state = {
   // draggable. Each station's deck-end n is derived from this line, so
   // moving the deck line reshapes every station's top at once.
   deckLine: defaultDeckLine(),
+  // Plan-view beam line (controls hull width at each longitudinal position).
+  beamLine: defaultBeamLine(),
   // Loft mesh overlay in side view
   showLoftMesh: true,
   meshOpacity: 70,
@@ -109,7 +112,7 @@ function stationsPlaceholder() {
   return interiorParams.map((s) => {
     const taper    = Math.sin(Math.PI * s);
     const halfBeam = 0.18 + 0.12 * taper;
-    return { s, kind: 'interior', points: defaultSection(halfBeam) };
+    return { s, kind: 'interior', points: defaultSection() };
   });
 }
 
@@ -139,7 +142,7 @@ function defaultSheer(end, L = 5.2) {
         t:        0.45,
         bottomPt: { x: sign * half * 0.917, z: tipZ * 0.16  },
         topPt:    { x: sign * half * 0.912, z: tipZ * 0.635 },
-        points:   defaultSection(0.12),
+        points:   defaultSection(),
       },
     ],
   };
@@ -215,17 +218,31 @@ function reconcileDeckPoints(state) {
   state.sternSheer.stations.forEach(st => snapDeck(st.points));
 }
 
-// n values are normalized: 0 = keel, 1 = deck. Values outside [0,1] are
-// valid (e.g. n=1.5 is 50% above the deck line). buildLoft multiplies by
-// the physical deck height at each station when projecting to world space.
-function defaultSection(halfBeam) {
+// n: normalized 0=keel, 1=deck. b: normalized 0=centerline, 1=hull edge.
+// Both are multiplied by their respective physical extents in buildLoft.
+function defaultSection() {
   return [
-    { b: 0,               n: 0,    chine: false }, // keel (centerline)
-    { b: halfBeam * 0.55, n: 0.13, chine: false },
-    { b: halfBeam,        n: 0.53, chine: false }, // beam-max
-    { b: halfBeam * 0.55, n: 0.90, chine: false },
-    { b: 0,               n: 1.0,  chine: false }, // deck (centerline)
+    { b: 0,    n: 0,    chine: false }, // keel (centerline)
+    { b: 0.55, n: 0.13, chine: false },
+    { b: 1.0,  n: 0.53, chine: false }, // beam-max
+    { b: 0.55, n: 0.90, chine: false },
+    { b: 0,    n: 1.0,  chine: false }, // deck (centerline)
   ];
+}
+
+// Beam line: piecewise cubic Bézier in the X-Y plane (plan view).
+// Endpoints are pinned to the convergence tips (b=0 there). Each interior
+// peak stores an anchor (x, y) and a single outgoing handle (hdx, hdy);
+// the incoming handle is symmetric: C1 continuity.
+function defaultBeamLine(L = 5.2) {
+  const half = L / 2;
+  return {
+    sternHandle: { dx:  half * 0.45, dy: 0 }, // outgoing from stern tip
+    bowHandle:   { dx: -half * 0.45, dy: 0 }, // outgoing from bow tip (toward stern)
+    peaks: [
+      { x: -half * 0.10, y: 0.30, hdx: half * 0.35, hdy: 0 },
+    ],
+  };
 }
 
 // (stemProfileToSection removed — sheer ends now use world-space keel lines
@@ -404,6 +421,52 @@ function sampleAlong(sampled, t) {
   const ddz = pts[hi].y - pts[lo].y;
   const len = Math.hypot(ddx, ddz) || 1;
   return { p, tx: ddx / len, tz: ddz / len };
+}
+
+// Sample the beam-line piecewise Bézier (X-Y plane, plan view).
+// Returns an array of {x, y} points, x increasing from stern to bow.
+// Endpoints are the convergence tips; peaks are the interior anchors.
+function sampledBeamLine(state) {
+  const st = state.sternSheer.tip, bw = state.bowSheer.tip;
+  const bl = state.beamLine;
+  // Build the list of anchor/handle tuples:
+  // [ { p, hOut }, peak..., { p, hIn } ]
+  const sorted = [...bl.peaks].sort((a, b) => a.x - b.x);
+  const nodes = [
+    { p: { x: st.x, y: 0 }, hOut: { x: st.x + bl.sternHandle.dx, y: bl.sternHandle.dy } },
+    ...sorted.map(pk => ({
+      p:    { x: pk.x,        y: pk.y        },
+      hIn:  { x: pk.x - pk.hdx, y: pk.y - pk.hdy },
+      hOut: { x: pk.x + pk.hdx, y: pk.y + pk.hdy },
+    })),
+    { p: { x: bw.x, y: 0 }, hIn: { x: bw.x + bl.bowHandle.dx, y: bl.bowHandle.dy } },
+  ];
+  const pts = [];
+  for (let seg = 0; seg < nodes.length - 1; seg++) {
+    const P0 = nodes[seg].p,   P3 = nodes[seg + 1].p;
+    const P1 = nodes[seg].hOut ?? P0;
+    const P2 = nodes[seg + 1].hIn ?? P3;
+    const steps = 24;
+    for (let j = (seg === 0 ? 0 : 1); j <= steps; j++) {
+      const t = j / steps, u = 1 - t;
+      pts.push({
+        x: u**3*P0.x + 3*u**2*t*P1.x + 3*u*t**2*P2.x + t**3*P3.x,
+        y: u**3*P0.y + 3*u**2*t*P1.y + 3*u*t**2*P2.y + t**3*P3.y,
+      });
+    }
+  }
+  return pts;
+}
+
+// Evaluate half-beam at world X by linear interpolation in the sampled pts.
+function beamEvalAt(beamPts, wx) {
+  if (!beamPts.length) return 0;
+  if (wx <= beamPts[0].x) return Math.max(0, beamPts[0].y);
+  if (wx >= beamPts[beamPts.length - 1].x) return Math.max(0, beamPts[beamPts.length - 1].y);
+  let lo = 0, hi = beamPts.length - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (beamPts[m].x <= wx) lo = m; else hi = m; }
+  const t = (wx - beamPts[lo].x) / (beamPts[hi].x - beamPts[lo].x);
+  return Math.max(0, beamPts[lo].y + t * (beamPts[hi].y - beamPts[lo].y));
 }
 
 // Arc length of the rocker between two normalized parameters.
@@ -599,6 +662,8 @@ function buildLoft(state) {
   const allSt = unifiedStations(state, lengths, N);
   const M     = allSt.length;
 
+  const beamPts = sampledBeamLine(state);
+
   const rows = allSt.map(st => {
     if (st.kind === 'bowSheer' || st.kind === 'sternSheer') {
       const isBow  = st.kind === 'bowSheer';
@@ -607,17 +672,19 @@ function buildLoft(state) {
         : 1 - st.S / lengths.sternFrac));
       const botPt  = sampleAlong(isBow ? bowKSampled  : sternKSampled, tFrac).p;
       const topPt  = sampleAlong(isBow ? bowTSampled  : sternTSampled, tFrac).p;
+      const halfB  = beamEvalAt(beamPts, botPt.x);
       return st.samples.map(({ b, n }) => ({
         x: botPt.x + n * (topPt.x - botPt.x),
-        y: b,
+        y: b * halfB,
         z: botPt.z + n * (topPt.z - botPt.z),
       }));
     }
     const { p, tx, tz } = compositeAt(state, lengths, st.S);
     const nx = -tz, nz = tx;
     const deckN_phys = st.kind === 'tip' ? 0 : deckNFromLine(p.x, p.z, tx, tz, deckEvalLoft);
+    const halfB      = st.kind === 'tip' ? 0 : beamEvalAt(beamPts, p.x);
     return st.samples.map(({ b, n }) => ({
-      x: p.x + n * deckN_phys * nx, y: b, z: p.z + n * deckN_phys * nz,
+      x: p.x + n * deckN_phys * nx, y: b * halfB, z: p.z + n * deckN_phys * nz,
     }));
   });
 
@@ -662,15 +729,17 @@ function buildLoft(state) {
           : 1 - st.S / lengths.sternFrac));
         const botPt = sampleAlong(isBow ? bowKSampled : sternKSampled, tFrac).p;
         const topPt = sampleAlong(isBow ? bowTSampled : sternTSampled, tFrac).p;
+        const halfB = beamEvalAt(beamPts, botPt.x);
         projFn = ({ b, n }) => ({
-          x: botPt.x + n * (topPt.x - botPt.x), y: b,
+          x: botPt.x + n * (topPt.x - botPt.x), y: b * halfB,
           z: botPt.z + n * (topPt.z - botPt.z),
         });
       } else {
         const { p, tx, tz } = compositeAt(state, lengths, st.S);
         const nx = -tz, nz = tx;
         const deckN = deckNFromLine(p.x, p.z, tx, tz, deckEvalLoft);
-        projFn = ({ b, n }) => ({ x: p.x + n*deckN*nx, y: b, z: p.z + n*deckN*nz });
+        const halfB = beamEvalAt(beamPts, p.x);
+        projFn = ({ b, n }) => ({ x: p.x + n*deckN*nx, y: b*halfB, z: p.z + n*deckN*nz });
       }
       return { kind: st.kind, S: st.S, points: st.samples.map(projFn) };
     });
@@ -1033,6 +1102,7 @@ const el = (tag, attrs = {}, content) => {
   return e;
 };
 
+const topSvg     = document.getElementById('top-view');
 const sideSvg    = document.getElementById('side-view');
 const sectionSvg = document.getElementById('section-view');
 
@@ -1045,6 +1115,110 @@ function deckNOf(st) {
 
 const SIDE_SCALE_X = 100; // px/m horizontal
 const SIDE_SCALE_Z = 200; // px/m vertical (exaggerated so rocker is visible)
+
+// ── Top view (plan view, X-Y) ─────────────────────────────────────────────
+
+const TOP_SCALE_X =  80; // px/m longitudinal (same feel as side view)
+const TOP_SCALE_Y = 500; // px/m transverse (amplified — beam is narrow)
+
+function renderTopView() {
+  topSvg.innerHTML = '';
+  const xOf = (x) =>  x * TOP_SCALE_X;
+  const yOf = (y) => -y * TOP_SCALE_Y; // Y up in world = up in SVG
+
+  // Beam curve samples.
+  const beamPts = sampledBeamLine(state);
+
+  // Waterline reference.
+  topSvg.appendChild(el('line', {
+    x1: xOf(state.sternSheer.tip.x) - 10, y1: 0,
+    x2: xOf(state.bowSheer.tip.x) + 10,   y2: 0,
+    class: 'water',
+  }));
+
+  // Hull outline: starboard + mirrored port.
+  const stbd = beamPts.map(p => `${xOf(p.x).toFixed(2)},${yOf(p.y).toFixed(2)}`);
+  const port  = [...beamPts].reverse().map(p => `${xOf(p.x).toFixed(2)},${yOf(-p.y).toFixed(2)}`);
+  topSvg.appendChild(el('polygon', {
+    points: [...stbd, ...port].join(' '), class: 'silhouette',
+  }));
+  topSvg.appendChild(el('path', {
+    class: 'bow-sheer-curve',
+    d: 'M ' + beamPts.map(p => `${xOf(p.x).toFixed(2)} ${yOf( p.y).toFixed(2)}`).join(' L '),
+  }));
+  topSvg.appendChild(el('path', {
+    class: 'stern-sheer-curve',
+    d: 'M ' + beamPts.map(p => `${xOf(p.x).toFixed(2)} ${yOf(-p.y).toFixed(2)}`).join(' L '),
+    style: 'opacity:0.4',
+  }));
+
+  // Bézier handle lines + handle dots.
+  const stPt = state.sternSheer.tip, bwPt = state.bowSheer.tip;
+  const bl = state.beamLine;
+  const sorted = [...bl.peaks].sort((a, b) => a.x - b.x);
+
+  // Build nodes same order as sampledBeamLine.
+  const nodes = [
+    { p: { x: stPt.x, y: 0 },   hOut: { x: stPt.x + bl.sternHandle.dx, y: bl.sternHandle.dy }, id: 'stern' },
+    ...sorted.map((pk, i) => ({
+      p:    { x: pk.x, y: pk.y },
+      hIn:  { x: pk.x - pk.hdx, y: pk.y - pk.hdy },
+      hOut: { x: pk.x + pk.hdx, y: pk.y + pk.hdy },
+      id: String(i),
+    })),
+    { p: { x: bwPt.x, y: 0 },   hIn: { x: bwPt.x + bl.bowHandle.dx, y: bl.bowHandle.dy }, id: 'bow' },
+  ];
+
+  nodes.forEach((nd, ni) => {
+    if (nd.hIn) {
+      topSvg.appendChild(el('line', {
+        x1: xOf(nd.p.x), y1: yOf(nd.p.y), x2: xOf(nd.hIn.x), y2: yOf(nd.hIn.y),
+        class: 'handle-line',
+      }));
+      topSvg.appendChild(el('circle', { cx: xOf(nd.hIn.x), cy: yOf(nd.hIn.y), r: 10, class: 'handle-hit',   'data-drag': 'beam-handle-in',  'data-idx': nd.id }));
+      topSvg.appendChild(el('circle', { cx: xOf(nd.hIn.x), cy: yOf(nd.hIn.y), r: 3.5, class: 'spine-handle', 'data-drag': 'beam-handle-in',  'data-idx': nd.id }));
+    }
+    if (nd.hOut) {
+      topSvg.appendChild(el('line', {
+        x1: xOf(nd.p.x), y1: yOf(nd.p.y), x2: xOf(nd.hOut.x), y2: yOf(nd.hOut.y),
+        class: 'handle-line',
+      }));
+      topSvg.appendChild(el('circle', { cx: xOf(nd.hOut.x), cy: yOf(nd.hOut.y), r: 10, class: 'handle-hit',   'data-drag': 'beam-handle-out', 'data-idx': nd.id }));
+      topSvg.appendChild(el('circle', { cx: xOf(nd.hOut.x), cy: yOf(nd.hOut.y), r: 3.5, class: 'spine-handle', 'data-drag': 'beam-handle-out', 'data-idx': nd.id }));
+    }
+    // Anchor dot.
+    const isEndpt = nd.id === 'stern' || nd.id === 'bow';
+    topSvg.appendChild(el('circle', { cx: xOf(nd.p.x), cy: yOf(nd.p.y), r: 14, class: 'spine-hit', 'data-drag': isEndpt ? `beam-endpt-${nd.id}` : 'beam-peak', 'data-idx': nd.id }));
+    topSvg.appendChild(el('circle', { cx: xOf(nd.p.x), cy: yOf(nd.p.y), r: 5,  class: 'spine-anchor', 'data-drag': isEndpt ? `beam-endpt-${nd.id}` : 'beam-peak', 'data-idx': nd.id }));
+  });
+
+  // Station ticks.
+  const spSampled = sampledSpine(state.spine, 64);
+  const lengths   = compositeLengths(state);
+  const unified   = listAllStations(state);
+  unified.forEach((entry, i) => {
+    let kx;
+    if (entry.kind === 'interior') {
+      kx = spineAt({ ctrl: state.spine, sampled: spSampled }, entry.ref.s).p.x;
+    } else {
+      const end    = entry.kind === 'bowSheer' ? 'bow' : 'stern';
+      const kSamp  = sampledSheerKeel(state, end, spSampled);
+      kx = sampleAlong(kSamp, entry.ref.t).p.x;
+    }
+    const halfB  = beamEvalAt(beamPts, kx);
+    const isSel  = i === state.selectedStation;
+    topSvg.appendChild(el('line', {
+      x1: xOf(kx), y1: yOf(-halfB), x2: xOf(kx), y2: yOf(halfB),
+      class: 'station' + (isSel ? ' selected' : ''),
+    }));
+    topSvg.appendChild(el('circle', {
+      cx: xOf(kx), cy: yOf(halfB), r: 14, class: 'station-hit',
+      'data-drag': 'station', 'data-idx': String(i),
+    }));
+  });
+}
+
+// ── Side view ─────────────────────────────────────────────────────────────
 
 function renderSideView() {
   sideSvg.innerHTML = '';
@@ -1390,8 +1564,9 @@ function listAllStations(state) {
 }
 
 // Section-view scale constants — also used by drag-handler coordinate math.
-const SECTION_SCALE   = 600; // px/m  (b axis — physical metres)
-const SECTION_SCALE_N = SECTION_SCALE * DEFAULT_DECK_N; // px/unit (n axis — normalised)
+const SECTION_SCALE   = 600; // px/m  (reference, not used directly for b or n)
+const SECTION_SCALE_N = SECTION_SCALE * DEFAULT_DECK_N;    // px/unit (n, normalised)
+const SECTION_SCALE_B = SECTION_SCALE * DEFAULT_HALF_BEAM; // px/unit (b, normalised)
 
 // Look up the currently selected station object (interior or sheer).
 function selectedStationObj() {
@@ -1401,7 +1576,7 @@ function selectedStationObj() {
 
 function renderSectionView() {
   sectionSvg.innerHTML = '';
-  const bOf = (b) => b * SECTION_SCALE;
+  const bOf = (b) => b * SECTION_SCALE_B;
   const nOf = (n) => -n * SECTION_SCALE_N;
 
   const sel = selectedStationObj();
@@ -1525,6 +1700,8 @@ function selectStation(i) {
   renderSectionView();
   rebuildHull();
   renderSideView();
+
+  renderTopView();
   syncStationButtons();
 }
 
@@ -1590,6 +1767,8 @@ function addStation() {
   rebuildHull();
   renderStationList();
   renderSideView();
+
+  renderTopView();
   renderSectionView();
   syncStationButtons();
 }
@@ -1613,6 +1792,8 @@ function removeStation() {
   rebuildHull();
   renderStationList();
   renderSideView();
+
+  renderTopView();
   renderSectionView();
   syncStationButtons();
 }
@@ -1656,6 +1837,8 @@ lengthEl.addEventListener('input', () => {
   lengthOut.textContent = newL.toFixed(2) + ' m';
   rebuildHull();
   renderSideView();
+
+  renderTopView();
 });
 
 loftResEl.addEventListener('change', () => {
@@ -1685,12 +1868,16 @@ meshOpacityOut.textContent = state.meshOpacity.toFixed(0) + '%';
 showMeshEl.addEventListener('change', () => {
   state.showLoftMesh = showMeshEl.checked;
   renderSideView();
+
+  renderTopView();
 });
 
 meshOpacityEl.addEventListener('input', () => {
   state.meshOpacity = parseFloat(meshOpacityEl.value);
   meshOpacityOut.textContent = state.meshOpacity.toFixed(0) + '%';
   renderSideView();
+
+  renderTopView();
 });
 
 // ── Ambient occlusion — direct SSAOPass parameter knobs ──────────────────
@@ -1811,6 +1998,106 @@ function spineXToS(spine, targetX) {
 
 let drag = null;
 
+// ── Top-view drag/click/delete ───────────────────────────────────────────
+
+let topDrag = null;
+
+function svgToLocalTop(e) {
+  const pt = topSvg.createSVGPoint();
+  pt.x = e.clientX; pt.y = e.clientY;
+  const loc = pt.matrixTransform(topSvg.getScreenCTM().inverse());
+  return { wx: loc.x / TOP_SCALE_X, wy: -loc.y / TOP_SCALE_Y };
+}
+
+topSvg.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  const target = e.target.closest('[data-drag]');
+  if (!target) return;
+  e.preventDefault();
+  topDrag = { kind: target.dataset.drag, id: target.dataset.idx, moved: false, pointerId: e.pointerId };
+  if (topDrag.kind === 'station') selectStation(+topDrag.id);
+  topSvg.setPointerCapture(e.pointerId);
+});
+
+topSvg.addEventListener('pointermove', (e) => {
+  if (!topDrag) return;
+  const { wx, wy } = svgToLocalTop(e);
+  topDrag.moved = true;
+  const bl = state.beamLine;
+  const sorted = [...bl.peaks].sort((a, b) => a.x - b.x);
+  const peakIdx = (id) => bl.peaks.findIndex(p => p === sorted[+id]);
+
+  if (topDrag.kind === 'beam-peak') {
+    const pi = peakIdx(topDrag.id);
+    if (pi >= 0) { bl.peaks[pi].x = wx; bl.peaks[pi].y = Math.max(0, wy); }
+  } else if (topDrag.kind === 'beam-handle-out') {
+    if (topDrag.id === 'stern') {
+      bl.sternHandle = { dx: wx - state.sternSheer.tip.x, dy: wy };
+    } else if (topDrag.id === 'bow') {
+      bl.bowHandle = { dx: wx - state.bowSheer.tip.x, dy: wy };
+    } else {
+      const pi = peakIdx(topDrag.id);
+      if (pi >= 0) { bl.peaks[pi].hdx = wx - bl.peaks[pi].x; bl.peaks[pi].hdy = wy - bl.peaks[pi].y; }
+    }
+  } else if (topDrag.kind === 'beam-handle-in') {
+    if (topDrag.id === 'bow') {
+      bl.bowHandle = { dx: wx - state.bowSheer.tip.x, dy: wy };
+    } else if (topDrag.id === 'stern') {
+      bl.sternHandle = { dx: wx - state.sternSheer.tip.x, dy: wy };
+    } else {
+      const pi = peakIdx(topDrag.id);
+      if (pi >= 0) { bl.peaks[pi].hdx = -(wx - bl.peaks[pi].x); bl.peaks[pi].hdy = -(wy - bl.peaks[pi].y); }
+    }
+  }
+  rebuildHull();
+  renderTopView();
+});
+
+topSvg.addEventListener('pointerup',     () => { topDrag = null; });
+topSvg.addEventListener('pointercancel', () => { topDrag = null; });
+
+// Click near beam curve to add peak.
+topSvg.addEventListener('click', (e) => {
+  if (e.target.closest('[data-drag]')) return;
+  if (topDrag?.moved) return;
+  const { wx, wy } = svgToLocalTop(e);
+  const beamPts = sampledBeamLine(state);
+  let best = Infinity;
+  for (let i = 0; i < beamPts.length - 1; i++) {
+    const a = beamPts[i], b = beamPts[i + 1];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const lenSq = dx*dx + dy*dy;
+    const t = lenSq > 0 ? Math.max(0, Math.min(1, ((wx-a.x)*dx + (wy-a.y)*dy) / lenSq)) : 0;
+    // Check both stbd and port sides.
+    const d1 = Math.hypot(wx-(a.x+t*dx), wy-(a.y+t*dy)) / (TOP_SCALE_Y / TOP_SCALE_X);
+    const d2 = Math.hypot(wx-(a.x+t*dx), wy+(a.y+t*dy)) / (TOP_SCALE_Y / TOP_SCALE_X);
+    best = Math.min(best, d1, d2);
+  }
+  if (best > 0.12) return;
+  const half = state.length / 2;
+  const insertAt = state.beamLine.peaks.findIndex(p => p.x > wx);
+  state.beamLine.peaks.splice(insertAt < 0 ? state.beamLine.peaks.length : insertAt, 0,
+    { x: wx, y: Math.max(0.01, Math.abs(wy)), hdx: half * 0.2, hdy: 0 });
+  rebuildHull();
+  renderTopView();
+});
+
+// Right-click a peak to delete.
+topSvg.addEventListener('contextmenu', (e) => {
+  const target = e.target.closest('[data-drag="beam-peak"]');
+  if (!target) return;
+  e.preventDefault();
+  if (state.beamLine.peaks.length <= 1) return;
+  const sorted = [...state.beamLine.peaks].sort((a, b) => a.x - b.x);
+  const pk = sorted[+target.dataset.idx];
+  const pi = state.beamLine.peaks.indexOf(pk);
+  if (pi >= 0) state.beamLine.peaks.splice(pi, 1);
+  rebuildHull();
+  renderTopView();
+});
+
+// ── Side-view drag/click/delete ──────────────────────────────────────────
+
 sideSvg.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
   const target = e.target.closest('[data-drag]');
@@ -1843,6 +2130,8 @@ sideSvg.addEventListener('pointermove', (e) => {
     drag.moved = true;
     rebuildHull();
     renderSideView();
+
+    renderTopView();
   } else if (drag.kind.startsWith('sheer-bot-') || drag.kind.startsWith('sheer-top-')) {
     const isBot = drag.kind.startsWith('sheer-bot-');
     const end   = drag.kind.endsWith('-bow') ? 'bow' : 'stern';
@@ -1853,18 +2142,24 @@ sideSvg.addEventListener('pointermove', (e) => {
     drag.moved = true;
     rebuildHull();
     renderSideView();
+
+    renderTopView();
   } else if (drag.kind === 'sheer-tip-bow' || drag.kind === 'sheer-tip-stern') {
     const end = drag.kind === 'sheer-tip-bow' ? 'bow' : 'stern';
     (end === 'bow' ? state.bowSheer : state.sternSheer).tip = { x: wx, z: wz };
     drag.moved = true;
     rebuildHull();
     renderSideView();
+
+    renderTopView();
   } else if (drag.kind === 'sheer-deck-bow' || drag.kind === 'sheer-deck-stern') {
     const end = drag.kind === 'sheer-deck-bow' ? 'bow' : 'stern';
     (end === 'bow' ? state.bowSheer : state.sternSheer).deckEndPt = { x: wx, z: wz };
     drag.moved = true;
     rebuildHull();
     renderSideView();
+
+    renderTopView();
   } else if (drag.kind === 'sheer-start-bow' || drag.kind === 'sheer-start-stern') {
     // Drag the join point along the rocker.
     const end   = drag.kind === 'sheer-start-bow' ? 'bow' : 'stern';
@@ -1882,6 +2177,8 @@ sideSvg.addEventListener('pointermove', (e) => {
     drag.moved = true;
     rebuildHull();
     renderSideView();
+
+    renderTopView();
   } else if (drag.kind === 'sheer-station') {
     // Drag a sheer station along its sheer profile.
     const sel   = listAllStations(state)[drag.idx];
@@ -1911,6 +2208,8 @@ sideSvg.addEventListener('pointermove', (e) => {
     drag.moved = true;
     rebuildHull();
     renderSideView();
+
+    renderTopView();
     renderStationList();
   } else if (drag.kind.startsWith('anchor-') || drag.kind.startsWith('handle-')) {
     const sp = state.spine;
@@ -1950,6 +2249,8 @@ sideSvg.addEventListener('pointermove', (e) => {
     lengthOut.textContent = state.length.toFixed(2) + ' m';
     rebuildHull();
     renderSideView();
+
+    renderTopView();
   } else if (drag.kind === 'station') {
     // Interior station drag along the rocker. drag.idx is the unified index.
     const sel = listAllStations(state)[drag.idx];
@@ -1969,6 +2270,8 @@ sideSvg.addEventListener('pointermove', (e) => {
     renderStationList();
     rebuildHull();
     renderSideView();
+
+    renderTopView();
   }
 });
 
@@ -2013,6 +2316,8 @@ sideSvg.addEventListener('click', (e) => {
       else state.deckLine.points.splice(insertIdx, 0, { x: wx, z: wz });
       rebuildHull();
       renderSideView();
+
+      renderTopView();
       return;
     }
   }
@@ -2055,10 +2360,12 @@ sideSvg.addEventListener('click', (e) => {
     t: bestT,
     bottomPt: { x: bPt.x, z: bPt.z },
     topPt:    { x: tPt.x, z: tPt.z },
-    points:   defaultSection(0.10),
+    points:   defaultSection(),
   });
   rebuildHull();
   renderSideView();
+
+  renderTopView();
 });
 
 sideSvg.addEventListener('contextmenu', (e) => {
@@ -2072,6 +2379,8 @@ sideSvg.addEventListener('contextmenu', (e) => {
     // Re-index isn't needed — we use natural array index
     rebuildHull();
     renderSideView();
+
+    renderTopView();
     return;
   }
   const target = e.target.closest('[data-drag^="sheer-bot-"],[data-drag^="sheer-top-"]');
@@ -2084,6 +2393,8 @@ sideSvg.addEventListener('contextmenu', (e) => {
   sheer.stations.splice(sIdx, 1);
   rebuildHull();
   renderSideView();
+
+  renderTopView();
 });
 
 // ── Cross-section drag / add / delete handlers ───────────────────────────
@@ -2119,13 +2430,15 @@ sectionSvg.addEventListener('pointermove', (e) => {
     station.points[i].b = 0;
     station.points[i].n = n;
   } else {
-    station.points[i].b = Math.max(0, x / SECTION_SCALE);
+    station.points[i].b = Math.max(0, x / SECTION_SCALE_B);
     station.points[i].n = n;
   }
   sectionDrag.moved = true;
   renderSectionView();
   rebuildHull();
   renderSideView();
+
+  renderTopView();
 });
 
 function endSectionDrag() {
@@ -2148,7 +2461,7 @@ sectionSvg.addEventListener('click', (e) => {
   if (!sel) return;
   const station = sel.ref;
   const { x, y } = svgToLocal(sectionSvg, e);
-  const b = x / SECTION_SCALE;
+  const b = x / SECTION_SCALE_B;
   const n = -y / SECTION_SCALE_N;
   if (b < 0) return;
   const insertIdx = nearestSegmentInsertIdx(station.points, b, n);
@@ -2157,6 +2470,8 @@ sectionSvg.addEventListener('click', (e) => {
   renderSectionView();
   rebuildHull();
   renderSideView();
+
+  renderTopView();
 });
 
 // Right-click a control point to delete it. Keel (idx 0) and deck-end
@@ -2178,6 +2493,8 @@ sectionSvg.addEventListener('contextmenu', (e) => {
   renderSectionView();
   rebuildHull();
   renderSideView();
+
+  renderTopView();
 });
 
 // Find the index at which a new (b, n) should be inserted into a section's
@@ -2208,4 +2525,6 @@ lengthOut.textContent = state.length.toFixed(2) + ' m';
 stationLabel.textContent = stationLabelFor(state.selectedStation);
 renderStationList();
 renderSideView();
+
+renderTopView();
 renderSectionView();

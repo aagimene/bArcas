@@ -17,7 +17,7 @@
 <body>
 
 <header>
-  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · free-stem</span>
+  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · plan-view</span>
   <h1>Loft</h1>
   <p class="subtitle">
     Design a 3D kayak hull from a curved spine (rocker) and a set of cross-sections, lofted live.
@@ -29,6 +29,12 @@
 </header>
 
 <main>
+  <section class="pane pane-top">
+    <div class="pane-title">Top view <span class="ref">— X-Y, beam editor</span></div>
+    <svg id="top-view" viewBox="-440 -150 880 300" preserveAspectRatio="xMidYMid meet" aria-label="Top view"></svg>
+    <p class="hint pane-hint">Drag anchor circles to move beam control points. Drag small dots to adjust Bézier handles. Click near the curve to add a point; right-click to delete.</p>
+  </section>
+
   <section class="pane pane-3d">
     <div class="pane-title">3D loft <span class="ref">— rotatable</span></div>
     <div id="three-host"></div>
@@ -114,17 +120,6 @@
     </div>
   </aside>
 
-  <section class="pane pane-side">
-    <div class="pane-title">Side view <span class="ref">— X-Z, rocker editor</span></div>
-    <svg id="side-view" viewBox="-340 -140 680 240" preserveAspectRatio="xMidYMid meet" aria-label="Side view"></svg>
-    <p class="hint pane-hint">
-      <strong>Anchors</strong>: drag blue circles (stern / bow tips) or the amber circle (paddler seat) to set positions.
-      <strong>Handles</strong>: drag the small blue dots to angle and lengthen the tangent at each anchor —
-      the paddler's two handles share a direction but can have different lengths, biasing curvature fore vs aft.
-      Orange station ticks are draggable along arc length.
-    </p>
-  </section>
-
   <section class="pane pane-section">
     <div class="pane-title">
       Cross-section <span class="ref">— body plan, station <span id="station-label">3</span> of 5</span>
@@ -134,9 +129,11 @@
       </span>
     </div>
     <svg id="section-view" viewBox="-340 -240 680 360" preserveAspectRatio="xMidYMid meet" aria-label="Cross-section editor"></svg>
-    <p class="hint pane-hint">
-      Drag points to reshape · click empty space to add a point · right-click a point to delete. Keel (blue) is locked on the spine. Hard-chine flag arrives in phase&nbsp;E.
-    </p>
+  </section>
+
+  <section class="pane pane-side">
+    <div class="pane-title">Side view <span class="ref">— X-Z, rocker editor</span></div>
+    <svg id="side-view" viewBox="-340 -140 680 240" preserveAspectRatio="xMidYMid meet" aria-label="Side view"></svg>
   </section>
 </main>
 
