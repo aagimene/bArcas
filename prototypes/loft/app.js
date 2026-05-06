@@ -1140,8 +1140,10 @@ function renderTopView() {
     const stX = state.sternSheer.tip.x, bwX = state.bowSheer.tip.x;
     const maxB = Math.max(...beamPts.map(p => p.y), 0.05);
     const padX = 0.25, padY = 0.06;  // world-unit padding (metres)
-    const paneH = Math.max(topSvg.parentElement.clientHeight, 100);
-    const paneW = Math.max(topSvg.clientWidth,                 60);
+    // Use the SVG's own rendered bounds; fall back to pane minus ~title height.
+    const bbox  = topSvg.getBoundingClientRect();
+    const paneH = Math.max(bbox.height > 10 ? bbox.height : topSvg.parentElement.clientHeight - 44, 100);
+    const paneW = Math.max(bbox.width  > 10 ? bbox.width  : topSvg.clientWidth, 60);
     TOP_SCALE_X = paneH / (bwX - stX + 2 * padX);
     TOP_SCALE_Y = paneW / ((maxB + padY) * 2);
     const vbW = (maxB + padY) * 2 * TOP_SCALE_Y;   // == paneW
