@@ -1120,8 +1120,9 @@ const SIDE_SCALE_Z = 200; // px/m vertical (exaggerated so rocker is visible)
 // World X (longitudinal) maps to SVG Y (hull runs vertically, bow at top).
 // World Y (beam/transverse) maps to SVG X (beam expands horizontally).
 
-const TOP_SCALE_X =  50; // px/m  longitudinal → SVG Y
-const TOP_SCALE_Y = 320; // px/m  transverse   → SVG X
+// Computed dynamically in renderTopView() to fill the pane.
+let TOP_SCALE_X = 50;
+let TOP_SCALE_Y = 320;
 
 function renderTopView() {
   topSvg.innerHTML = '';
@@ -1132,26 +1133,21 @@ function renderTopView() {
 
   const beamPts = sampledBeamLine(state);
 
-  // ── Dynamic viewBox: fill the pane's actual pixel dimensions ─────────
+  // ── Dynamic scales: fill the pane exactly in both axes ───────────────
+  // scaleX and scaleY are computed independently so the hull spans the full
+  // pane height AND width regardless of the hull's physical aspect ratio.
   {
     const stX = state.sternSheer.tip.x, bwX = state.bowSheer.tip.x;
     const maxB = Math.max(...beamPts.map(p => p.y), 0.05);
-    const hullSvgH = (bwX - stX) * TOP_SCALE_X;      // hull height in SVG px
-    const hullSvgW = maxB * TOP_SCALE_Y * 2;          // hull width  in SVG px
-    const pad = 24;
-    const paneH = Math.max(topSvg.parentElement.clientHeight, hullSvgH + 2 * pad);
-    const paneW = Math.max(topSvg.clientWidth, hullSvgW + 2 * pad);
-    const aspect = paneW / paneH;
-    let vbW, vbH;
-    if (aspect > hullSvgW / hullSvgH) {
-      vbH = hullSvgH + 2 * pad;
-      vbW = Math.max(vbH * aspect, hullSvgW + 2 * pad);
-    } else {
-      vbW = hullSvgW + 2 * pad;
-      vbH = Math.max(vbW / aspect, hullSvgH + 2 * pad);
-    }
+    const padX = 0.25, padY = 0.06;  // world-unit padding (metres)
+    const paneH = Math.max(topSvg.parentElement.clientHeight, 100);
+    const paneW = Math.max(topSvg.clientWidth,                 60);
+    TOP_SCALE_X = paneH / (bwX - stX + 2 * padX);
+    TOP_SCALE_Y = paneW / ((maxB + padY) * 2);
+    const vbW = (maxB + padY) * 2 * TOP_SCALE_Y;   // == paneW
+    const vbH = (bwX - stX + 2 * padX) * TOP_SCALE_X; // == paneH
     topSvg.setAttribute('viewBox',
-      `${(-vbW/2).toFixed(1)} ${(yOfT(bwX) - pad).toFixed(1)} ${vbW.toFixed(1)} ${vbH.toFixed(1)}`);
+      `${(-vbW / 2).toFixed(1)} ${(-bwX * TOP_SCALE_X - padX * TOP_SCALE_X).toFixed(1)} ${vbW.toFixed(1)} ${vbH.toFixed(1)}`);
   }
 
   // Centreline reference (Y=0 axis, vertical line).
