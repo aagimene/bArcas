@@ -1116,106 +1116,123 @@ function deckNOf(st) {
 const SIDE_SCALE_X = 100; // px/m horizontal
 const SIDE_SCALE_Z = 200; // px/m vertical (exaggerated so rocker is visible)
 
-// ── Top view (plan view, X-Y) ─────────────────────────────────────────────
+// ── Top view (plan view, X-Y vertical orientation) ────────────────────────
+// World X (longitudinal) maps to SVG Y (hull runs vertically, bow at top).
+// World Y (beam/transverse) maps to SVG X (beam expands horizontally).
 
-const TOP_SCALE_X =  80; // px/m longitudinal (same feel as side view)
-const TOP_SCALE_Y = 500; // px/m transverse (amplified — beam is narrow)
+const TOP_SCALE_X =  50; // px/m  longitudinal → SVG Y
+const TOP_SCALE_Y = 320; // px/m  transverse   → SVG X
 
 function renderTopView() {
   topSvg.innerHTML = '';
-  const xOf = (x) =>  x * TOP_SCALE_X;
-  const yOf = (y) => -y * TOP_SCALE_Y; // Y up in world = up in SVG
+  // Vertical orientation: bow at top, stern at bottom.
+  const xOfT = (wy) =>  wy * TOP_SCALE_Y;   // world Y  → SVG X (beam, horizontal)
+  const yOfT = (wx) => -wx * TOP_SCALE_X;   // world X  → SVG Y (length, vertical)
+  const p2s  = (wx, wy) => `${xOfT(wy).toFixed(2)},${yOfT(wx).toFixed(2)}`;
+  const pD   = (pts) => 'M ' + pts.map(p => `${xOfT(p.y).toFixed(2)} ${yOfT(p.x).toFixed(2)}`).join(' L ');
 
-  // Beam curve samples.
   const beamPts = sampledBeamLine(state);
 
-  // Waterline reference.
+  // Centreline reference (Y=0 axis, vertical line).
   topSvg.appendChild(el('line', {
-    x1: xOf(state.sternSheer.tip.x) - 10, y1: 0,
-    x2: xOf(state.bowSheer.tip.x) + 10,   y2: 0,
+    x1: 0, y1: yOfT(state.sternSheer.tip.x) + 10,
+    x2: 0, y2: yOfT(state.bowSheer.tip.x)   - 10,
     class: 'water',
   }));
 
-  // Hull outline: starboard + mirrored port.
-  const stbd = beamPts.map(p => `${xOf(p.x).toFixed(2)},${yOf(p.y).toFixed(2)}`);
-  const port  = [...beamPts].reverse().map(p => `${xOf(p.x).toFixed(2)},${yOf(-p.y).toFixed(2)}`);
-  topSvg.appendChild(el('polygon', {
-    points: [...stbd, ...port].join(' '), class: 'silhouette',
-  }));
-  topSvg.appendChild(el('path', {
-    class: 'bow-sheer-curve',
-    d: 'M ' + beamPts.map(p => `${xOf(p.x).toFixed(2)} ${yOf( p.y).toFixed(2)}`).join(' L '),
-  }));
-  topSvg.appendChild(el('path', {
-    class: 'stern-sheer-curve',
-    d: 'M ' + beamPts.map(p => `${xOf(p.x).toFixed(2)} ${yOf(-p.y).toFixed(2)}`).join(' L '),
-    style: 'opacity:0.4',
-  }));
+  // Hull silhouette: starboard (wy>0) + port mirror (wy<0).
+  const stbd = beamPts.map(p => p2s(p.x,  p.y));
+  const port  = [...beamPts].reverse().map(p => p2s(p.x, -p.y));
+  topSvg.appendChild(el('polygon', { points: [...stbd, ...port].join(' '), class: 'silhouette' }));
 
-  // Bézier handle lines + handle dots.
+  // Beam curves: starboard solid, port ghosted.
+  topSvg.appendChild(el('path', { class: 'beam-curve',        d: pD(beamPts) }));
+  topSvg.appendChild(el('path', { class: 'beam-curve mirror', d: pD(beamPts.map(p => ({ x: p.x, y: -p.y }))) }));
+
+  // ── Mesh overlay ─────────────────────────────────────────────────────
+  if (state.showLoftMesh && lastLoft) {
+    const opacity = state.meshOpacity / 100;
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('style', `opacity:${opacity}`);
+    // Longitudinal lines (k fixed, i varies) — trace hull outline from above.
+    for (let k = 0; k < (lastLoft.rows[0]?.length || 0); k++) {
+      const stbdD = lastLoft.rows.map(r => r[k] ? `${xOfT( r[k].y).toFixed(1)} ${yOfT(r[k].x).toFixed(1)}` : null).filter(Boolean);
+      const portD  = lastLoft.rows.map(r => r[k] ? `${xOfT(-r[k].y).toFixed(1)} ${yOfT(r[k].x).toFixed(1)}` : null).filter(Boolean);
+      if (stbdD.length > 1) g.appendChild(el('path', { class: 'loft-mesh-line', d: 'M ' + stbdD.join(' L ') }));
+      if (portD.length  > 1) g.appendChild(el('path', { class: 'loft-mesh-line', d: 'M ' + portD.join(' L ') }));
+    }
+    // Transverse lines (i fixed, k varies) — station widths.
+    for (let i = 0; i < lastLoft.rows.length; i++) {
+      const row = lastLoft.rows[i];
+      const stbdPts = row.map(v => `${xOfT( v.y).toFixed(1)} ${yOfT(v.x).toFixed(1)}`);
+      const portPts = [...row].reverse().map(v => `${xOfT(-v.y).toFixed(1)} ${yOfT(v.x).toFixed(1)}`);
+      g.appendChild(el('path', { class: 'loft-mesh-line', d: 'M ' + [...stbdPts, ...portPts].join(' L ') + ' Z' }));
+    }
+    topSvg.appendChild(g);
+  }
+
+  // ── Bézier control points ─────────────────────────────────────────────
   const stPt = state.sternSheer.tip, bwPt = state.bowSheer.tip;
-  const bl = state.beamLine;
+  const bl    = state.beamLine;
   const sorted = [...bl.peaks].sort((a, b) => a.x - b.x);
 
-  // Build nodes same order as sampledBeamLine.
   const nodes = [
-    { p: { x: stPt.x, y: 0 },   hOut: { x: stPt.x + bl.sternHandle.dx, y: bl.sternHandle.dy }, id: 'stern' },
+    { p: { x: stPt.x, y: 0 }, hOut: { x: stPt.x + bl.sternHandle.dx, y: bl.sternHandle.dy }, id: 'stern' },
     ...sorted.map((pk, i) => ({
       p:    { x: pk.x, y: pk.y },
       hIn:  { x: pk.x - pk.hdx, y: pk.y - pk.hdy },
       hOut: { x: pk.x + pk.hdx, y: pk.y + pk.hdy },
-      id: String(i),
+      id:   String(i),
     })),
-    { p: { x: bwPt.x, y: 0 },   hIn: { x: bwPt.x + bl.bowHandle.dx, y: bl.bowHandle.dy }, id: 'bow' },
+    { p: { x: bwPt.x, y: 0 }, hIn: { x: bwPt.x + bl.bowHandle.dx, y: bl.bowHandle.dy }, id: 'bow' },
   ];
 
-  nodes.forEach((nd, ni) => {
-    if (nd.hIn) {
-      topSvg.appendChild(el('line', {
-        x1: xOf(nd.p.x), y1: yOf(nd.p.y), x2: xOf(nd.hIn.x), y2: yOf(nd.hIn.y),
-        class: 'handle-line',
-      }));
-      topSvg.appendChild(el('circle', { cx: xOf(nd.hIn.x), cy: yOf(nd.hIn.y), r: 10, class: 'handle-hit',   'data-drag': 'beam-handle-in',  'data-idx': nd.id }));
-      topSvg.appendChild(el('circle', { cx: xOf(nd.hIn.x), cy: yOf(nd.hIn.y), r: 3.5, class: 'spine-handle', 'data-drag': 'beam-handle-in',  'data-idx': nd.id }));
-    }
-    if (nd.hOut) {
-      topSvg.appendChild(el('line', {
-        x1: xOf(nd.p.x), y1: yOf(nd.p.y), x2: xOf(nd.hOut.x), y2: yOf(nd.hOut.y),
-        class: 'handle-line',
-      }));
-      topSvg.appendChild(el('circle', { cx: xOf(nd.hOut.x), cy: yOf(nd.hOut.y), r: 10, class: 'handle-hit',   'data-drag': 'beam-handle-out', 'data-idx': nd.id }));
-      topSvg.appendChild(el('circle', { cx: xOf(nd.hOut.x), cy: yOf(nd.hOut.y), r: 3.5, class: 'spine-handle', 'data-drag': 'beam-handle-out', 'data-idx': nd.id }));
-    }
-    // Anchor dot.
+  nodes.forEach(nd => {
+    const cx = xOfT(nd.p.y), cy = yOfT(nd.p.x);
     const isEndpt = nd.id === 'stern' || nd.id === 'bow';
-    topSvg.appendChild(el('circle', { cx: xOf(nd.p.x), cy: yOf(nd.p.y), r: 14, class: 'spine-hit', 'data-drag': isEndpt ? `beam-endpt-${nd.id}` : 'beam-peak', 'data-idx': nd.id }));
-    topSvg.appendChild(el('circle', { cx: xOf(nd.p.x), cy: yOf(nd.p.y), r: 5,  class: 'spine-anchor', 'data-drag': isEndpt ? `beam-endpt-${nd.id}` : 'beam-peak', 'data-idx': nd.id }));
+    const dragAnchor = isEndpt ? `beam-endpt-${nd.id}` : 'beam-peak';
+
+    for (const [key, drag] of [['hIn', 'beam-handle-in'], ['hOut', 'beam-handle-out']]) {
+      if (!nd[key]) continue;
+      const hx = xOfT(nd[key].y), hy = yOfT(nd[key].x);
+      topSvg.appendChild(el('line',   { x1: cx, y1: cy, x2: hx, y2: hy, class: 'handle-line' }));
+      topSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 10,  class: 'handle-hit',   'data-drag': drag, 'data-idx': nd.id }));
+      topSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 3.5, class: 'spine-handle', 'data-drag': drag, 'data-idx': nd.id }));
+    }
+    topSvg.appendChild(el('circle', { cx, cy, r: 14, class: 'spine-hit',    'data-drag': dragAnchor, 'data-idx': nd.id }));
+    topSvg.appendChild(el('circle', { cx, cy, r: 5,  class: 'spine-anchor', 'data-drag': dragAnchor, 'data-idx': nd.id }));
   });
 
-  // Station ticks.
+  // ── Station ticks ────────────────────────────────────────────────────
   const spSampled = sampledSpine(state.spine, 64);
-  const lengths   = compositeLengths(state);
   const unified   = listAllStations(state);
   unified.forEach((entry, i) => {
     let kx;
     if (entry.kind === 'interior') {
       kx = spineAt({ ctrl: state.spine, sampled: spSampled }, entry.ref.s).p.x;
     } else {
-      const end    = entry.kind === 'bowSheer' ? 'bow' : 'stern';
-      const kSamp  = sampledSheerKeel(state, end, spSampled);
+      const end   = entry.kind === 'bowSheer' ? 'bow' : 'stern';
+      const kSamp = sampledSheerKeel(state, end, spSampled);
       kx = sampleAlong(kSamp, entry.ref.t).p.x;
     }
-    const halfB  = beamEvalAt(beamPts, kx);
-    const isSel  = i === state.selectedStation;
+    const halfB = beamEvalAt(beamPts, kx);
+    const isSel = i === state.selectedStation;
     topSvg.appendChild(el('line', {
-      x1: xOf(kx), y1: yOf(-halfB), x2: xOf(kx), y2: yOf(halfB),
+      x1: xOfT(-halfB), y1: yOfT(kx), x2: xOfT(halfB), y2: yOfT(kx),
       class: 'station' + (isSel ? ' selected' : ''),
     }));
     topSvg.appendChild(el('circle', {
-      cx: xOf(kx), cy: yOf(halfB), r: 14, class: 'station-hit',
-      'data-drag': 'station', 'data-idx': String(i),
+      cx: xOfT(halfB), cy: yOfT(kx), r: 14,
+      class: 'station-hit', 'data-drag': 'station', 'data-idx': String(i),
     }));
+    topSvg.appendChild(el('text', {
+      x: xOfT(halfB) + 6, y: yOfT(kx) + 4, class: 'station-label',
+    }, entry.label));
   });
+
+  // Labels.
+  topSvg.appendChild(el('text', { x: 0, y: yOfT(state.bowSheer.tip.x)  - 8, class: 'label', 'text-anchor': 'middle' }, 'bow'));
+  topSvg.appendChild(el('text', { x: 0, y: yOfT(state.sternSheer.tip.x) + 16, class: 'label', 'text-anchor': 'middle' }, 'stern'));
 }
 
 // ── Side view ─────────────────────────────────────────────────────────────
@@ -2006,7 +2023,8 @@ function svgToLocalTop(e) {
   const pt = topSvg.createSVGPoint();
   pt.x = e.clientX; pt.y = e.clientY;
   const loc = pt.matrixTransform(topSvg.getScreenCTM().inverse());
-  return { wx: loc.x / TOP_SCALE_X, wy: -loc.y / TOP_SCALE_Y };
+  // Vertical orientation: SVG X = world Y * TOP_SCALE_Y, SVG Y = -world X * TOP_SCALE_X
+  return { wx: -loc.y / TOP_SCALE_X, wy: loc.x / TOP_SCALE_Y };
 }
 
 topSvg.addEventListener('pointerdown', (e) => {
@@ -2068,9 +2086,8 @@ topSvg.addEventListener('click', (e) => {
     const dx = b.x - a.x, dy = b.y - a.y;
     const lenSq = dx*dx + dy*dy;
     const t = lenSq > 0 ? Math.max(0, Math.min(1, ((wx-a.x)*dx + (wy-a.y)*dy) / lenSq)) : 0;
-    // Check both stbd and port sides.
-    const d1 = Math.hypot(wx-(a.x+t*dx), wy-(a.y+t*dy)) / (TOP_SCALE_Y / TOP_SCALE_X);
-    const d2 = Math.hypot(wx-(a.x+t*dx), wy+(a.y+t*dy)) / (TOP_SCALE_Y / TOP_SCALE_X);
+    const d1 = Math.hypot(wx-(a.x+t*dx), wy-(a.y+t*dy));
+    const d2 = Math.hypot(wx-(a.x+t*dx), wy+(a.y+t*dy));
     best = Math.min(best, d1, d2);
   }
   if (best > 0.12) return;
