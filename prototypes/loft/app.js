@@ -1824,18 +1824,7 @@ sideSvg.addEventListener('pointerdown', (e) => {
     startWx: x / SIDE_SCALE_X,
     startWz: -y / SIDE_SCALE_Z,
   };
-  if (kind.startsWith('sheer-bot-') || kind.startsWith('sheer-top-')) {
-    const end   = kind.endsWith('-bow') ? 'bow' : 'stern';
-    const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
-    const sst   = sheer.stations[idx];
-    if (sst) {
-      const spS   = sampledSpine(state.spine, 64);
-      const kSamp = sampledSheerKeel(state, end, spS);
-      drag.tangent       = sampleAlong(kSamp, sst.t);
-      drag.startBottomPt = { ...sst.bottomPt };
-      drag.startTopPt    = { ...sst.topPt };
-    }
-  }
+
   if (kind === 'station' || kind === 'sheer-station') selectStation(idx);
   sideSvg.setPointerCapture(e.pointerId);
 });
@@ -1858,19 +1847,9 @@ sideSvg.addEventListener('pointermove', (e) => {
     const isBot = drag.kind.startsWith('sheer-bot-');
     const end   = drag.kind.endsWith('-bow') ? 'bow' : 'stern';
     const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
-    const sst   = sheer.stations[drag.idx];
-    if (!sst) return;
-    const dx = wx - drag.startWx, dz = wz - drag.startWz;
-    const { tx: ttx, tz: ttz } = drag.tangent;
-    const dl = dx * ttx + dz * ttz;
-    const lx = dl * ttx, lz = dl * ttz;
-    if (isBot) {
-      sheer.stations[drag.idx].bottomPt = { x: drag.startBottomPt.x + dx, z: drag.startBottomPt.z + dz };
-      sheer.stations[drag.idx].topPt    = { x: drag.startTopPt.x    + lx, z: drag.startTopPt.z    + lz };
-    } else {
-      sheer.stations[drag.idx].topPt    = { x: drag.startTopPt.x    + dx, z: drag.startTopPt.z    + dz };
-      sheer.stations[drag.idx].bottomPt = { x: drag.startBottomPt.x + lx, z: drag.startBottomPt.z + lz };
-    }
+    if (!sheer.stations[drag.idx]) return;
+    if (isBot) sheer.stations[drag.idx].bottomPt = { x: wx, z: wz };
+    else        sheer.stations[drag.idx].topPt    = { x: wx, z: wz };
     drag.moved = true;
     rebuildHull();
     renderSideView();
