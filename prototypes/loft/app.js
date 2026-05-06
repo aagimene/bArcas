@@ -589,36 +589,36 @@ function buildLoft(state) {
   const lengths = compositeLengths(state);
   const N = { low: 32, med: 64, high: 128 }[state.loftRes];
 
-  const spSampled    = sampledSpine(state.spine, 64);
-  const deckEvalLoft = buildDeckSpline(state, spSampled);
-  const bowTSampled  = sampledTopSheer(state, 'bow',   spSampled);
-  const sternTSampled = sampledTopSheer(state, 'stern', spSampled);
+  const spSampled     = sampledSpine(state.spine, 64);
+  const deckEvalLoft  = buildDeckSpline(state, spSampled);
+  const bowKSampled   = sampledSheerKeel(state, 'bow',   spSampled);
+  const bowTSampled   = sampledTopSheer (state, 'bow',   spSampled);
+  const sternKSampled = sampledSheerKeel(state, 'stern', spSampled);
+  const sternTSampled = sampledTopSheer (state, 'stern', spSampled);
 
   const allSt = unifiedStations(state, lengths, N);
   const M     = allSt.length;
 
   const rows = allSt.map(st => {
+    if (st.kind === 'bowSheer' || st.kind === 'sternSheer') {
+      const isBow  = st.kind === 'bowSheer';
+      const tFrac  = Math.max(0, Math.min(1, isBow
+        ? (st.S - (1 - lengths.bowFrac)) / lengths.bowFrac
+        : 1 - st.S / lengths.sternFrac));
+      const botPt  = sampleAlong(isBow ? bowKSampled  : sternKSampled, tFrac).p;
+      const topPt  = sampleAlong(isBow ? bowTSampled  : sternTSampled, tFrac).p;
+      return st.samples.map(({ b, n }) => ({
+        x: botPt.x + n * (topPt.x - botPt.x),
+        y: b,
+        z: botPt.z + n * (topPt.z - botPt.z),
+      }));
+    }
     const { p, tx, tz } = compositeAt(state, lengths, st.S);
     const nx = -tz, nz = tx;
-    let deckN_phys;
-    if (st.kind === 'tip') {
-      deckN_phys = 0;
-    } else if (st.kind === 'bowSheer' || st.kind === 'sternSheer') {
-      const isBow = st.kind === 'bowSheer';
-      const tFrac = isBow
-        ? (st.S - (1 - lengths.bowFrac))  / lengths.bowFrac
-        : 1 - st.S / lengths.sternFrac;
-      const tSamp = isBow ? bowTSampled : sternTSampled;
-      const { p: topPt } = sampleAlong(tSamp, Math.max(0, Math.min(1, tFrac)));
-      // Project (topPt − keelPt) onto the local rocker normal.
-      deckN_phys = Math.max(0, (topPt.x - p.x) * nx + (topPt.z - p.z) * nz);
-    } else {
-      deckN_phys = deckNFromLine(p.x, p.z, tx, tz, deckEvalLoft);
-    }
-    return st.samples.map(({ b, n }) => {
-      const nPhys = n * deckN_phys;
-      return { x: p.x + nPhys * nx, y: b, z: p.z + nPhys * nz };
-    });
+    const deckN_phys = st.kind === 'tip' ? 0 : deckNFromLine(p.x, p.z, tx, tz, deckEvalLoft);
+    return st.samples.map(({ b, n }) => ({
+      x: p.x + n * deckN_phys * nx, y: b, z: p.z + n * deckN_phys * nz,
+    }));
   });
 
   // Starboard mesh + port mirror — ruled quad strips between adjacent rows.
@@ -654,27 +654,25 @@ function buildLoft(state) {
   const stationRows = allSt
     .filter(st => st.kind !== 'tip')
     .map(st => {
-      const { p, tx, tz } = compositeAt(state, lengths, st.S);
-      const nx = -tz, nz = tx;
-      let deckN_phys;
+      let projFn;
       if (st.kind === 'bowSheer' || st.kind === 'sternSheer') {
         const isBow = st.kind === 'bowSheer';
-        const tFrac = isBow
-          ? (st.S - (1 - lengths.bowFrac))  / lengths.bowFrac
-          : 1 - st.S / lengths.sternFrac;
-        const tSamp = isBow ? bowTSampled : sternTSampled;
-        const { p: topPt } = sampleAlong(tSamp, Math.max(0, Math.min(1, tFrac)));
-        deckN_phys = Math.max(0, (topPt.x - p.x) * nx + (topPt.z - p.z) * nz);
+        const tFrac = Math.max(0, Math.min(1, isBow
+          ? (st.S - (1 - lengths.bowFrac)) / lengths.bowFrac
+          : 1 - st.S / lengths.sternFrac));
+        const botPt = sampleAlong(isBow ? bowKSampled : sternKSampled, tFrac).p;
+        const topPt = sampleAlong(isBow ? bowTSampled : sternTSampled, tFrac).p;
+        projFn = ({ b, n }) => ({
+          x: botPt.x + n * (topPt.x - botPt.x), y: b,
+          z: botPt.z + n * (topPt.z - botPt.z),
+        });
       } else {
-        deckN_phys = deckNFromLine(p.x, p.z, tx, tz, deckEvalLoft);
+        const { p, tx, tz } = compositeAt(state, lengths, st.S);
+        const nx = -tz, nz = tx;
+        const deckN = deckNFromLine(p.x, p.z, tx, tz, deckEvalLoft);
+        projFn = ({ b, n }) => ({ x: p.x + n*deckN*nx, y: b, z: p.z + n*deckN*nz });
       }
-      return {
-        kind: st.kind, S: st.S,
-        points: st.samples.map(({ b, n }) => {
-          const nPhys = n * deckN_phys;
-          return { x: p.x + nPhys * nx, y: b, z: p.z + nPhys * nz };
-        }),
-      };
+      return { kind: st.kind, S: st.S, points: st.samples.map(projFn) };
     });
 
   return { positions, indices, rows, stationRows, lengths, N, M };
