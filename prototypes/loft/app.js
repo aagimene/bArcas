@@ -1125,13 +1125,34 @@ const TOP_SCALE_Y = 320; // px/m  transverse   → SVG X
 
 function renderTopView() {
   topSvg.innerHTML = '';
-  // Vertical orientation: bow at top, stern at bottom.
-  const xOfT = (wy) =>  wy * TOP_SCALE_Y;   // world Y  → SVG X (beam, horizontal)
-  const yOfT = (wx) => -wx * TOP_SCALE_X;   // world X  → SVG Y (length, vertical)
+  const xOfT = (wy) =>  wy * TOP_SCALE_Y;
+  const yOfT = (wx) => -wx * TOP_SCALE_X;
   const p2s  = (wx, wy) => `${xOfT(wy).toFixed(2)},${yOfT(wx).toFixed(2)}`;
   const pD   = (pts) => 'M ' + pts.map(p => `${xOfT(p.y).toFixed(2)} ${yOfT(p.x).toFixed(2)}`).join(' L ');
 
   const beamPts = sampledBeamLine(state);
+
+  // ── Dynamic viewBox: fill the pane's actual pixel dimensions ─────────
+  {
+    const stX = state.sternSheer.tip.x, bwX = state.bowSheer.tip.x;
+    const maxB = Math.max(...beamPts.map(p => p.y), 0.05);
+    const hullSvgH = (bwX - stX) * TOP_SCALE_X;      // hull height in SVG px
+    const hullSvgW = maxB * TOP_SCALE_Y * 2;          // hull width  in SVG px
+    const pad = 24;
+    const paneH = Math.max(topSvg.parentElement.clientHeight, hullSvgH + 2 * pad);
+    const paneW = Math.max(topSvg.clientWidth, hullSvgW + 2 * pad);
+    const aspect = paneW / paneH;
+    let vbW, vbH;
+    if (aspect > hullSvgW / hullSvgH) {
+      vbH = hullSvgH + 2 * pad;
+      vbW = Math.max(vbH * aspect, hullSvgW + 2 * pad);
+    } else {
+      vbW = hullSvgW + 2 * pad;
+      vbH = Math.max(vbW / aspect, hullSvgH + 2 * pad);
+    }
+    topSvg.setAttribute('viewBox',
+      `${(-vbW/2).toFixed(1)} ${(yOfT(bwX) - pad).toFixed(1)} ${vbW.toFixed(1)} ${vbH.toFixed(1)}`);
+  }
 
   // Centreline reference (Y=0 axis, vertical line).
   topSvg.appendChild(el('line', {
@@ -2542,6 +2563,7 @@ lengthOut.textContent = state.length.toFixed(2) + ' m';
 stationLabel.textContent = stationLabelFor(state.selectedStation);
 renderStationList();
 renderSideView();
-
 renderTopView();
 renderSectionView();
+
+window.addEventListener('resize', () => { renderTopView(); renderSideView(); });
