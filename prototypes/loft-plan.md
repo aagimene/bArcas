@@ -12,7 +12,13 @@ User-flagged items, not yet implemented. Listed here so we can pick them up with
 4. **Recolour bottom (keel) station points to blue** so they match the rocker keel curve. Currently teal — switch to the rocker's blue (`#2563eb`-ish) for visual coherence.
 5. **Drop the green "sheer start" tick + drag handle on the rocker.** It controls where rocker hands off to sheer keel, but with full pink-style station control everywhere this knob is moot. Constraint to keep: the rocker (blue Bézier) is still the underlying curve the keel-points snap to / slide along — i.e. the blue line must remain the keel-point rail. Just remove the explicit handoff knob.
 6. **Endpoint spine-radius slider.** A single global radius `r` (default ~1 cm). Implementation note from user: do **not** scale the section by `r`. Instead, **translate** the entire starboard half-mesh outward in +Y by `r`, and the port half-mesh in −Y by `r`. The keel-centerline and deck-centerline edges (the b=0 vertices at top and bottom of every section) are no longer at Y=0 — they sit at ±r. This gives a tiny constant-width "spine" loop running around the deck-line and keel-line of the hull (a thin flat band, not a tapered tube). Slider range probably 0–0.05 m, default 0.01 m. Affects the 3D mesh only; the 2D editor panes unchanged.
-7. **Full visible history log + undo.** See [history-log section below](#todo-history-log--undo-deferred) for the full design sketch — captured in the previous session.
+7. **Top/bottom hull split along a longitudinal edge loop.** Needs more design work — capturing rough intent here. One of the longitudinal edge loops (at some cross-section b-index, probably near the waterline or chine) acts as the seam dividing the hull into a top half (deck) and bottom half (hull). Constraints/ideas to flesh out:
+   - The split edge loop is selectable (or a dedicated control point on the cross-section sets the split b-index).
+   - A small configurable gap height at the split — similar in concept to the spine-radius slider (item 6 above): translate the top half up by `h/2` and the bottom half down by `h/2` in the section-normal direction, not a scale. Default gap might be 0 (flush) or a few mm.
+   - Constraints: the split edge loop must be a clean, closed loop with no self-intersections; the two halves should seal perfectly when gap = 0.
+   - Implications for manufacturing: this is where a CNC or composite layup seam would live — so the position needs to be designable precisely.
+   - Needs further thought: how the split interacts with the spine-radius endpoints (item 6), whether the split loop has its own b-parameter or is pinned to a chine flag, and what the export format looks like with two separate shells.
+8. **Full visible history log + undo.** See [history-log section below](#todo-history-log--undo-deferred) for the full design sketch — captured in the previous session.
 
 
 ## Scope
