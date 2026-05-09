@@ -376,8 +376,7 @@ main {
 #top-view .spine-hit         { fill: transparent; cursor: grab; }
 #top-view .handle-hit        { fill: transparent; cursor: grab; }
 #top-view .loft-mesh-line    { fill: none; stroke: #9ca3af; stroke-width: 0.7; pointer-events: none; }
-#side-view .bow-top-sheer-curve    { fill: none; stroke: #f97316; stroke-width: 1.6; stroke-dasharray: 5 3; pointer-events: none; }
-#side-view .stern-top-sheer-curve  { fill: none; stroke: #7c3aed; stroke-width: 1.6; stroke-dasharray: 5 3; pointer-events: none; }
+/* sheer-top curves subsumed into pink deck perimeter — rules removed */
 #side-view .sheer-top-ctrl-bow     { fill: white; stroke: #f97316; stroke-width: 2.2; cursor: grab; }
 #side-view .sheer-top-ctrl-stern   { fill: white; stroke: #7c3aed; stroke-width: 2.2; cursor: grab; }
 
@@ -429,12 +428,14 @@ main {
 
 /* ── SVG: cross-section ──────────────────────────────────────── */
 
-#section-view .axis           { stroke: #cbd5e1; stroke-width: 1.4; }
-#section-view .axis.deck-axis { stroke: #16a34a; stroke-dasharray: 6 4; stroke-width: 1.4; }
-#section-view .water { stroke: #94a3b8; stroke-dasharray: 6 4; stroke-width: 1.4; }
-#section-view .label { font: 14px -apple-system, sans-serif; fill: #475569; }
-#section-view .section-curve  { fill: none; stroke: #1f2937; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-#section-view .section-mirror { fill: none; stroke: #94a3b8; stroke-width: 1.8; stroke-dasharray: 4 4; stroke-linecap: round; }
+/* Section view: tight 400-unit viewBox in a 260px pane → 0.65 px/SVG-unit.
+   All sizes scaled so screen-pixel weights match the side view's 1.62 px/SVG-unit. */
+#section-view .axis           { stroke: #cbd5e1; stroke-width: 2.2; }
+#section-view .axis.deck-axis { stroke: #ec4899; stroke-dasharray: 8 5; stroke-width: 2.2; }
+#section-view .water          { stroke: #94a3b8; stroke-dasharray: 8 5; stroke-width: 2.2; }
+#section-view .label          { font: 22px -apple-system, sans-serif; fill: #475569; }
+#section-view .section-curve  { fill: none; stroke: #1f2937; stroke-width: 3.8; stroke-linecap: round; stroke-linejoin: round; }
+#section-view .section-mirror { fill: none; stroke: #94a3b8; stroke-width: 2.8; stroke-dasharray: 6 5; stroke-linecap: round; }
 #section-view { cursor: crosshair; }  /* signals "click to add" */
 #section-view .section-curve  { pointer-events: none; }
 #section-view .section-mirror { pointer-events: none; }
@@ -443,7 +444,7 @@ main {
 #section-view .label          { pointer-events: none; }
 
 #section-view .ctrl-pt {
-  fill: white; stroke: #2563eb; stroke-width: 2.2;
+  fill: white; stroke: #2563eb; stroke-width: 3.2;
   cursor: grab;
 }
 #section-view .ctrl-pt:active { cursor: grabbing; }
@@ -486,6 +487,14 @@ main {
 #section-view .ctrl-hit.centerline.deck { cursor: not-allowed; pointer-events: none; }
 
 /* ── Footer ──────────────────────────────────────────────────── */
+
+.state-io { display: flex; gap: 0.4rem; }
+.state-io button, .state-io .import-label {
+  flex: 1; padding: 0.3rem 0; text-align: center; font-size: 0.78rem;
+  border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;
+  background: #f8fafc; color: #334155;
+}
+.state-io button:hover, .state-io .import-label:hover { background: #e2e8f0; }
 
 .footer {
   text-align: center;

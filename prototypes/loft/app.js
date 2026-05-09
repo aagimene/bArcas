@@ -1738,25 +1738,25 @@ function renderSectionView() {
 
   // Centerline (b = 0).
   sectionSvg.appendChild(el('line', {
-    x1: 0, y1: -240, x2: 0, y2: 120, class: 'axis',
+    x1: 0, y1: -205, x2: 0, y2: 85, class: 'axis',
   }));
-  sectionSvg.appendChild(el('text', { x: 4, y: -230, class: 'label' }, 'centerline'));
+  sectionSvg.appendChild(el('text', { x: 5, y: -192, class: 'label' }, 'CL'));
 
   // Keel reference (n = 0).
   sectionSvg.appendChild(el('line', {
-    x1: -340, y1: nOf(0), x2: 340, y2: nOf(0), class: 'axis',
+    x1: -195, y1: nOf(0), x2: 195, y2: nOf(0), class: 'axis',
   }));
   sectionSvg.appendChild(el('text', {
-    x: 320, y: nOf(0) + 11, class: 'label', 'text-anchor': 'end',
-  }, 'keel (n = 0)'));
+    x: 193, y: nOf(0) + 18, class: 'label', 'text-anchor': 'end',
+  }, 'keel'));
 
   // Deck reference (n = 1).
   sectionSvg.appendChild(el('line', {
-    x1: -340, y1: nOf(1), x2: 340, y2: nOf(1), class: 'axis deck-axis',
+    x1: -195, y1: nOf(1), x2: 195, y2: nOf(1), class: 'axis deck-axis',
   }));
   sectionSvg.appendChild(el('text', {
-    x: 320, y: nOf(1) - 4, class: 'label', 'text-anchor': 'end',
-  }, 'deck (n = 1)'));
+    x: 193, y: nOf(1) - 6, class: 'label', 'text-anchor': 'end',
+  }, 'deck'));
 
   // Closed-loop section.
   const dense = sampleSpline(station.points, 'b', 'n', 24);
@@ -1772,12 +1772,12 @@ function renderSectionView() {
     const isCenterline = isKeel || isDeck;
     const cls = (isKeel ? 'keel ' : '') + (isDeck ? 'deck ' : '') + (isCenterline ? 'centerline ' : '');
     sectionSvg.appendChild(el('circle', {
-      cx: bOf(p.b), cy: nOf(p.n), r: 16,
+      cx: bOf(p.b), cy: nOf(p.n), r: 22,
       class: ('ctrl-hit ' + cls).trim(),
       'data-drag': 'ctrl', 'data-idx': String(i),
     }));
     sectionSvg.appendChild(el('circle', {
-      cx: bOf(p.b), cy: nOf(p.n), r: 6.5,
+      cx: bOf(p.b), cy: nOf(p.n), r: 9,
       class: ('ctrl-pt ' + cls + (p.chine ? 'chine' : '')).trim(),
       'data-drag': 'ctrl', 'data-idx': String(i),
     }));
@@ -1785,17 +1785,17 @@ function renderSectionView() {
 
   if (station.points.length <= 5) {
     sectionSvg.appendChild(el('text', {
-      x: 0, y: 110, class: 'label', 'text-anchor': 'middle',
-    }, 'click to add · right-click a point to delete'));
+      x: 0, y: 72, class: 'label', 'text-anchor': 'middle',
+    }, 'click · right-click to delete'));
   }
 
   // Coordinate-system badge (Y-Z plane, looking forward toward bow).
   {
-    const ax = -332, ay = 110, L = 28;
+    const ax = -193, ay = 80, L = 22;
     sectionSvg.appendChild(el('line', { x1: ax, y1: ay, x2: ax + L, y2: ay,     class: 'axis-arrow' }));
     sectionSvg.appendChild(el('line', { x1: ax, y1: ay, x2: ax,     y2: ay - L, class: 'axis-arrow' }));
-    sectionSvg.appendChild(el('text', { x: ax + L + 4, y: ay + 4,     class: 'axis-label' }, '+Y (port)'));
-    sectionSvg.appendChild(el('text', { x: ax - 4,     y: ay - L - 2, class: 'axis-label', 'text-anchor': 'start' }, '+Z (up)'));
+    sectionSvg.appendChild(el('text', { x: ax + L + 3, y: ay + 7,     class: 'axis-label' }, '+Y'));
+    sectionSvg.appendChild(el('text', { x: ax - 3,     y: ay - L - 3, class: 'axis-label', 'text-anchor': 'start' }, '+Z'));
   }
 }
 
@@ -2694,6 +2694,52 @@ sideSvg.addEventListener('pointercancel', () => { sidePanDrag = null; }, true);
 document.getElementById('side-reset').addEventListener('click', () => {
   Object.assign(sideVP, SIDE_VP_DEFAULT);
   renderSideView();
+});
+
+// ── State export / import ─────────────────────────────────────────────────
+
+document.getElementById('export-state').addEventListener('click', () => {
+  // Serialise the full state object (all hull geometry + UI settings).
+  const json = JSON.stringify(state, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'loft-state.json'; a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('import-state').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const parsed = JSON.parse(ev.target.result);
+      // Shallow-merge top-level keys so we keep any new keys not in the file.
+      Object.assign(state, parsed);
+      // Clamp selectedStation in case the imported state has fewer stations.
+      const n = listAllStations(state).length;
+      if (state.selectedStation >= n) state.selectedStation = Math.max(0, n - 1);
+      // Fill in any deckPts that weren't saved (backward-compat).
+      reconcileStationDeckPts(state);
+      reconcileDeckPoints(state);
+      // Sync UI controls that mirror state.
+      loftResEl.value  = state.loftRes;
+      xSubdivEl.value  = String(state.xSubdiv);
+      lengthEl.value   = state.length.toFixed(2);
+      lengthOut.textContent = state.length.toFixed(2) + ' m';
+      rebuildHull();
+      renderStationList();
+      renderSideView();
+      renderTopView();
+      renderSectionView();
+    } catch (err) {
+      alert('Could not parse JSON: ' + err.message);
+    }
+    // Reset the file input so re-importing the same file works.
+    e.target.value = '';
+  };
+  reader.readAsText(file);
 });
 
 // ── Side-view sheer profile editing ──────────────────────────────────────
