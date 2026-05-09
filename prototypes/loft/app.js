@@ -25,7 +25,8 @@ const DEFAULT_HALF_BEAM = 0.30; // reference half-beam for display scale
 
 const state = {
   length: 5.2,
-  loftRes: 'med',
+  loftRes: '24',     // section (Y-Z) subdivisions per station
+  xSubdiv: 4,        // longitudinal (X) interpolation factor between adjacent stations
   selectedStation: 2,   // index into the unified station list (interior + sheer)
   spine: spinePlaceholder(5.2),
   // Interior stations only — closed-loop cross-sections perpendicular to the rocker.
@@ -654,7 +655,7 @@ function unifiedStations(state, lengths, N) {
 // position) so the hull naturally closes to a point at bow and stern.
 function buildLoft(state) {
   const lengths = compositeLengths(state);
-  const N = { low: 32, med: 64, high: 128 }[state.loftRes];
+  const N = parseInt(state.loftRes, 10) || 24;
 
   const spSampled     = sampledSpine(state.spine, 64);
   const deckEvalLoft  = buildDeckSpline(state, spSampled);
@@ -692,14 +693,41 @@ function buildLoft(state) {
     }));
   });
 
+  // ── Longitudinal (X) densification ──────────────────────────────────
+  // Fit per-column cubic splines through the base rows' world positions
+  // at their composite S, then resample at xSubdiv× density. xSubdiv=1
+  // disables densification and uses base rows directly.
+  const xSubdiv = Math.max(1, parseInt(state.xSubdiv, 10) || 1);
+  let denseRows = rows;
+  if (xSubdiv > 1 && M >= 2) {
+    const baseS = allSt.map(st => st.S);
+    const M2 = (M - 1) * xSubdiv + 1;
+    denseRows = new Array(M2);
+    for (let i = 0; i < M2; i++) denseRows[i] = new Array(N);
+    for (let k = 0; k < N; k++) {
+      const xs = rows.map(r => r[k].x);
+      const ys = rows.map(r => r[k].y);
+      const zs = rows.map(r => r[k].z);
+      const fx = naturalCubicNonUniform(baseS, xs);
+      const fy = naturalCubicNonUniform(baseS, ys);
+      const fz = naturalCubicNonUniform(baseS, zs);
+      for (let i = 0; i < M2; i++) {
+        const t = i / (M2 - 1);
+        const S = baseS[0] + t * (baseS[M - 1] - baseS[0]);
+        denseRows[i][k] = { x: fx(S), y: fy(S), z: fz(S) };
+      }
+    }
+  }
+  const Mdense = denseRows.length;
+
   // Starboard mesh + port mirror — ruled quad strips between adjacent rows.
   const positions = [];
   const indices   = [];
-  for (let i = 0; i < M; i++)
+  for (let i = 0; i < Mdense; i++)
     for (let k = 0; k < N; k++)
-      positions.push(rows[i][k].x, rows[i][k].z, rows[i][k].y);
+      positions.push(denseRows[i][k].x, denseRows[i][k].z, denseRows[i][k].y);
 
-  for (let i = 0; i < M - 1; i++) {
+  for (let i = 0; i < Mdense - 1; i++) {
     for (let k = 0; k < N - 1; k++) {
       const a = i * N + k, b = i * N + k + 1;
       const c = (i + 1) * N + k, d = (i + 1) * N + k + 1;
@@ -708,12 +736,12 @@ function buildLoft(state) {
     }
   }
 
-  const stbdVertCount = M * N;
-  for (let i = 0; i < M; i++)
+  const stbdVertCount = Mdense * N;
+  for (let i = 0; i < Mdense; i++)
     for (let k = 0; k < N; k++)
-      positions.push(rows[i][k].x, rows[i][k].z, -rows[i][k].y);
+      positions.push(denseRows[i][k].x, denseRows[i][k].z, -denseRows[i][k].y);
 
-  for (let i = 0; i < M - 1; i++) {
+  for (let i = 0; i < Mdense - 1; i++) {
     for (let k = 0; k < N - 1; k++) {
       const a = stbdVertCount + i * N + k, b = stbdVertCount + i * N + k + 1;
       const c = stbdVertCount + (i + 1) * N + k, d = stbdVertCount + (i + 1) * N + k + 1;
@@ -748,7 +776,8 @@ function buildLoft(state) {
       return { kind: st.kind, S: st.S, points: st.samples.map(projFn) };
     });
 
-  return { positions, indices, rows, stationRows, lengths, N, M };
+  // Expose the densified rows so SVG wireframe overlays match the 3D mesh.
+  return { positions, indices, rows: denseRows, stationRows, lengths, N, M: Mdense };
 }
 
 // Sample the lofted section in (b, n) at any normalized arc length s.
@@ -842,40 +871,45 @@ renderer.domElement.addEventListener('dblclick', () => {
   controls.update();
 });
 
-// Lighting.
-// Brighter lights to make up for the dark background.
-scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-const keyLight = new THREE.DirectionalLight(0xffffff, 1.05);
-keyLight.position.set(2, 4, 1.5);
+// Lighting — low ambient so AO has something to bite, strong key light
+// from above-front, modest fill from the rear-opposite side, plus a small
+// back rim light for hull-edge separation against the dark background.
+scene.add(new THREE.AmbientLight(0xffffff, 0.22));
+const keyLight = new THREE.DirectionalLight(0xffffff, 2.1);
+keyLight.position.set(3, 5, 2.5);
 scene.add(keyLight);
-const fillLight = new THREE.DirectionalLight(0xc7d2fe, 0.55);
-fillLight.position.set(-2, 1, -2);
+const fillLight = new THREE.DirectionalLight(0xc7d2fe, 0.45);
+fillLight.position.set(-2.5, 1.5, -2);
 scene.add(fillLight);
+const rimLight  = new THREE.DirectionalLight(0xfde68a, 0.55);
+rimLight.position.set(-1.5, 2, 3.5);
+scene.add(rimLight);
 
-// Grid planes live in their own scene so they are rendered AFTER the AO
-// composer pass and appear correctly in every output mode (Normal, SSAO, etc).
-const gridScene = new THREE.Scene();
+// Grid planes live in the main scene so they depth-test against the hull
+// and intersect visually in 3D rather than always rendering on top.
 
 // Horizontal reference grid at Z = 0 (waterline plane).
 const grid = new THREE.GridHelper(8, 16, 0xe2e8f0, 0x64748b);
 grid.position.y = 0;
 grid.material.transparent = true;
-grid.material.opacity = 0.85;
-gridScene.add(grid);
+grid.material.opacity = 0.65;
+grid.material.depthWrite = false;
+scene.add(grid);
 
 // Centerline plane grid (longitudinal-vertical bisecting plane).
 const centerGrid = new THREE.GridHelper(6, 12, 0xa5b4fc, 0x475569);
 centerGrid.rotation.x = Math.PI / 2;
 centerGrid.material.transparent = true;
-centerGrid.material.opacity = 0.6;
+centerGrid.material.opacity = 0.45;
+centerGrid.material.depthWrite = false;
 centerGrid.position.y = 0;
-gridScene.add(centerGrid);
+scene.add(centerGrid);
 
 // Bright centerline at the intersection of the two grid planes.
-const centerlineMat  = new THREE.LineBasicMaterial({ color: 0xfbbf24 });
+const centerlineMat  = new THREE.LineBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.9, depthWrite: false });
 const centerlineGeom = new THREE.BufferGeometry();
 const centerlineLine = new THREE.Line(centerlineGeom, centerlineMat);
-gridScene.add(centerlineLine);
+scene.add(centerlineLine);
 
 // Hull mesh group.
 const hullGroup = new THREE.Group();
@@ -1082,17 +1116,12 @@ const resizeObserver = new ResizeObserver(() => {
 });
 resizeObserver.observe(threeHost);
 
-// Render loop. Grid scene rendered after the composer so it appears on top
-// in every AO output mode (Normal, SSAO, etc). clearDepth() preserves the
-// color output while allowing grid lines to depth-test against each other.
+// Render loop. Grids live in the main scene now and depth-test against
+// the hull so they intersect properly instead of overlaying it.
 function animate() {
   requestAnimationFrame(animate);
   controls.update();
   composer.render();
-  renderer.autoClear = false;
-  renderer.clearDepth();
-  renderer.render(gridScene, camera);
-  renderer.autoClear = true;
 }
 animate();
 
@@ -1915,6 +1944,19 @@ lengthEl.addEventListener('input', () => {
 loftResEl.addEventListener('change', () => {
   state.loftRes = loftResEl.value;
   rebuildHull();
+  // Wireframes in side/top views read lastLoft.rows — refresh now so the
+  // overlay density updates immediately to match the 3D mesh.
+  renderSideView();
+  renderTopView();
+});
+
+const xSubdivEl = document.getElementById('x-subdiv');
+xSubdivEl.value = String(state.xSubdiv);
+xSubdivEl.addEventListener('change', () => {
+  state.xSubdiv = parseInt(xSubdivEl.value, 10) || 1;
+  rebuildHull();
+  renderSideView();
+  renderTopView();
 });
 
 // Hull colors — outside is the material's .color (used on front-facing
@@ -1969,16 +2011,16 @@ const aoMxOut     = document.getElementById('ao-mx-out');
 const aoCtOut     = document.getElementById('ao-ct-out');
 const aoResetBtn  = document.getElementById('ao-reset');
 
-// AO is off by default — SSAOPass output is too weak for kayak-scale
-// crevices even with pow-amplified contrast. See loft-plan.md "TODO" for
-// the planned fix. Users can still flip it on in the AO panel.
+// AO defaults tuned for visible contour shading on a kayak hull. Combined
+// with the lower ambient + stronger key light above, contours on the hull
+// belly should read clearly.
 const AO_DEFAULTS = {
   enabled:      true,
-  kernelRadius: 0.2,
-  minDistance:  0.00001,
-  maxDistance:  0.5,
-  contrast:     4.0,
-  output:       5,   // Normal — colored normal vectors
+  kernelRadius: 0.35,
+  minDistance:  0.0001,
+  maxDistance:  0.6,
+  contrast:     12.0,
+  output:       0,   // Default (beauty + AO)
 };
 
 const aoOutputModes = [
