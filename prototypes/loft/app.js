@@ -630,7 +630,12 @@ function unifiedStations(state, lengths, N) {
   state.sternSheer.stations.forEach(sst => {
     const S = sheerStationS('stern', sst.t, lengths);
     if (S <= 1e-6 || S >= sternFrac - 1e-6) return;
-    out.push({ S, kind: 'sternSheer', samples: sampleSection(sst.points, N) });
+    out.push({
+      S, kind: 'sternSheer',
+      samples:  sampleSection(sst.points, N),
+      bottomPt: sst.bottomPt,   // chord endpoints used directly by buildLoft
+      topPt:    sst.topPt,
+    });
   });
 
   // Interior rocker stations.
@@ -649,7 +654,12 @@ function unifiedStations(state, lengths, N) {
   state.bowSheer.stations.forEach(sst => {
     const S = sheerStationS('bow', sst.t, lengths);
     if (S <= 1 - bowFrac + 1e-6 || S >= 1 - 1e-6) return;
-    out.push({ S, kind: 'bowSheer', samples: sampleSection(sst.points, N) });
+    out.push({
+      S, kind: 'bowSheer',
+      samples:  sampleSection(sst.points, N),
+      bottomPt: sst.bottomPt,
+      topPt:    sst.topPt,
+    });
   });
 
   // S=1: bow tip — single degenerate point.
@@ -681,18 +691,16 @@ function buildLoft(state) {
 
   const rows = allSt.map(st => {
     if (st.kind === 'bowSheer' || st.kind === 'sternSheer') {
-      const isBow  = st.kind === 'bowSheer';
-      const tFrac  = Math.max(0, Math.min(1, isBow
-        ? (st.S - (1 - lengths.bowFrac)) / lengths.bowFrac
-        : 1 - st.S / lengths.sternFrac));
-      const botPt  = sampleAlong(isBow ? bowKSampled  : sternKSampled, tFrac).p;
-      const topPt  = sampleAlong(isBow ? bowTSampled  : sternTSampled, tFrac).p;
-      const halfB  = beamEvalAt(beamPts, botPt.x);
-      return st.samples.map(({ b, n }) => ({
-        x: botPt.x + n * (topPt.x - botPt.x),
-        y: b * halfB,
-        z: botPt.z + n * (topPt.z - botPt.z),
-      }));
+      // Chord runs from the user-controlled bottomPt (keel) to topPt (deck).
+      // Beam half-width is sampled at the chord-X for each n so the section
+      // tilts correctly with the chord just like interior pink stations.
+      const botPt = st.bottomPt;
+      const topPt = st.topPt;
+      const dx = topPt.x - botPt.x, dz = topPt.z - botPt.z;
+      return st.samples.map(({ b, n }) => {
+        const cx = botPt.x + n * dx;
+        return { x: cx, y: b * beamEvalAt(beamPts, cx), z: botPt.z + n * dz };
+      });
     }
     if (st.kind === 'tip') {
       const { p } = compositeAt(state, lengths, st.S);
@@ -771,17 +779,12 @@ function buildLoft(state) {
     .map(st => {
       let projFn;
       if (st.kind === 'bowSheer' || st.kind === 'sternSheer') {
-        const isBow = st.kind === 'bowSheer';
-        const tFrac = Math.max(0, Math.min(1, isBow
-          ? (st.S - (1 - lengths.bowFrac)) / lengths.bowFrac
-          : 1 - st.S / lengths.sternFrac));
-        const botPt = sampleAlong(isBow ? bowKSampled : sternKSampled, tFrac).p;
-        const topPt = sampleAlong(isBow ? bowTSampled : sternTSampled, tFrac).p;
-        const halfB = beamEvalAt(beamPts, botPt.x);
-        projFn = ({ b, n }) => ({
-          x: botPt.x + n * (topPt.x - botPt.x), y: b * halfB,
-          z: botPt.z + n * (topPt.z - botPt.z),
-        });
+        const botPt = st.bottomPt, topPt = st.topPt;
+        const dx = topPt.x - botPt.x, dz = topPt.z - botPt.z;
+        projFn = ({ b, n }) => {
+          const cx = botPt.x + n * dx;
+          return { x: cx, y: b * beamEvalAt(beamPts, cx), z: botPt.z + n * dz };
+        };
       } else {
         const { p } = compositeAt(state, lengths, st.S);
         const dPt = st.deckPt || { x: p.x, z: p.z + 0.3 };
@@ -1300,10 +1303,13 @@ function renderTopView() {
       class: 'station-hit',
       'data-drag': 'station', 'data-idx': String(i),
     }));
-    // Visible station chord — magenta to match the side-view chord overlay.
+    // Visible station chord — colour-matched to its end (pink for interior,
+    // orange for bow sheer, purple for stern sheer).
+    const endCls = entry.kind === 'bowSheer' ? ' chord-bow'
+                 : entry.kind === 'sternSheer' ? ' chord-stern' : '';
     topSvg.appendChild(el('line', {
       x1: xOfT(-halfB), y1: yOfT(kx), x2: xOfT(halfB), y2: yOfT(kx),
-      class: 'station-chord' + (isSel ? ' selected' : ''),
+      class: 'station-chord' + endCls + (isSel ? ' selected' : ''),
     }));
     // Centerline marker dot.
     topSvg.appendChild(el('circle', {
@@ -1557,7 +1563,7 @@ function renderSideView() {
       sideSvg.appendChild(el('line', {
         x1: xOf(sst.bottomPt.x), y1: yOf(sst.bottomPt.z),
         x2: xOf(sst.topPt.x),    y2: yOf(sst.topPt.z),
-        class: 'station-chord' + (isSel ? ' selected' : ''),
+        class: `station-chord chord-${end}` + (isSel ? ' selected' : ''),
       }));
 
       // Bottom (keel) control point — solid fill.
@@ -1631,17 +1637,8 @@ function renderSideView() {
     }));
   }
 
-  // ── Deck-line endpoints (sheer ↔ hull boundary) ───────────────────────
-  // The deck line itself is now driven by the station deck points (pink
-  // diamonds), so the only remaining green diamonds are the two locked
-  // endpoints that join the sheer top to the hull deck.
-  for (const dep of [sternDeckEndPt, bowDeckEndPt]) {
-    sideSvg.appendChild(el('rect', {
-      x: xOf(dep.x) - 4.5, y: yOf(dep.z) - 4.5, width: 9, height: 9,
-      transform: `rotate(45 ${xOf(dep.x)} ${yOf(dep.z)})`,
-      class: 'deck-ctrl locked',
-    }));
-  }
+  // (The two sheer↔hull deck-line endpoints are rendered as draggable
+  // green diamonds inside the sheer-end loop above.)
 
   // ── Loft mesh overlay (if enabled) ───────────────────────────────────
   if (state.showLoftMesh && lastLoft) {
@@ -2327,9 +2324,20 @@ sideSvg.addEventListener('pointermove', (e) => {
     const isBot = drag.kind.startsWith('sheer-bot-');
     const end   = drag.kind.endsWith('-bow') ? 'bow' : 'stern';
     const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
-    if (!sheer.stations[drag.idx]) return;
-    if (isBot) sheer.stations[drag.idx].bottomPt = { x: wx, z: wz };
-    else        sheer.stations[drag.idx].topPt    = { x: wx, z: wz };
+    const sst   = sheer.stations[drag.idx];
+    if (!sst) return;
+    if (isBot) sst.bottomPt = { x: wx, z: wz };
+    else       sst.topPt    = { x: wx, z: wz };
+    // Re-derive t from bottomPt.x so longitudinal ordering and the cubic
+    // spline densification along S stay consistent with the dragged
+    // position. t goes 0 (junction) → 1 (tip).
+    const sampled = sampledSpine(state.spine, 64);
+    const junctionX = spineAt({ ctrl: state.spine, sampled }, sheer.startS).p.x;
+    const tipX = sheer.tip.x;
+    const span = (tipX - junctionX) || 1e-6;
+    const tNew = Math.max(0.02, Math.min(0.98, (sst.bottomPt.x - junctionX) / span));
+    sst.t = tNew;
+    sheer.stations.sort((a, b) => a.t - b.t);
     drag.moved = true;
     rebuildHull();
     renderSideView();

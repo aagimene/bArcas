@@ -352,9 +352,14 @@ main {
 #top-view .silhouette        { fill: #fdf6e3; stroke: none; opacity: 0.7; }
 #top-view .beam-curve        { fill: none; stroke: #0891b2; stroke-width: 2; stroke-linecap: round; pointer-events: none; }
 #top-view .beam-curve.mirror { opacity: 0.35; }
-/* Stations in top view: magenta to match the side-view chord overlay. */
+/* Stations in top view: colour-matched to their end (pink interior,
+   orange bow, purple stern). */
 #top-view .station-chord          { stroke: #ec4899; stroke-width: 1.6; stroke-dasharray: 5 3; pointer-events: none; opacity: 0.85; }
 #top-view .station-chord.selected { stroke: #be185d; stroke-width: 2.4; stroke-dasharray: none; opacity: 1; }
+#top-view .station-chord.chord-bow            { stroke: #f97316; }
+#top-view .station-chord.chord-bow.selected   { stroke: #c2410c; }
+#top-view .station-chord.chord-stern          { stroke: #7c3aed; }
+#top-view .station-chord.chord-stern.selected { stroke: #5b21b6; }
 #top-view .station-keel           { fill: #0d9488; stroke: white; stroke-width: 1.4; pointer-events: none; }
 #top-view .station-keel.selected  { fill: #0f766e; stroke-width: 1.8; }
 #top-view .station-hit            { stroke: transparent; stroke-width: 16; cursor: ns-resize; fill: none; }
@@ -404,10 +409,15 @@ main {
 #side-view .station-deck-hit { fill: transparent; cursor: grab; }
 #side-view .station-label    { font: 9px -apple-system, sans-serif; fill: #b45309; text-anchor: middle; pointer-events: none; }
 
-/* Station chord = colored overlay line between keel-pt and deck-pt of a
-   station. The section is lofted along this chord. */
+/* Station chord = overlay line between a station's keel and deck control
+   points. Pink for interior stations; orange for bow sheer; purple for
+   stern sheer — matching the colour of each end's control points. */
 #side-view .station-chord          { stroke: #ec4899; stroke-width: 1.6; stroke-dasharray: 5 3; pointer-events: none; opacity: 0.85; }
 #side-view .station-chord.selected { stroke: #be185d; stroke-width: 2.4; stroke-dasharray: none; opacity: 1; }
+#side-view .station-chord.chord-bow            { stroke: #f97316; }
+#side-view .station-chord.chord-bow.selected   { stroke: #c2410c; }
+#side-view .station-chord.chord-stern          { stroke: #7c3aed; }
+#side-view .station-chord.chord-stern.selected { stroke: #5b21b6; }
 
 /* Interior station keel control (on the rocker) — teal solid, slides along curve. */
 #side-view .station-keel          { fill: #0d9488; stroke: white; stroke-width: 1.4; cursor: ew-resize; }
