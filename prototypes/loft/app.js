@@ -296,50 +296,68 @@ function invalidateLocalFrames(state) {
 }
 
 // ── X-ordering guards ──────────────────────────────────────────────────────
-// Each helper returns [loX, hiX] that the dragged point's X must lie within.
-// Endpoints use ±Infinity so first/last points have no outer X constraint.
+//
+// Simple rule: a control point's X cannot exceed its +X neighbour's X, nor
+// be less than its −X neighbour's X. Each helper returns
+//   { lo: X-of-(−X)-neighbour, hi: X-of-(+X)-neighbour }
+// where lo/hi are the IMMEDIATE neighbours along its own control line. If
+// the point has no neighbour on a side (e.g. it's the outermost), that
+// side is undefined (returned as ±Infinity).
 
-// Interior station deck: must not cross adjacent stations' deck pts in X.
-function deckPtXBounds(state, stationIdx) {
-  const lo = stationIdx === 0
-    ? -Infinity
-    : (state.stations[stationIdx - 1].deckPt?.x ?? -Infinity);
-  const hi = stationIdx === state.stations.length - 1
-    ? Infinity
-    : (state.stations[stationIdx + 1].deckPt?.x ?? Infinity);
-  return [lo + 0.01, hi - 0.01];
+const EPS_X = 0.005;  // 5 mm minimum gap between neighbours
+
+function clampToXNeighbours(wx, { lo, hi }) {
+  return Math.max((lo ?? -Infinity) + EPS_X, Math.min((hi ?? Infinity) - EPS_X, wx));
 }
 
-// Sheer station pt: must stay between its immediate neighbours' X values.
-// Uses the sorted X positions of all anchor points (junction, other-station
-// pts of the same kind, tip) to bracket the dragged point.
-function sheerPtXBounds(state, end, excludeSst, ptKind) {
+// Interior station deck pt: neighbours are the adjacent stations' deck pts.
+// (Endpoints — first/last station — have no neighbour on the outer side.)
+function interiorDeckXNeighbours(state, stationIdx) {
+  const lo = stationIdx > 0 ? state.stations[stationIdx - 1].deckPt?.x : null;
+  const hi = stationIdx < state.stations.length - 1 ? state.stations[stationIdx + 1].deckPt?.x : null;
+  return { lo, hi };
+}
+
+// Sheer station bottom (keel) pt: neighbours along the sheer keel line are
+// the junction (toward boat centre) and the tip (toward boat end), with any
+// other sheer-station bottom pts in between sorted by t.
+// Returns the immediate ±X neighbours.
+function sheerKeelXNeighbours(state, end, sIdx) {
   const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
   const sp = sampledSpine(state.spine, 64);
-  const jPt = spineAt({ ctrl: state.spine, sampled: sp }, sheer.startS).p;
-  const getX = s => ptKind === 'bottom' ? s.bottomPt.x : s.topPt.x;
-  // All fixed neighbour X values sorted ascending.
-  const fixed = [jPt.x, sheer.tip.x,
-    ...sheer.stations.filter(s => s !== excludeSst).map(getX)
-  ].sort((a, b) => a - b);
-  // The valid range is between the smallest-X fixed point that is still
-  // within the sheer region and the largest-X one — i.e. the full spread.
-  // For a single station the range is simply [min(jPt,tip)+ε, max(jPt,tip)-ε].
-  // For multiple, each station's bracket is between its sorted neighbours.
-  const currX = getX(excludeSst);
-  // Find the largest fixed value < currX (left wall) and smallest > currX.
-  const leftWall  = fixed.filter(x => x < currX - 1e-6).pop()  ?? -Infinity;
-  const rightWall = fixed.find(x => x > currX + 1e-6)          ?? Infinity;
-  return [leftWall + 0.01, rightWall - 0.01];
+  const jX = spineAt({ ctrl: state.spine, sampled: sp }, sheer.startS).p.x;
+  // Order along the sheer: t=0 (junction) → t=1 (tip).
+  const sorted = [...sheer.stations].sort((a, b) => a.t - b.t);
+  const idxInSorted = sorted.indexOf(sheer.stations[sIdx]);
+  const prevX = idxInSorted > 0 ? sorted[idxInSorted - 1].bottomPt.x : jX;
+  const nextX = idxInSorted < sorted.length - 1 ? sorted[idxInSorted + 1].bottomPt.x : sheer.tip.x;
+  // For bow: junction has smaller X, tip has larger X → lo=prev, hi=next.
+  // For stern: junction has larger X, tip has smaller X → lo=next, hi=prev.
+  if (end === 'bow') return { lo: prevX, hi: nextX };
+  return { lo: nextX, hi: prevX };
 }
 
-// Sheer tip: must stay outboard of all sheer-station pts (bow = larger X).
-function sheerTipXBounds(state, end) {
+// Sheer station top (deck) pt: neighbours along the deck-perimeter line are,
+// from boat centre outward: deckEndPt → other sheer-station topPts (sorted
+// by t) → tip.
+function sheerDeckXNeighbours(state, end, sIdx) {
   const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
-  if (sheer.stations.length === 0) return [-Infinity, Infinity];
+  const innerX = sheer.deckEndPt.x;
+  const sorted = [...sheer.stations].sort((a, b) => a.t - b.t);
+  const idxInSorted = sorted.indexOf(sheer.stations[sIdx]);
+  const prevX = idxInSorted > 0 ? sorted[idxInSorted - 1].topPt.x : innerX;
+  const nextX = idxInSorted < sorted.length - 1 ? sorted[idxInSorted + 1].topPt.x : sheer.tip.x;
+  if (end === 'bow') return { lo: prevX, hi: nextX };
+  return { lo: nextX, hi: prevX };
+}
+
+// Sheer tip: outboard of every sheer-station pt; no outer neighbour.
+function sheerTipXNeighbours(state, end) {
+  const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
+  if (sheer.stations.length === 0) return { lo: null, hi: null };
   const allX = sheer.stations.flatMap(s => [s.bottomPt.x, s.topPt.x]);
-  if (end === 'bow') return [Math.max(...allX) + 0.01, Infinity];
-  return [-Infinity, Math.min(...allX) - 0.01];
+  if (end === 'bow') return { lo: Math.max(...allX), hi: null };
+  return { lo: null, hi: Math.min(...allX) };
 }
 
 // Helper: compute deckLocal for an interior station from a world deck position.
@@ -2468,9 +2486,7 @@ topSvg.addEventListener('pointermove', (e) => {
       const sst   = sheer.stations[sel.stationIdx];
       const spSampled = sampledSpine(state.spine, 64);
       const kSamp = sampledSheerKeel(state, end, spSampled);
-      // Clamp wx within the X range the station is allowed to occupy.
-      const [topShLo, topShHi] = sheerPtXBounds(state, end, sst, 'bottom');
-      const wxClamped = Math.max(topShLo, Math.min(topShHi, wx));
+      const wxClamped = clampToXNeighbours(wx, sheerKeelXNeighbours(state, end, sel.stationIdx));
       // Closest point on sheer keel curve to clamped wx (in X).
       let bestI = 0, bestD = Infinity;
       for (let i = 0; i < kSamp.pts.length; i++) {
@@ -2707,8 +2723,8 @@ sideSvg.addEventListener('pointermove', (e) => {
     const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
     const sst   = sheer.stations[drag.idx];
     if (!sst) return;
-    const [shLo, shHi] = sheerPtXBounds(state, end, sst, isBot ? 'bottom' : 'top');
-    wx = Math.max(shLo, Math.min(shHi, wx));
+    if (isBot) wx = clampToXNeighbours(wx, sheerKeelXNeighbours(state, end, drag.idx));
+    else       wx = clampToXNeighbours(wx, sheerDeckXNeighbours(state, end, drag.idx));
     if (isBot) { sst.bottomPt = { x: wx, z: wz }; sst.bottomLocal = worldToSheerLocal(state, end, wx, wz); }
     else       { sst.topPt    = { x: wx, z: wz }; sst.topLocal    = worldToSheerLocal(state, end, wx, wz); }
     // Re-derive t from bottomPt.x for ordering.
@@ -2725,8 +2741,7 @@ sideSvg.addEventListener('pointermove', (e) => {
   } else if (drag.kind === 'sheer-tip-bow' || drag.kind === 'sheer-tip-stern') {
     const end = drag.kind === 'sheer-tip-bow' ? 'bow' : 'stern';
     const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
-    const [tipLo, tipHi] = sheerTipXBounds(state, end);
-    wx = Math.max(tipLo, Math.min(tipHi, wx));
+    wx = clampToXNeighbours(wx, sheerTipXNeighbours(state, end));
     sheer.tip      = { x: wx, z: wz };
     sheer.tipLocal = worldToSheerLocal(state, end, wx, wz);
     drag.moved = true;
@@ -2804,8 +2819,7 @@ sideSvg.addEventListener('pointermove', (e) => {
     // Don't let the deck point pass below the keel or cross X-neighbours.
     const sampled = sampledSpine(state.spine, 32);
     const keel    = spineAt({ ctrl: state.spine, sampled }, st.s).p;
-    const [dkLo, dkHi] = deckPtXBounds(state, stationIdx);
-    wx = Math.max(dkLo, Math.min(dkHi, wx));
+    wx = clampToXNeighbours(wx, interiorDeckXNeighbours(state, stationIdx));
     st.deckPt    = { x: wx, z: Math.max(keel.z + 0.02, wz) };
     st.deckLocal = worldToDeckLocal(state, stationIdx, st.deckPt.x, st.deckPt.z);
     rebuildHull();
