@@ -1952,23 +1952,49 @@ lengthEl.addEventListener('input', () => {
   const newL     = parseFloat(lengthEl.value);
   const currentL = state.spine.bow.x - state.spine.stern.x;
   if (currentL > 0) {
-    const ratio = newL / currentL;
+    const r = newL / currentL;  // scale factor for all longitudinal X positions
+    const sx = v => v * r;      // scale a world-X value
+    const sdx = v => v * r;     // scale a relative dx handle offset
+
+    // Rocker spine — X positions and handle X-offsets.
     const sp = state.spine;
-    sp.stern.x          *= ratio;
-    sp.paddler.x         *= ratio;
-    sp.bow.x             *= ratio;
-    sp.sternHandle.dx    *= ratio;
-    sp.bowHandle.dx      *= ratio;
-    sp.paddlerAftLen     *= ratio;
-    sp.paddlerForeLen    *= ratio;
-    // Z values and handle dz are intentionally not scaled — rocker depth
-    // shouldn't stretch with hull length.
+    sp.stern.x        = sx(sp.stern.x);
+    sp.paddler.x      = sx(sp.paddler.x);
+    sp.bow.x          = sx(sp.bow.x);
+    sp.sternHandle.dx = sdx(sp.sternHandle.dx);
+    sp.bowHandle.dx   = sdx(sp.bowHandle.dx);
+    sp.paddlerAftLen  = sdx(sp.paddlerAftLen);
+    sp.paddlerForeLen = sdx(sp.paddlerForeLen);
+    // Z values intentionally not scaled — rocker depth is independent of length.
+
+    // Interior station deck points (keel `s` param is dimensionless, unchanged).
+    state.stations.forEach(st => {
+      if (st.deckPt) st.deckPt.x = sx(st.deckPt.x);
+    });
+
+    // Sheer ends — all world-X positions scale; Z (height) does not.
+    for (const sheer of [state.bowSheer, state.sternSheer]) {
+      sheer.tip.x      = sx(sheer.tip.x);
+      sheer.deckEndPt.x = sx(sheer.deckEndPt.x);
+      sheer.stations.forEach(sst => {
+        sst.bottomPt.x = sx(sst.bottomPt.x);
+        sst.topPt.x    = sx(sst.topPt.x);
+      });
+    }
+
+    // Beam line — peak X positions and handle X-offsets; Y (beam width) unchanged.
+    const bl = state.beamLine;
+    bl.sternHandle.dx = sdx(bl.sternHandle.dx);
+    bl.bowHandle.dx   = sdx(bl.bowHandle.dx);
+    bl.peaks.forEach(pk => {
+      pk.x   = sx(pk.x);
+      pk.hdx = sdx(pk.hdx);
+    });
   }
   state.length = newL;
   lengthOut.textContent = newL.toFixed(2) + ' m';
   rebuildHull();
   renderSideView();
-
   renderTopView();
 });
 
@@ -2287,7 +2313,7 @@ topSvg.addEventListener('pointercancel', () => { topDrag = null; });
 let topPanDrag = null;
 topSvg.addEventListener('wheel', (e) => {
   e.preventDefault();
-  const dz = e.deltaY < 0 ? 1.05 : 1 / 1.05;
+  const dz = e.deltaY < 0 ? 1.025 : 1 / 1.025;
   const pt = topSvg.createSVGPoint();
   pt.x = e.clientX; pt.y = e.clientY;
   const loc = pt.matrixTransform(topSvg.getScreenCTM().inverse());
@@ -2628,7 +2654,7 @@ sideSvg.addEventListener('pointercancel', endDrag);
 let sidePanDrag = null;
 sideSvg.addEventListener('wheel', (e) => {
   e.preventDefault();
-  const dz = e.deltaY < 0 ? 1.05 : 1 / 1.05;
+  const dz = e.deltaY < 0 ? 1.025 : 1 / 1.025;
   const { x: mx, y: my } = svgToLocal(sideSvg, e);
   sideVP.minX = mx - (mx - sideVP.minX) / dz;
   sideVP.minY = my - (my - sideVP.minY) / dz;
