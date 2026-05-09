@@ -1422,57 +1422,21 @@ function renderSideView() {
 
   const spSampled = sampledSpine(state.spine, 64);
 
-  // ── Unified deck perimeter spline ─────────────────────────────────────
-  // One natural cubic through ALL deck-perimeter control points in x-order:
-  // stern tip → stern sheer topPts → sternDeckEndPt → station deckPts →
-  // bowDeckEndPt → bow sheer topPts → bow tip.
-  // Building a single spline avoids the kink that appears when two
-  // independently-fit cubics are joined at deckEndPt.
-  const deckCtrlPts = (() => {
-    const sternSheerTopSorted = [...state.sternSheer.stations]
-      .sort((a, b) => a.topPt.x - b.topPt.x)    // ascending x (tip → deckEndPt)
-      .map(s => ({ x: s.topPt.x, z: s.topPt.z }));
-    const bowSheerTopSorted = [...state.bowSheer.stations]
-      .sort((a, b) => a.topPt.x - b.topPt.x)    // ascending x (deckEndPt → tip)
-      .map(s => ({ x: s.topPt.x, z: s.topPt.z }));
-    const interiorDeckPts = state.stations
-      .filter(st => st.deckPt && Number.isFinite(st.deckPt.x))
-      .map(st => ({ x: st.deckPt.x, z: st.deckPt.z }))
-      .sort((a, b) => a.x - b.x);
-    return [
-      { x: state.sternSheer.tip.x, z: state.sternSheer.tip.z },
-      ...sternSheerTopSorted,
-      { x: sternDeckEndPt.x, z: sternDeckEndPt.z },
-      ...interiorDeckPts,
-      { x: bowDeckEndPt.x, z: bowDeckEndPt.z },
-      ...bowSheerTopSorted,
-      { x: state.bowSheer.tip.x, z: state.bowSheer.tip.z },
-    ].filter((p, i, arr) =>
-      // remove duplicates and non-strictly-increasing x values
-      i === 0 || p.x > arr[i - 1].x + 1e-6
-    );
-  })();
-  const deckPerimEval = naturalCubicNonUniform(
-    deckCtrlPts.map(p => p.x), deckCtrlPts.map(p => p.z)
-  );
-  const perimPts = (() => {
-    const x0 = deckCtrlPts[0].x, x1 = deckCtrlPts[deckCtrlPts.length - 1].x;
-    return Array.from({ length: 121 }, (_, i) => {
-      const x = x0 + (i / 120) * (x1 - x0);
-      return { x, z: deckPerimEval(x) };
-    });
-  })();
-
-  // For legacy usage (deckSamplePts used in silhouette) keep the interior span.
-  const deckSamplePts = perimPts.filter(
-    p => p.x >= sternDeckEndPt.x - 1e-4 && p.x <= bowDeckEndPt.x + 1e-4
-  );
+  // ── Pink deck perimeter = mesh deck edge ─────────────────────────────
+  // The loft mesh rows[i][N-1] are the deck-centerline vertices of the
+  // 3D surface (k=N-1 is where b≈0, n≈1). Tracing those in side-view
+  // (X-Z projection) gives the exact same curve as the mesh top edge,
+  // so the pink line is pixel-perfect with the rendered hull.
+  // This also eliminates the need for an independent spline fit and any
+  // kink at the deckEndPt junctions.
+  const perimPts = lastLoft
+    ? lastLoft.rows.map(row => ({ x: row[lastLoft.N - 1].x, z: row[lastLoft.N - 1].z }))
+    : [];
 
   const pt2str = p => `${xOf(p.x).toFixed(2)},${yOf(p.z).toFixed(2)}`;
   const pathD  = pts => 'M ' + pts.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.z).toFixed(2)}`).join(' L ');
 
-  // Silhouette: use the unified perimeter samples for the top edge so it
-  // matches the pink line exactly (no separate stitching of sub-splines).
+  // Silhouette top edge: same mesh deck vertices, so fill matches the line.
   const silPts = [
     ...perimPts.map(pt2str),
     ...[...bowSheerPts].reverse().map(pt2str),
