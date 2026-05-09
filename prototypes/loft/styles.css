@@ -376,26 +376,11 @@ main {
 #top-view .spine-hit         { fill: transparent; cursor: grab; }
 #top-view .handle-hit        { fill: transparent; cursor: grab; }
 #top-view .loft-mesh-line    { fill: none; stroke: #9ca3af; stroke-width: 0.7; pointer-events: none; }
-/* sheer-top curves subsumed into pink deck perimeter — rules removed */
-#side-view .sheer-top-ctrl-bow     { fill: white; stroke: #f97316; stroke-width: 2.2; cursor: grab; }
-#side-view .sheer-top-ctrl-stern   { fill: white; stroke: #7c3aed; stroke-width: 2.2; cursor: grab; }
-
-/* Sheer keel control points: bow = orange, stern = purple.
-   .tip = convergence/tip point, slightly larger, ring style */
-#side-view .sheer-ctrl-bow       { fill: #f97316; stroke: white; stroke-width: 1.2; cursor: grab; }
+/* Sheer tip convergence points — bow = orange, stern = purple ring.
+   Interior sheer station keel/deck pts now use station-keel/deck classes. */
 #side-view .sheer-ctrl-bow.tip   { fill: white; stroke: #f97316; stroke-width: 2.2; cursor: grab; }
-#side-view .sheer-ctrl-stern     { fill: #7c3aed; stroke: white; stroke-width: 1.2; cursor: grab; }
 #side-view .sheer-ctrl-stern.tip { fill: white; stroke: #7c3aed; stroke-width: 2.2; cursor: grab; }
 #side-view .stem-hit { fill: transparent; cursor: grab; }
-
-/* startS and deck-ctrl removed — no longer interactive controls */
-
-/* Sheer station tick */
-#side-view .sheer-station { stroke: #f59e0b; stroke-width: 1.6; pointer-events: none; }
-#side-view .sheer-station.selected { stroke: #b45309; stroke-width: 2.2; }
-#side-view .sheer-station-tick     { fill: #f59e0b; stroke: white; stroke-width: 0.8; cursor: ew-resize; }
-#side-view .sheer-station-tick.selected { fill: #b45309; }
-#side-view .sheer-station-hit      { fill: transparent; cursor: ew-resize; }
 #side-view .station    { stroke: #f59e0b; stroke-width: 1.6; pointer-events: none; }
 #side-view .station.selected { stroke: #b45309; stroke-width: 2.2; }
 #side-view .station-tick {

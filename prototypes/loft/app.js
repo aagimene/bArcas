@@ -1571,42 +1571,30 @@ function renderSideView() {
         class: `station-chord chord-${end}` + (isSel ? ' selected' : ''),
       }));
 
-      // Bottom (keel) control point — solid fill.
+      // Keel (bottom) control point — same blue as hull keel points.
       sideSvg.appendChild(el('circle', {
         cx: xOf(sst.bottomPt.x), cy: yOf(sst.bottomPt.z), r: 14,
-        class: 'stem-hit', 'data-drag': `sheer-bot-${end}`, 'data-idx': String(sIdx),
+        class: 'station-hit',
+        'data-drag': `sheer-bot-${end}`, 'data-idx': String(sIdx), 'data-uni': String(uniIdx),
       }));
       sideSvg.appendChild(el('circle', {
-        cx: xOf(sst.bottomPt.x), cy: yOf(sst.bottomPt.z), r: 4.5,
-        class: botClass + (isSel ? ' selected' : ''),
-        'data-drag': `sheer-bot-${end}`, 'data-idx': String(sIdx),
+        cx: xOf(sst.bottomPt.x), cy: yOf(sst.bottomPt.z), r: 5,
+        class: 'station-keel' + (isSel ? ' selected' : ''),
+        'data-drag': `sheer-bot-${end}`, 'data-idx': String(sIdx), 'data-uni': String(uniIdx),
       }));
 
-      // Top (deck) control point — ring fill.
+      // Deck (top) control point — same pink diamond as hull deck points.
       sideSvg.appendChild(el('circle', {
         cx: xOf(sst.topPt.x), cy: yOf(sst.topPt.z), r: 14,
-        class: 'stem-hit', 'data-drag': `sheer-top-${end}`, 'data-idx': String(sIdx),
+        class: 'station-deck-hit',
+        'data-drag': `sheer-top-${end}`, 'data-idx': String(sIdx), 'data-uni': String(uniIdx),
       }));
-      sideSvg.appendChild(el('circle', {
-        cx: xOf(sst.topPt.x), cy: yOf(sst.topPt.z), r: 5,
-        class: topClass + (isSel ? ' selected' : ''),
-        'data-drag': `sheer-top-${end}`, 'data-idx': String(sIdx),
+      sideSvg.appendChild(el('rect', {
+        x: xOf(sst.topPt.x) - 5, y: yOf(sst.topPt.z) - 5, width: 10, height: 10,
+        transform: `rotate(45 ${xOf(sst.topPt.x)} ${yOf(sst.topPt.z)})`,
+        class: 'station-deck' + (isSel ? ' selected' : ''),
+        'data-drag': `sheer-top-${end}`, 'data-idx': String(sIdx), 'data-uni': String(uniIdx),
       }));
-
-      // Station hit area at the midpoint of the bottomPt→topPt line.
-      if (uniIdx >= 0) {
-        const mx = (sst.bottomPt.x + sst.topPt.x) / 2;
-        const mz = (sst.bottomPt.z + sst.topPt.z) / 2;
-        sideSvg.appendChild(el('circle', {
-          cx: xOf(mx), cy: yOf(mz), r: 14, class: 'sheer-station-hit',
-          'data-drag': 'sheer-station', 'data-idx': String(uniIdx),
-        }));
-        sideSvg.appendChild(el('circle', {
-          cx: xOf(mx), cy: yOf(mz), r: 3.5,
-          class: 'sheer-station-tick' + (isSel ? ' selected' : ''),
-          'data-drag': 'sheer-station', 'data-idx': String(uniIdx),
-        }));
-      }
     });
 
     // Convergence tip — ring, draggable.
@@ -2488,7 +2476,13 @@ sideSvg.addEventListener('pointerdown', (e) => {
     startWz: -y / SIDE_SCALE_Z,
   };
 
-  if (kind === 'station' || kind === 'sheer-station' || kind === 'station-deck') selectStation(idx);
+  if (kind === 'station' || kind === 'sheer-station' || kind === 'station-deck') {
+    selectStation(idx);
+  } else if (kind.startsWith('sheer-bot-') || kind.startsWith('sheer-top-')) {
+    // Sheer control points carry their unified idx in data-uni.
+    const uni = parseInt(target.dataset.uni, 10);
+    if (!isNaN(uni)) selectStation(uni);
+  }
   sideSvg.setPointerCapture(e.pointerId);
 });
 
@@ -2530,38 +2524,6 @@ sideSvg.addEventListener('pointermove', (e) => {
     renderSideView();
 
     renderTopView();
-  } else if (drag.kind === 'sheer-station') {
-    // Drag a sheer station along its sheer profile.
-    const sel   = listAllStations(state)[drag.idx];
-    if (!sel || (sel.kind !== 'bowSheer' && sel.kind !== 'sternSheer')) return;
-    const end   = sel.kind === 'bowSheer' ? 'bow' : 'stern';
-    const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
-    const spSampled = sampledSpine(state.spine, 64);
-    // Find nearest t along the sheer keel line (world-space, not offset-space).
-    const keelSmp = sampledSheerKeel(state, end, spSampled);
-    let bestT = 0, bestDist = Infinity;
-    for (let i = 0; i < keelSmp.pts.length; i++) {
-      const d = Math.hypot(wx - keelSmp.pts[i].x, wz - keelSmp.pts[i].y);
-      if (d < bestDist) {
-        bestDist = d;
-        bestT = keelSmp.total > 0 ? keelSmp.arc[i] / keelSmp.total : 0;
-      }
-    }
-    bestT = Math.max(0.05, Math.min(0.95, bestT));
-    sel.ref.t = bestT;
-    sheer.stations.sort((a, b) => a.t - b.t);
-    // Re-resolve selectedStation index (since sort may have shuffled).
-    const newIdx = sheer.stations.findIndex(s => s === sel.ref);
-    const unified = listAllStations(state);
-    state.selectedStation = unified.findIndex(e =>
-      e.kind === sel.kind && e.stationIdx === newIdx
-    );
-    drag.moved = true;
-    rebuildHull();
-    renderSideView();
-
-    renderTopView();
-    renderStationList();
   } else if (drag.kind.startsWith('anchor-') || drag.kind.startsWith('handle-')) {
     const sp = state.spine;
     if (drag.kind === 'anchor-stern') {
