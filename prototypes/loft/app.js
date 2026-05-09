@@ -983,7 +983,6 @@ renderer.domElement.addEventListener('dblclick', () => {
 // back rim light for hull-edge separation against the dark background.
 scene.add(new THREE.AmbientLight(0xffffff, 0.22));
 const keyLight = new THREE.DirectionalLight(0xffffff, 2.1);
-keyLight.position.set(3, 5, 2.5);
 scene.add(keyLight);
 const fillLight = new THREE.DirectionalLight(0xc7d2fe, 0.45);
 fillLight.position.set(-2.5, 1.5, -2);
@@ -991,6 +990,21 @@ scene.add(fillLight);
 const rimLight  = new THREE.DirectionalLight(0xfde68a, 0.55);
 rimLight.position.set(-1.5, 2, 3.5);
 scene.add(rimLight);
+
+// Key-light spherical orbit — shift+drag on the 3D canvas to reposition.
+// azimuth = horizontal angle, elevation = vertical angle (0=horizon, π/2=top).
+const KEY_LIGHT_DIST = 6.5;
+const KEY_LIGHT_DEFAULTS = { az: 0.69, el: 0.89 };
+const keyLightAngles = { ...KEY_LIGHT_DEFAULTS };
+function applyKeyLightPosition() {
+  const { az, el } = keyLightAngles;
+  keyLight.position.set(
+    KEY_LIGHT_DIST * Math.cos(el) * Math.cos(az),
+    KEY_LIGHT_DIST * Math.sin(el),
+    KEY_LIGHT_DIST * Math.cos(el) * Math.sin(az)
+  );
+}
+applyKeyLightPosition();
 
 // Grid planes live in the main scene so they depth-test against the hull
 // and intersect visually in 3D rather than always rendering on top.
@@ -1228,6 +1242,35 @@ const resizeObserver = new ResizeObserver(() => {
   }
 });
 resizeObserver.observe(threeHost);
+
+// ── Key-light orbit: shift+drag on the 3D canvas ─────────────────────────
+// Horizontal drag = azimuth, vertical drag = elevation.
+// OrbitControls gets the event first; we intercept in capture phase and
+// consume shift+pointer so the camera doesn't also rotate.
+{
+  let lightDrag = null;
+  const RATE = 0.006; // radians per pixel
+
+  renderer.domElement.addEventListener('pointerdown', (e) => {
+    if (!e.shiftKey || e.button !== 0) return;
+    e.stopImmediatePropagation();
+    e.preventDefault();
+    lightDrag = { x: e.clientX, y: e.clientY, az: keyLightAngles.az, el: keyLightAngles.el };
+    renderer.domElement.setPointerCapture(e.pointerId);
+  }, true);
+
+  renderer.domElement.addEventListener('pointermove', (e) => {
+    if (!lightDrag) return;
+    const dx = e.clientX - lightDrag.x;
+    const dy = e.clientY - lightDrag.y;
+    keyLightAngles.az = lightDrag.az - dx * RATE;
+    keyLightAngles.el = Math.max(0.05, Math.min(Math.PI / 2 - 0.05, lightDrag.el - dy * RATE));
+    applyKeyLightPosition();
+  }, true);
+
+  renderer.domElement.addEventListener('pointerup',     () => { lightDrag = null; }, true);
+  renderer.domElement.addEventListener('pointercancel', () => { lightDrag = null; }, true);
+}
 
 // Render loop. Grids live in the main scene now and depth-test against
 // the hull so they intersect properly instead of overlaying it.
@@ -2427,6 +2470,11 @@ topSvg.addEventListener('pointermove', (e) => {
 
 topSvg.addEventListener('pointerup',     () => { topPanDrag = null; }, true);
 topSvg.addEventListener('pointercancel', () => { topPanDrag = null; }, true);
+
+document.getElementById('light-reset').addEventListener('click', () => {
+  Object.assign(keyLightAngles, KEY_LIGHT_DEFAULTS);
+  applyKeyLightPosition();
+});
 
 document.getElementById('top-reset').addEventListener('click', () => {
   topVP.zoom = 1; topVP.offX = 0; topVP.offY = 0;
