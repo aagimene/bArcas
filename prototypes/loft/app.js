@@ -296,49 +296,50 @@ function invalidateLocalFrames(state) {
 }
 
 // ── X-ordering guards ──────────────────────────────────────────────────────
-// Find the X range a point must stay within to avoid crossing its neighbours.
+// Each helper returns [loX, hiX] that the dragged point's X must lie within.
+// Endpoints use ±Infinity so first/last points have no outer X constraint.
 
-// Interior station deck: must stay between prev/next station deckPt.x (or deckEndPt at the ends).
+// Interior station deck: must not cross adjacent stations' deck pts in X.
 function deckPtXBounds(state, stationIdx) {
   const lo = stationIdx === 0
-    ? state.sternSheer.deckEndPt.x
+    ? -Infinity
     : (state.stations[stationIdx - 1].deckPt?.x ?? -Infinity);
   const hi = stationIdx === state.stations.length - 1
-    ? state.bowSheer.deckEndPt.x
+    ? Infinity
     : (state.stations[stationIdx + 1].deckPt?.x ?? Infinity);
   return [lo + 0.01, hi - 0.01];
 }
 
-// Sheer station pt: must stay between its adjacent fixed X values
-// (junction, neighbouring stations of the same kind, tip).
+// Sheer station pt: must stay between its immediate neighbours' X values.
+// Uses the sorted X positions of all anchor points (junction, other-station
+// pts of the same kind, tip) to bracket the dragged point.
 function sheerPtXBounds(state, end, excludeSst, ptKind) {
   const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
   const sp = sampledSpine(state.spine, 64);
   const jPt = spineAt({ ctrl: state.spine, sampled: sp }, sheer.startS).p;
   const getX = s => ptKind === 'bottom' ? s.bottomPt.x : s.topPt.x;
-  const fixed = [
-    jPt.x,
-    sheer.tip.x,
-    ...sheer.stations.filter(s => s !== excludeSst).map(getX),
+  // All fixed neighbour X values sorted ascending.
+  const fixed = [jPt.x, sheer.tip.x,
+    ...sheer.stations.filter(s => s !== excludeSst).map(getX)
   ].sort((a, b) => a - b);
+  // The valid range is between the smallest-X fixed point that is still
+  // within the sheer region and the largest-X one — i.e. the full spread.
+  // For a single station the range is simply [min(jPt,tip)+ε, max(jPt,tip)-ε].
+  // For multiple, each station's bracket is between its sorted neighbours.
   const currX = getX(excludeSst);
-  let lo = -Infinity, hi = Infinity;
-  for (const fx of fixed) {
-    if (fx < currX - 1e-4) lo = fx;
-    else if (fx > currX + 1e-4 && hi === Infinity) hi = fx;
-  }
-  return [lo + 0.01, hi - 0.01];
+  // Find the largest fixed value < currX (left wall) and smallest > currX.
+  const leftWall  = fixed.filter(x => x < currX - 1e-6).pop()  ?? -Infinity;
+  const rightWall = fixed.find(x => x > currX + 1e-6)          ?? Infinity;
+  return [leftWall + 0.01, rightWall - 0.01];
 }
 
-// Sheer tip: must stay outward of every station bottomPt and topPt.
+// Sheer tip: must stay outboard of all sheer-station pts (bow = larger X).
 function sheerTipXBounds(state, end) {
   const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
-  const allPtX = sheer.stations.flatMap(s => [s.bottomPt.x, s.topPt.x]);
-  if (allPtX.length === 0) return [-Infinity, Infinity];
-  const sp = sampledSpine(state.spine, 64);
-  const jPt = spineAt({ ctrl: state.spine, sampled: sp }, sheer.startS).p;
-  if (end === 'bow')   return [Math.max(...allPtX) + 0.01, Infinity];
-  return [-Infinity, Math.min(...allPtX) - 0.01];
+  if (sheer.stations.length === 0) return [-Infinity, Infinity];
+  const allX = sheer.stations.flatMap(s => [s.bottomPt.x, s.topPt.x]);
+  if (end === 'bow') return [Math.max(...allX) + 0.01, Infinity];
+  return [-Infinity, Math.min(...allX) - 0.01];
 }
 
 // Helper: compute deckLocal for an interior station from a world deck position.
