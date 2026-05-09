@@ -38,12 +38,10 @@ const state = {
   // the loft passes through them just like interior stations on the rocker.
   bowSheer:   defaultSheer('bow'),
   sternSheer: defaultSheer('stern'),
-  // Deck line — an explicit natural-cubic spline in world (X, Z) defining
-  // the top edge of the hull. Its endpoints are locked to the tips of the
-  // bow and stern sheer profiles; interior control points are freely
-  // draggable. Each station's deck-end n is derived from this line, so
-  // moving the deck line reshapes every station's top at once.
-  deckLine: defaultDeckLine(),
+  // Deck line — natural-cubic spline through the station deck points
+  // and the two locked sheer-end diamonds. Interior control is now done
+  // entirely via the station deckPts (pink diamonds in the side view), so
+  // there are no extra interior deck-line control points.
   // Plan-view beam line (controls hull width at each longitudinal position).
   beamLine: defaultBeamLine(),
   // Loft mesh overlay in side view
@@ -154,34 +152,22 @@ function defaultSheer(end, L = 5.2) {
   };
 }
 
-// Closed-loop section: starboard half from keel-centerline up the side to
-// the deck-centerline. The mirrored port half makes the full closed cross
-// section. First and last points are constrained to the centerline (b=0).
-// Deck line — interior control points only. The endpoints (at stern tip
-// and bow tip) are computed from the sheer profiles and prepended /
-// appended automatically when building the spline. Keep the X range
-// inside the hull and the Z values above the keel at every station.
-function defaultDeckLine() {
-  return {
-    points: [
-      { x: -1.3, z: 0.29 },
-      { x:  0,   z: 0.26 },  // gentle concave crown at midship
-      { x:  1.3, z: 0.29 },
-    ],
-  };
-}
-
 // Deckline endpoints are the deckEndPt of each sheer (not the convergence tip).
 function sheerTip(state, _spSampled, end) {
   return (end === 'bow' ? state.bowSheer : state.sternSheer).deckEndPt;
 }
 
-// Build a natural-cubic spline evaluator f(x) → z for the deck line,
-// prepending the stern tip and appending the bow tip so the ends connect.
+// Build a natural-cubic spline evaluator f(x) → z for the deck line.
+// The interior control points are now the interior stations' own deckPts —
+// the deck line passes through every station's deck point automatically,
+// so dragging a station's deck point reshapes the deck line directly.
 function buildDeckSpline(state, spSampled) {
   const spt = sheerTip(state, spSampled, 'stern');
   const bpt = sheerTip(state, spSampled, 'bow');
-  const pts = [spt, ...state.deckLine.points, bpt]
+  const interior = state.stations
+    .filter(st => st.deckPt && Number.isFinite(st.deckPt.x) && Number.isFinite(st.deckPt.z))
+    .map(st => ({ x: st.deckPt.x, z: st.deckPt.z }));
+  const pts = [spt, ...interior, bpt]
     .slice()
     .sort((a, b) => a.x - b.x);
   const xs = pts.map(p => p.x);
@@ -1645,26 +1631,17 @@ function renderSideView() {
     }));
   }
 
-  // ── Deck line interior control points ────────────────────────────────
-  const deckTips = [
-    { ...sternDeckEndPt, locked: true, idx: -1 },
-    ...state.deckLine.points.map((p, i) => ({ ...p, locked: false, idx: i })),
-    { ...bowDeckEndPt,   locked: true, idx: -2 },
-  ];
-  deckTips.forEach(({ x, z, locked, idx }) => {
-    if (!locked) {
-      sideSvg.appendChild(el('circle', {
-        cx: xOf(x), cy: yOf(z), r: 14, class: 'deck-hit',
-        'data-drag': 'deck-pt', 'data-idx': String(idx),
-      }));
-    }
+  // ── Deck-line endpoints (sheer ↔ hull boundary) ───────────────────────
+  // The deck line itself is now driven by the station deck points (pink
+  // diamonds), so the only remaining green diamonds are the two locked
+  // endpoints that join the sheer top to the hull deck.
+  for (const dep of [sternDeckEndPt, bowDeckEndPt]) {
     sideSvg.appendChild(el('rect', {
-      x: xOf(x) - 4.5, y: yOf(z) - 4.5, width: 9, height: 9,
-      transform: `rotate(45 ${xOf(x)} ${yOf(z)})`,
-      class: 'deck-ctrl' + (locked ? ' locked' : ''),
-      ...(locked ? {} : { 'data-drag': 'deck-pt', 'data-idx': String(idx) }),
+      x: xOf(dep.x) - 4.5, y: yOf(dep.z) - 4.5, width: 9, height: 9,
+      transform: `rotate(45 ${xOf(dep.x)} ${yOf(dep.z)})`,
+      class: 'deck-ctrl locked',
     }));
-  });
+  }
 
   // ── Loft mesh overlay (if enabled) ───────────────────────────────────
   if (state.showLoftMesh && lastLoft) {
@@ -2346,16 +2323,7 @@ sideSvg.addEventListener('pointermove', (e) => {
   const wz = -y / SIDE_SCALE_Z;
   drag.moved = true;
 
-  if (drag.kind === 'deck-pt') {
-    const idx = drag.idx;
-    if (idx < 0) return; // locked endpoint
-    state.deckLine.points[idx] = { x: wx, z: wz };
-    drag.moved = true;
-    rebuildHull();
-    renderSideView();
-
-    renderTopView();
-  } else if (drag.kind.startsWith('sheer-bot-') || drag.kind.startsWith('sheer-top-')) {
+  if (drag.kind.startsWith('sheer-bot-') || drag.kind.startsWith('sheer-top-')) {
     const isBot = drag.kind.startsWith('sheer-bot-');
     const end   = drag.kind.endsWith('-bow') ? 'bow' : 'stern';
     const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
@@ -2585,13 +2553,42 @@ sideSvg.addEventListener('click', (e) => {
     if (wx > sternEnd.x + 0.02 && wx < bowEnd.x - 0.02) {
       const deckEvalC = buildDeckSpline(state, SP);
       const deckZ = deckEvalC(wx);
+      // The deck spline now passes through the station deck points. A
+      // click near it inserts a new interior station whose deckPt is the
+      // click location, with the keel point chosen on the rocker so its
+      // 's' is the same fraction between the neighbours' 's' as the
+      // click is between the neighbours' deckPt.x.
       candidates.push({
         dist: Math.abs(wz - deckZ),
-        kind: 'deck',
+        kind: 'station-from-deck',
         run:  () => {
-          const insertIdx = state.deckLine.points.findIndex(p => p.x > wx);
-          if (insertIdx === -1) state.deckLine.points.push({ x: wx, z: wz });
-          else state.deckLine.points.splice(insertIdx, 0, { x: wx, z: wz });
+          // Build neighbour list along the deck line: stern endpoint
+          // (anchored at sternSheer.startS) → interior stations → bow
+          // endpoint (anchored at bowSheer.startS), sorted by x.
+          const sternX = state.sternSheer.deckEndPt.x;
+          const bowX   = state.bowSheer.deckEndPt.x;
+          const neighbours = [
+            { x: sternX, s: state.sternSheer.startS },
+            ...state.stations.map(st => ({ x: st.deckPt.x, s: st.s })),
+            { x: bowX,   s: state.bowSheer.startS   },
+          ].sort((a, b) => a.x - b.x);
+          // Find the segment the click falls in.
+          let lo = 0;
+          while (lo < neighbours.length - 2 && neighbours[lo + 1].x < wx) lo++;
+          const A = neighbours[lo], B = neighbours[lo + 1];
+          const span = (B.x - A.x) || 1e-6;
+          const frac = Math.max(0, Math.min(1, (wx - A.x) / span));
+          const newS = A.s + frac * (B.s - A.s);
+          const sLo  = state.sternSheer.startS + 0.02;
+          const sHi  = state.bowSheer.startS   - 0.02;
+          const sClamped = Math.max(sLo, Math.min(sHi, newS));
+          state.stations.push({
+            s:      sClamped,
+            deckPt: { x: wx, z: wz },
+            kind:   'interior',
+            points: defaultSection(),
+          });
+          state.stations.sort((a, b) => a.s - b.s);
         },
       });
     }
@@ -2640,18 +2637,22 @@ sideSvg.addEventListener('click', (e) => {
 });
 
 sideSvg.addEventListener('contextmenu', (e) => {
-  // Deck-pt delete
-  const dTarget = e.target.closest('[data-drag="deck-pt"]');
-  if (dTarget) {
+  // Right-click a station's deck pt to delete the entire station.
+  const stationDeckTarget = e.target.closest('[data-drag="station-deck"]');
+  if (stationDeckTarget) {
     e.preventDefault();
-    const idx = +dTarget.dataset.idx;
-    if (idx < 0 || state.deckLine.points.length <= 1) return;
-    state.deckLine.points.splice(idx, 1);
-    // Re-index isn't needed — we use natural array index
+    const sel = listAllStations(state)[+stationDeckTarget.dataset.idx];
+    if (!sel || sel.kind !== 'interior') return;
+    if (state.stations.length <= 1) return;
+    state.stations.splice(sel.stationIdx, 1);
+    if (state.selectedStation >= listAllStations(state).length) {
+      state.selectedStation = Math.max(0, listAllStations(state).length - 1);
+    }
+    renderStationList();
     rebuildHull();
     renderSideView();
-
     renderTopView();
+    renderSectionView();
     return;
   }
   const target = e.target.closest('[data-drag^="sheer-bot-"],[data-drag^="sheer-top-"]');
