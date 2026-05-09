@@ -2339,28 +2339,26 @@ topSvg.addEventListener('pointercancel', () => { topDrag = null; });
 let topPanDrag = null;
 topSvg.addEventListener('wheel', (e) => {
   e.preventDefault();
-  const dz = e.deltaY < 0 ? 1.18 : 1 / 1.18;
-  // Mouse position in SVG coords.
+  const dz = e.deltaY < 0 ? 1.05 : 1 / 1.05;
   const pt = topSvg.createSVGPoint();
   pt.x = e.clientX; pt.y = e.clientY;
   const loc = pt.matrixTransform(topSvg.getScreenCTM().inverse());
-  // Keep loc fixed: offX moves so the viewBox centre shifts appropriately.
-  // Current viewBox centre = (offX, offY+baseCY) at the current zoom.
-  // After zoom: centre moves so loc stays at same screen position.
-  // Δcentre = (loc - centre) * (1 - 1/dz)
   topVP.offX = loc.x - (loc.x - topVP.offX) / dz;
   topVP.offY = loc.y - (loc.y - topVP.offY) / dz;
   topVP.zoom = Math.max(0.1, Math.min(20, topVP.zoom * dz));
   renderTopView();
 }, { passive: false });
 
+// Pan: left-drag on background (no control target), or middle-button anywhere.
 topSvg.addEventListener('pointerdown', (e) => {
-  const isPan = e.button === 1 || (e.button === 0 && e.altKey);
-  if (!isPan) return;
+  const isMiddle = e.button === 1;
+  const isBackground = e.button === 0 && !e.target.closest('[data-drag]');
+  if (!isMiddle && !isBackground) return;
   e.preventDefault();
+  e.stopPropagation();
   topPanDrag = { startX: e.clientX, startY: e.clientY, startOffX: topVP.offX, startOffY: topVP.offY };
   topSvg.setPointerCapture(e.pointerId);
-}, true);  // capture so it fires before other pointerdown listeners
+}, true);
 
 topSvg.addEventListener('pointermove', (e) => {
   if (!topPanDrag) return;
@@ -2682,7 +2680,7 @@ sideSvg.addEventListener('pointercancel', endDrag);
 let sidePanDrag = null;
 sideSvg.addEventListener('wheel', (e) => {
   e.preventDefault();
-  const dz = e.deltaY < 0 ? 1.18 : 1 / 1.18;
+  const dz = e.deltaY < 0 ? 1.05 : 1 / 1.05;
   const { x: mx, y: my } = svgToLocal(sideSvg, e);
   sideVP.minX = mx - (mx - sideVP.minX) / dz;
   sideVP.minY = my - (my - sideVP.minY) / dz;
@@ -2691,12 +2689,13 @@ sideSvg.addEventListener('wheel', (e) => {
   renderSideView();
 }, { passive: false });
 
+// Pan: left-drag on background (no control target), or middle-button anywhere.
 sideSvg.addEventListener('pointerdown', (e) => {
-  const isPan = e.button === 1 || (e.button === 0 && e.altKey);
-  if (!isPan) return;
+  const isMiddle = e.button === 1;
+  const isBackground = e.button === 0 && !e.target.closest('[data-drag]');
+  if (!isMiddle && !isBackground) return;
   e.preventDefault();
-  // Record screen start; scale is computed fresh each move so we can pan
-  // while the viewBox changes without accumulating floating-point drift.
+  e.stopPropagation();
   sidePanDrag = {
     screenX: e.clientX, screenY: e.clientY,
     vpMinX: sideVP.minX, vpMinY: sideVP.minY,
