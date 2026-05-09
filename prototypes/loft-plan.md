@@ -11,7 +11,9 @@ User-flagged items, not yet implemented. Listed here so we can pick them up with
    - **Sheer stations:** store `bottomLocal`, `topLocal`, `tipLocal`, `deckEndLocal` as (Δx, Δz) offsets from the sheer junction point `spineAt(sheer.startS).p`. When rocker moves, the junction moves with it, carrying all attached sheer geometry.
    - **Migration:** `reconcileStationDeckPts` computes locals from existing absolute values on first build (lazy init, backward-compatible). Drag handlers update locals immediately after a move.
    - **Result:** dragging the bow tip up curves the bow of the whole boat — keel, deck pts, and sheer profiles all rise together; any user-configured chord angle at each station is preserved.
-1. **Rotatable light in the 3D view.** A draggable light direction control — orbit the key light around the hull. The current static three-light rig sometimes hides contour features when the camera is on the lit side. Likely a small azimuth/elevation widget in the 3D pane corner, or shift-drag-on-canvas.
+1. **Rotatable light in the 3D view.**
+   - Also consider: the orange/purple top-sheer curve strokes that were previously separate are now subsumed into the pink deck perimeter — verify their CSS rules can be removed once the unified line is confirmed good.
+ A draggable light direction control — orbit the key light around the hull. The current static three-light rig sometimes hides contour features when the camera is on the lit side. Likely a small azimuth/elevation widget in the 3D pane corner, or shift-drag-on-canvas.
 2. **Zoom + pan in the side and top views, with a reset button.** Currently both panes are fixed-fit. Add scroll-to-zoom and click-drag (on empty space) to pan, plus a reset-view button per pane. Re-use the same px/m scale state so the SVG hit areas stay correct under transform.
 3. **Remove the green deck line and the two green endpoint diamonds entirely.** Now that pink station deck-pts drive everything (and dragging green endpoints is no longer load-bearing), the green curve and diamonds can go. Replace them with a **pink line through the pink points** so the deck still reads visually as a continuous curve.
 4. **Recolour bottom (keel) station points to blue** so they match the rocker keel curve. Currently teal — switch to the rocker's blue (`#2563eb`-ish) for visual coherence.
@@ -23,7 +25,14 @@ User-flagged items, not yet implemented. Listed here so we can pick them up with
    - Constraints: the split edge loop must be a clean, closed loop with no self-intersections; the two halves should seal perfectly when gap = 0.
    - Implications for manufacturing: this is where a CNC or composite layup seam would live — so the position needs to be designable precisely.
    - Needs further thought: how the split interacts with the spine-radius endpoints (item 6), whether the split loop has its own b-parameter or is pinned to a chine flag, and what the export format looks like with two separate shells.
-8. **Full visible history log + undo.** See [history-log section below](#todo-history-log--undo-deferred) for the full design sketch — captured in the previous session.
+8. **Section editor (cross-section pane) styling parity.** Text is still too small and lines too thin vs the side/top views despite earlier bumps — re-audit font size, stroke width, and control-point radius against what the side view actually renders at. Control points should use the same "crayon-precision" visual weight.
+
+9. **Starting state that looks like a kayak — or a save/load mechanism to set it.** Current default is still not kayak-like. Ideal default: 3 interior stations, simplified beam line with 3 control points and sensible handles for a parallel midbody, rocker that gives gentle entry and exit. User may prefer to do the modeling once (by hand in the editor), save that state, and have it load as the default — which requires a save/load feature. Both options captured:
+   - **Option A** (code only): tune `spinePlaceholder`, `stationsPlaceholder`, `defaultBeamLine`, `defaultSheer` defaults by hand in code.
+   - **Option B** (save/load): add JSON export/import of the full `state` object via a button or URL hash. User shapes the hull, saves it, and the exported JSON becomes the new initial state.
+   Option B is more sustainable long-term; Option A is faster to ship.
+
+10. **Full visible history log + undo.** See [history-log section below](#todo-history-log--undo-deferred) for the full design sketch — captured in the previous session.
 
 
 ## Scope

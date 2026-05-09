@@ -1447,11 +1447,18 @@ function renderSideView() {
   sideSvg.appendChild(el('path', { class: 'keel',              d: pathD(rockerPts) }));
   sideSvg.appendChild(el('path', { class: 'stern-sheer-curve', d: pathD(sternSheerPts) }));
   sideSvg.appendChild(el('path', { class: 'bow-sheer-curve',   d: pathD(bowSheerPts) }));
-  sideSvg.appendChild(el('path', { class: 'stern-top-sheer-curve', d: pathD(sternTopPts) }));
-  sideSvg.appendChild(el('path', { class: 'bow-top-sheer-curve',   d: pathD(bowTopPts) }));
-  // Deck line: pink curve through the station deck-pts (replaces the green
-  // deck-ctrl line; same geometry, new colour, no separate control points).
-  sideSvg.appendChild(el('path', { class: 'deck-pts-line',     d: pathD(deckSamplePts) }));
+  // Pink deck line: full deck perimeter — stern tip → stern top sheer →
+  // hull deck (through station deck-pts) → bow top sheer → bow tip.
+  // This follows exactly the top edge of the mesh so there are no kinks.
+  // The separate top-sheer curves are no longer drawn; they're subsumed.
+  {
+    const allDeckPts = [
+      ...[...sternTopPts].reverse(),  // stern tip → stern deckEndPt
+      ...deckSamplePts,               // stern deckEndPt → bow deckEndPt
+      ...bowTopPts,                   // bow deckEndPt → bow tip
+    ];
+    sideSvg.appendChild(el('path', { class: 'deck-pts-line', d: pathD(allDeckPts) }));
+  }
 
   // ── Bézier rocker spine ──────────────────────────────────────────────
   const sp = state.spine;
