@@ -224,6 +224,92 @@ function reconcileStationDeckPts(state) {
   });
 }
 
+// ── Local-frame storage for station control points ───────────────────────
+//
+// Interior station deckPt is stored as (along, perp) in the Frenet frame
+// at keel-s: along = projection onto rocker tangent t̂, perp = onto n̂ = (-tz,tx).
+// Sheer station bottomPt/topPt/tip/deckEndPt are stored as (dx, dz) offsets
+// relative to the sheer junction point spineAt(sheer.startS).p.
+// When the rocker moves, recomputeFromLocalFrames() re-derives every world
+// coordinate so the whole boat follows the spine shape.
+
+// Fill in any missing locals from current world positions (lazy init + post-drag sync).
+function reconcileLocalFrames(state) {
+  const sp = sampledSpine(state.spine, 64);
+  state.stations.forEach(st => {
+    if (st.deckLocal && Number.isFinite(st.deckLocal.along)) return;
+    if (!st.deckPt || !Number.isFinite(st.deckPt.x)) return;
+    const { p, tx, tz } = spineAt({ ctrl: state.spine, sampled: sp }, st.s);
+    const dx = st.deckPt.x - p.x, dz = st.deckPt.z - p.z;
+    st.deckLocal = { along: dx * tx + dz * tz, perp: -dx * tz + dz * tx };
+  });
+  for (const end of ['bow', 'stern']) {
+    const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
+    const jPt = spineAt({ ctrl: state.spine, sampled: sp }, sheer.startS).p;
+    const rel = (pt) => ({ dx: pt.x - jPt.x, dz: pt.z - jPt.z });
+    if (!sheer.tipLocal)      sheer.tipLocal      = rel(sheer.tip);
+    if (!sheer.deckEndLocal)  sheer.deckEndLocal  = rel(sheer.deckEndPt);
+    sheer.stations.forEach(sst => {
+      if (!sst.bottomLocal) sst.bottomLocal = rel(sst.bottomPt);
+      if (!sst.topLocal)    sst.topLocal    = rel(sst.topPt);
+    });
+  }
+}
+
+// Re-derive every world point from its stored local coordinates.
+// Called inside rebuildHull so any spine change is automatically reflected.
+function recomputeFromLocalFrames(state) {
+  const sp = sampledSpine(state.spine, 64);
+  state.stations.forEach(st => {
+    if (!st.deckLocal) return;
+    const { p, tx, tz } = spineAt({ ctrl: state.spine, sampled: sp }, st.s);
+    const { along, perp } = st.deckLocal;
+    st.deckPt = {
+      x: p.x + along * tx  - perp * tz,
+      z: p.z + along * tz  + perp * tx,
+    };
+  });
+  for (const end of ['bow', 'stern']) {
+    const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
+    const jPt = spineAt({ ctrl: state.spine, sampled: sp }, sheer.startS).p;
+    const abs = (loc) => ({ x: jPt.x + loc.dx, z: jPt.z + loc.dz });
+    if (sheer.tipLocal)     sheer.tip      = abs(sheer.tipLocal);
+    if (sheer.deckEndLocal) sheer.deckEndPt = abs(sheer.deckEndLocal);
+    sheer.stations.forEach(sst => {
+      if (sst.bottomLocal) sst.bottomPt = abs(sst.bottomLocal);
+      if (sst.topLocal)    sst.topPt    = abs(sst.topLocal);
+    });
+  }
+}
+
+// Force all locals to be recomputed from current world pts on next build.
+// Used after the length slider scales world positions en-masse.
+function invalidateLocalFrames(state) {
+  state.stations.forEach(st => { st.deckLocal = null; });
+  for (const sheer of [state.bowSheer, state.sternSheer]) {
+    sheer.tipLocal = null;
+    sheer.deckEndLocal = null;
+    sheer.stations.forEach(sst => { sst.bottomLocal = null; sst.topLocal = null; });
+  }
+}
+
+// Helper: compute deckLocal for an interior station from a world deck position.
+function worldToDeckLocal(state, stIdx, wx, wz) {
+  const st = state.stations[stIdx];
+  const sp = sampledSpine(state.spine, 64);
+  const { p, tx, tz } = spineAt({ ctrl: state.spine, sampled: sp }, st.s);
+  const dx = wx - p.x, dz = wz - p.z;
+  return { along: dx * tx + dz * tz, perp: -dx * tz + dz * tx };
+}
+
+// Helper: compute a sheer-local offset from a world point.
+function worldToSheerLocal(state, end, wx, wz) {
+  const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
+  const sp = sampledSpine(state.spine, 64);
+  const jPt = spineAt({ ctrl: state.spine, sampled: sp }, sheer.startS).p;
+  return { dx: wx - jPt.x, dz: wz - jPt.z };
+}
+
 // n: normalized 0=keel, 1=deck. b: normalized 0=centerline, 1=hull edge.
 // Both are multiplied by their respective physical extents in buildLoft.
 function defaultSection() {
@@ -968,9 +1054,13 @@ scene.add(bandGroup);
 let lastLoft = null; // updated by rebuildHull(); read by renderSideView()
 
 function rebuildHull() {
-  // Lazy-init each interior station's deckPt the first time we build.
+  // 1. Fill missing deckPts (new stations) from deck spline.
   reconcileStationDeckPts(state);
-  // Sync all station deck-ends to the deck line before lofting.
+  // 2. Fill missing local-frame coordinates from current world pts.
+  reconcileLocalFrames(state);
+  // 3. Re-derive all world pts from locals — picks up any spine/rocker change.
+  recomputeFromLocalFrames(state);
+  // 4. Snap deck n-values to exactly 1.0.
   reconcileDeckPoints(state);
 
   // Clear previous.
@@ -1981,6 +2071,9 @@ lengthEl.addEventListener('input', () => {
   }
   state.length = newL;
   lengthOut.textContent = newL.toFixed(2) + ' m';
+  // World pts were all just scaled; locals must be recomputed from them
+  // (they were relative to the old spine/junction positions).
+  invalidateLocalFrames(state);
   rebuildHull();
   renderSideView();
   renderTopView();
@@ -2257,11 +2350,8 @@ topSvg.addEventListener('pointermove', (e) => {
       const maxS = idx === state.stations.length - 1
         ? hi : Math.min(hi, state.stations[idx + 1].s + 0.02);
       st.s = Math.max(minS, Math.min(maxS, sRaw));
-      const newKeel = spineAt(spine, st.s).p;
-      if (st.deckPt) {
-        st.deckPt.x += newKeel.x - oldKeel.x;
-        st.deckPt.z += newKeel.z - oldKeel.z;
-      }
+      // deckLocal is in the Frenet frame at s — rebuildHull's
+      // recomputeFromLocalFrames derives the new world deckPt automatically.
     } else {
       // Sheer station: snap the keel point onto the sheer keel curve at
       // click X, then translate the deck point by the same offset.
@@ -2281,6 +2371,8 @@ topSvg.addEventListener('pointermove', (e) => {
       const dzBot = newBot.z - sst.bottomPt.z;
       sst.bottomPt = newBot;
       sst.topPt = { x: sst.topPt.x + dxBot, z: sst.topPt.z + dzBot };
+      sst.bottomLocal = worldToSheerLocal(state, end, sst.bottomPt.x, sst.bottomPt.z);
+      sst.topLocal    = worldToSheerLocal(state, end, sst.topPt.x,    sst.topPt.z);
       // Re-derive t from bottomPt.x (junction → tip).
       const junctionX = spineAt({ ctrl: state.spine, sampled: spSampled }, sheer.startS).p.x;
       const span = (sheer.tip.x - junctionX) || 1e-6;
@@ -2499,17 +2591,13 @@ sideSvg.addEventListener('pointermove', (e) => {
     const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
     const sst   = sheer.stations[drag.idx];
     if (!sst) return;
-    if (isBot) sst.bottomPt = { x: wx, z: wz };
-    else       sst.topPt    = { x: wx, z: wz };
-    // Re-derive t from bottomPt.x so longitudinal ordering and the cubic
-    // spline densification along S stay consistent with the dragged
-    // position. t goes 0 (junction) → 1 (tip).
+    if (isBot) { sst.bottomPt = { x: wx, z: wz }; sst.bottomLocal = worldToSheerLocal(state, end, wx, wz); }
+    else       { sst.topPt    = { x: wx, z: wz }; sst.topLocal    = worldToSheerLocal(state, end, wx, wz); }
+    // Re-derive t from bottomPt.x for ordering.
     const sampled = sampledSpine(state.spine, 64);
     const junctionX = spineAt({ ctrl: state.spine, sampled }, sheer.startS).p.x;
-    const tipX = sheer.tip.x;
-    const span = (tipX - junctionX) || 1e-6;
-    const tNew = Math.max(0.02, Math.min(0.98, (sst.bottomPt.x - junctionX) / span));
-    sst.t = tNew;
+    const span = (sheer.tip.x - junctionX) || 1e-6;
+    sst.t = Math.max(0.02, Math.min(0.98, (sst.bottomPt.x - junctionX) / span));
     sheer.stations.sort((a, b) => a.t - b.t);
     drag.moved = true;
     rebuildHull();
@@ -2518,7 +2606,9 @@ sideSvg.addEventListener('pointermove', (e) => {
     renderTopView();
   } else if (drag.kind === 'sheer-tip-bow' || drag.kind === 'sheer-tip-stern') {
     const end = drag.kind === 'sheer-tip-bow' ? 'bow' : 'stern';
-    (end === 'bow' ? state.bowSheer : state.sternSheer).tip = { x: wx, z: wz };
+    const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
+    sheer.tip      = { x: wx, z: wz };
+    sheer.tipLocal = worldToSheerLocal(state, end, wx, wz);
     drag.moved = true;
     rebuildHull();
     renderSideView();
@@ -2594,7 +2684,8 @@ sideSvg.addEventListener('pointermove', (e) => {
     // Don't let the deck point pass below the keel (would invert the chord).
     const sampled = sampledSpine(state.spine, 32);
     const keel    = spineAt({ ctrl: state.spine, sampled }, st.s).p;
-    st.deckPt = { x: wx, z: Math.max(keel.z + 0.02, wz) };
+    st.deckPt    = { x: wx, z: Math.max(keel.z + 0.02, wz) };
+    st.deckLocal = worldToDeckLocal(state, stationIdx, st.deckPt.x, st.deckPt.z);
     rebuildHull();
     renderSideView();
     renderTopView();
