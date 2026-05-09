@@ -105,16 +105,21 @@ function cubicBezierPt(p0, p1, p2, p3, t) {
 }
 
 function stationsPlaceholder() {
-  // Interior stations only. Each is a closed-loop cross-section in the
-  // local (b, n) frame: first point at (b=0, n=0) is keel-on-centerline,
-  // last point at (b=0, n=deck) is deck-on-centerline. Mirror to port
-  // closes the hull along Y = 0.
+  // Interior stations on the rocker. Each station owns:
+  //   s        — fraction along the rocker (keel point lives on the curve)
+  //   deckPt   — free 2D point in side view (X-Z); the section is lofted
+  //              along the chord from keelPt to deckPt with world Y as the
+  //              across-axis. Lazily filled by reconcileStationDeckPts() on
+  //              first build (depends on the deck spline, which is set up
+  //              after stations in the state literal).
+  //   points   — closed-loop cross-section in the local (b, n) frame.
   const interiorParams = [0.15, 0.32, 0.50, 0.68, 0.85];
-  return interiorParams.map((s) => {
-    const taper    = Math.sin(Math.PI * s);
-    const halfBeam = 0.18 + 0.12 * taper;
-    return { s, kind: 'interior', points: defaultSection() };
-  });
+  return interiorParams.map((s) => ({
+    s,
+    deckPt: null, // filled by reconcileStationDeckPts
+    kind:   'interior',
+    points: defaultSection(),
+  }));
 }
 
 // Sheer end: the bow / stern section that tapers from the last rocker
@@ -217,6 +222,20 @@ function reconcileDeckPoints(state) {
   state.stations.forEach(st => snapDeck(st.points));
   state.bowSheer.stations.forEach(st  => snapDeck(st.points));
   state.sternSheer.stations.forEach(st => snapDeck(st.points));
+}
+
+// For every interior station that doesn't yet have a deckPt, default it to
+// the deck-line height at the same X as the keel. After this each station
+// has a (keelPt, deckPt) pair the loft can use as its chord — the user can
+// drag the deck point freely to tilt the section.
+function reconcileStationDeckPts(state) {
+  const sampled  = sampledSpine(state.spine, 64);
+  const deckEval = buildDeckSpline(state, sampled);
+  state.stations.forEach(st => {
+    if (st.deckPt && Number.isFinite(st.deckPt.x) && Number.isFinite(st.deckPt.z)) return;
+    const keel = spineAt({ ctrl: state.spine, sampled }, st.s).p;
+    st.deckPt = { x: keel.x, z: deckEval(keel.x) };
+  });
 }
 
 // n: normalized 0=keel, 1=deck. b: normalized 0=centerline, 1=hull edge.
@@ -632,7 +651,12 @@ function unifiedStations(state, lengths, N) {
   state.stations.forEach(st => {
     if (st.s <= lengths.sternStartS + 1e-6) return;
     if (st.s >= lengths.bowStartS   - 1e-6) return;
-    out.push({ S: interiorStationS(st.s, lengths), kind: 'interior', samples: sampleSection(st.points, N) });
+    out.push({
+      S: interiorStationS(st.s, lengths),
+      kind: 'interior',
+      samples: sampleSection(st.points, N),
+      deckPt: st.deckPt,    // (keelPt, deckPt) chord drives section tilt
+    });
   });
 
   // Bow sheer-end stations.
@@ -684,13 +708,19 @@ function buildLoft(state) {
         z: botPt.z + n * (topPt.z - botPt.z),
       }));
     }
-    const { p, tx, tz } = compositeAt(state, lengths, st.S);
-    const nx = -tz, nz = tx;
-    const deckN_phys = st.kind === 'tip' ? 0 : deckNFromLine(p.x, p.z, tx, tz, deckEvalLoft);
-    const halfB      = st.kind === 'tip' ? 0 : beamEvalAt(beamPts, p.x);
-    return st.samples.map(({ b, n }) => ({
-      x: p.x + n * deckN_phys * nx, y: b * halfB, z: p.z + n * deckN_phys * nz,
-    }));
+    if (st.kind === 'tip') {
+      const { p } = compositeAt(state, lengths, st.S);
+      return st.samples.map(() => ({ x: p.x, y: 0, z: p.z }));
+    }
+    // Interior stations: chord from keelPt (on rocker) to deckPt (free in X-Z).
+    const { p } = compositeAt(state, lengths, st.S);
+    const dPt = st.deckPt || { x: p.x, z: p.z + 0.3 };
+    const dx  = dPt.x - p.x, dz = dPt.z - p.z;
+    return st.samples.map(({ b, n }) => {
+      const cx    = p.x + n * dx;
+      const halfB = beamEvalAt(beamPts, cx);
+      return { x: cx, y: b * halfB, z: p.z + n * dz };
+    });
   });
 
   // ── Longitudinal (X) densification ──────────────────────────────────
@@ -767,11 +797,13 @@ function buildLoft(state) {
           z: botPt.z + n * (topPt.z - botPt.z),
         });
       } else {
-        const { p, tx, tz } = compositeAt(state, lengths, st.S);
-        const nx = -tz, nz = tx;
-        const deckN = deckNFromLine(p.x, p.z, tx, tz, deckEvalLoft);
-        const halfB = beamEvalAt(beamPts, p.x);
-        projFn = ({ b, n }) => ({ x: p.x + n*deckN*nx, y: b*halfB, z: p.z + n*deckN*nz });
+        const { p } = compositeAt(state, lengths, st.S);
+        const dPt = st.deckPt || { x: p.x, z: p.z + 0.3 };
+        const dx = dPt.x - p.x, dz = dPt.z - p.z;
+        projFn = ({ b, n }) => {
+          const cx = p.x + n * dx;
+          return { x: cx, y: b * beamEvalAt(beamPts, cx), z: p.z + n * dz };
+        };
       }
       return { kind: st.kind, S: st.S, points: st.samples.map(projFn) };
     });
@@ -947,6 +979,8 @@ scene.add(bandGroup);
 let lastLoft = null; // updated by rebuildHull(); read by renderSideView()
 
 function rebuildHull() {
+  // Lazy-init each interior station's deckPt the first time we build.
+  reconcileStationDeckPts(state);
   // Sync all station deck-ends to the deck line before lofting.
   reconcileDeckPoints(state);
 
@@ -1450,28 +1484,50 @@ function renderSideView() {
   // ordering as buildLoft → state.selectedStation indexes into it).
   const unified = listAllStations(state);
 
-  // Interior station ticks along the rocker.
+  // Interior station chord overlays + control points. Each station has a
+  // keel point (on the rocker, slides via 's') and a deck point (free in
+  // X-Z). The chord between them is the section's local up-axis.
   unified.forEach((entry, i) => {
     if (entry.kind !== 'interior') return;
     const sp = spineAt(spine, entry.ref.s);
+    const dPt = entry.ref.deckPt || { x: sp.p.x, z: sp.p.z + 0.3 };
     const isSel = i === state.selectedStation;
+
+    // Chord overlay line: keel → deck.
     sideSvg.appendChild(el('line', {
-      x1: xOf(sp.p.x), y1: yOf(sp.p.z) - 12,
-      x2: xOf(sp.p.x), y2: yOf(sp.p.z) + 6,
-      class: 'station' + (isSel ? ' selected' : ''),
+      x1: xOf(sp.p.x), y1: yOf(sp.p.z),
+      x2: xOf(dPt.x),  y2: yOf(dPt.z),
+      class: 'station-chord' + (isSel ? ' selected' : ''),
     }));
+
+    // Keel control point — solid teal, slides along rocker.
     sideSvg.appendChild(el('circle', {
-      cx: xOf(sp.p.x), cy: yOf(sp.p.z) - 12, r: 14,
+      cx: xOf(sp.p.x), cy: yOf(sp.p.z), r: 14,
       class: 'station-hit',
       'data-drag': 'station', 'data-idx': String(i),
     }));
     sideSvg.appendChild(el('circle', {
-      cx: xOf(sp.p.x), cy: yOf(sp.p.z) - 12, r: 4.2,
-      class: 'station-tick' + (isSel ? ' selected' : ''),
+      cx: xOf(sp.p.x), cy: yOf(sp.p.z), r: 5,
+      class: 'station-keel' + (isSel ? ' selected' : ''),
       'data-drag': 'station', 'data-idx': String(i),
     }));
+
+    // Deck control point — diamond, free X-Z drag.
+    sideSvg.appendChild(el('circle', {
+      cx: xOf(dPt.x), cy: yOf(dPt.z), r: 14,
+      class: 'station-deck-hit',
+      'data-drag': 'station-deck', 'data-idx': String(i),
+    }));
+    sideSvg.appendChild(el('rect', {
+      x: xOf(dPt.x) - 5, y: yOf(dPt.z) - 5, width: 10, height: 10,
+      transform: `rotate(45 ${xOf(dPt.x)} ${yOf(dPt.z)})`,
+      class: 'station-deck' + (isSel ? ' selected' : ''),
+      'data-drag': 'station-deck', 'data-idx': String(i),
+    }));
+
+    // Label above the keel.
     sideSvg.appendChild(el('text', {
-      x: xOf(sp.p.x), y: yOf(sp.p.z) - 18, class: 'station-label',
+      x: xOf(sp.p.x), y: yOf(sp.p.z) + 16, class: 'station-label',
     }, entry.label));
   });
 
@@ -1500,6 +1556,13 @@ function renderSideView() {
         u.kind === (end === 'bow' ? 'bowSheer' : 'sternSheer') && u.stationIdx === sIdx
       );
       const isSel = uniIdx === state.selectedStation;
+
+      // Chord overlay: keel sheer point → deck sheer point.
+      sideSvg.appendChild(el('line', {
+        x1: xOf(sst.bottomPt.x), y1: yOf(sst.bottomPt.z),
+        x2: xOf(sst.topPt.x),    y2: yOf(sst.topPt.z),
+        class: 'station-chord' + (isSel ? ' selected' : ''),
+      }));
 
       // Bottom (keel) control point — solid fill.
       sideSvg.appendChild(el('circle', {
@@ -2225,7 +2288,7 @@ sideSvg.addEventListener('pointerdown', (e) => {
     startWz: -y / SIDE_SCALE_Z,
   };
 
-  if (kind === 'station' || kind === 'sheer-station') selectStation(idx);
+  if (kind === 'station' || kind === 'sheer-station' || kind === 'station-deck') selectStation(idx);
   sideSvg.setPointerCapture(e.pointerId);
 });
 
@@ -2385,6 +2448,20 @@ sideSvg.addEventListener('pointermove', (e) => {
     renderSideView();
 
     renderTopView();
+  } else if (drag.kind === 'station-deck') {
+    // Free X-Z drag of the station's deck point.
+    const sel = listAllStations(state)[drag.idx];
+    if (!sel || sel.kind !== 'interior') return;
+    const stationIdx = sel.stationIdx;
+    const st = state.stations[stationIdx];
+    // Don't let the deck point pass below the keel (would invert the chord).
+    const sampled = sampledSpine(state.spine, 32);
+    const keel    = spineAt({ ctrl: state.spine, sampled }, st.s).p;
+    st.deckPt = { x: wx, z: Math.max(keel.z + 0.02, wz) };
+    rebuildHull();
+    renderSideView();
+    renderTopView();
+    renderSectionView();
   }
 });
 

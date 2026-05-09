@@ -397,8 +397,23 @@ main {
   cursor: ew-resize;
 }
 #side-view .station-tick.selected { fill: #b45309; }
-#side-view .station-hit { fill: transparent; cursor: ew-resize; }
-#side-view .station-label { font: 9px -apple-system, sans-serif; fill: #b45309; text-anchor: middle; pointer-events: none; }
+#side-view .station-hit      { fill: transparent; cursor: ew-resize; }
+#side-view .station-deck-hit { fill: transparent; cursor: grab; }
+#side-view .station-label    { font: 9px -apple-system, sans-serif; fill: #b45309; text-anchor: middle; pointer-events: none; }
+
+/* Station chord = colored overlay line between keel-pt and deck-pt of a
+   station. The section is lofted along this chord. */
+#side-view .station-chord          { stroke: #ec4899; stroke-width: 1.6; stroke-dasharray: 5 3; pointer-events: none; opacity: 0.85; }
+#side-view .station-chord.selected { stroke: #be185d; stroke-width: 2.4; stroke-dasharray: none; opacity: 1; }
+
+/* Interior station keel control (on the rocker) — teal solid, slides along curve. */
+#side-view .station-keel          { fill: #0d9488; stroke: white; stroke-width: 1.4; cursor: ew-resize; }
+#side-view .station-keel.selected { fill: #0f766e; stroke: white; stroke-width: 1.8; }
+
+/* Interior station deck control — magenta diamond, free X-Z drag. */
+#side-view .station-deck          { fill: #ec4899; stroke: white; stroke-width: 1.4; cursor: grab; }
+#side-view .station-deck.selected { fill: #be185d; stroke: white; stroke-width: 1.8; }
+#side-view .station-deck:active   { cursor: grabbing; }
 
 /* ── SVG: cross-section ──────────────────────────────────────── */
 
