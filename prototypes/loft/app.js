@@ -1428,7 +1428,9 @@ function renderSideView() {
   sideSvg.appendChild(el('path', { class: 'bow-sheer-curve',   d: pathD(bowSheerPts) }));
   sideSvg.appendChild(el('path', { class: 'stern-top-sheer-curve', d: pathD(sternTopPts) }));
   sideSvg.appendChild(el('path', { class: 'bow-top-sheer-curve',   d: pathD(bowTopPts) }));
-  sideSvg.appendChild(el('path', { class: 'deck-curve',        d: pathD(deckSamplePts) }));
+  // Deck line: pink curve through the station deck-pts (replaces the green
+  // deck-ctrl line; same geometry, new colour, no separate control points).
+  sideSvg.appendChild(el('path', { class: 'deck-pts-line',     d: pathD(deckSamplePts) }));
 
   // ── Bézier rocker spine ──────────────────────────────────────────────
   const sp = state.spine;
@@ -1614,31 +1616,10 @@ function renderSideView() {
       class: `${botClass} tip`, 'data-drag': `sheer-tip-${end}`,
     }));
 
-    // deckEndPt — green diamond, draggable.
-    const dep = sheer.deckEndPt;
-    sideSvg.appendChild(el('circle', {
-      cx: xOf(dep.x), cy: yOf(dep.z), r: 14,
-      class: 'deck-hit', 'data-drag': `sheer-deck-${end}`,
-    }));
-    sideSvg.appendChild(el('rect', {
-      x: xOf(dep.x) - 5, y: yOf(dep.z) - 5, width: 10, height: 10,
-      transform: `rotate(45 ${xOf(dep.x)} ${yOf(dep.z)})`,
-      class: 'deck-ctrl', 'data-drag': `sheer-deck-${end}`,
-    }));
-
-    // Junction tick on rocker.
-    sideSvg.appendChild(el('line', {
-      x1: xOf(ep.x), y1: yOf(ep.z) + 10, x2: xOf(ep.x), y2: yOf(ep.z) - 10,
-      class: 'sheer-start', 'data-drag': `sheer-start-${end}`,
-    }));
-    sideSvg.appendChild(el('circle', {
-      cx: xOf(ep.x), cy: yOf(ep.z), r: 14,
-      class: 'sheer-start-hit', 'data-drag': `sheer-start-${end}`,
-    }));
+    // deckEndPt and sheer-start tick removed — no longer exposed as user
+    // controls. deckEndPt stays in the model as a spline endpoint; it is
+    // positioned by editing the sheer-station topPts.
   }
-
-  // (The two sheer↔hull deck-line endpoints are rendered as draggable
-  // green diamonds inside the sheer-end loop above.)
 
   // ── Loft mesh overlay (if enabled) ───────────────────────────────────
   if (state.showLoftMesh && lastLoft) {
@@ -2471,33 +2452,6 @@ sideSvg.addEventListener('pointermove', (e) => {
   } else if (drag.kind === 'sheer-tip-bow' || drag.kind === 'sheer-tip-stern') {
     const end = drag.kind === 'sheer-tip-bow' ? 'bow' : 'stern';
     (end === 'bow' ? state.bowSheer : state.sternSheer).tip = { x: wx, z: wz };
-    drag.moved = true;
-    rebuildHull();
-    renderSideView();
-
-    renderTopView();
-  } else if (drag.kind === 'sheer-deck-bow' || drag.kind === 'sheer-deck-stern') {
-    const end = drag.kind === 'sheer-deck-bow' ? 'bow' : 'stern';
-    (end === 'bow' ? state.bowSheer : state.sternSheer).deckEndPt = { x: wx, z: wz };
-    drag.moved = true;
-    rebuildHull();
-    renderSideView();
-
-    renderTopView();
-  } else if (drag.kind === 'sheer-start-bow' || drag.kind === 'sheer-start-stern') {
-    // Drag the join point along the rocker.
-    const end   = drag.kind === 'sheer-start-bow' ? 'bow' : 'stern';
-    const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
-    const spSampled = sampledSpine(state.spine, 64);
-    const spineObj  = { ctrl: state.spine, sampled: spSampled };
-    const newS = spineXToS(spineObj, wx);
-    if (newS == null) return;
-    // Keep stern < bow with a small margin, and ensure interior stations stay valid.
-    if (end === 'bow') {
-      sheer.startS = Math.max(state.sternSheer.startS + 0.1, Math.min(1.0, newS));
-    } else {
-      sheer.startS = Math.max(0.0, Math.min(state.bowSheer.startS - 0.1, newS));
-    }
     drag.moved = true;
     rebuildHull();
     renderSideView();
