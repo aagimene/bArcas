@@ -2,6 +2,18 @@
 
 A new `prototypes/loft/` station for designing a 3D kayak hull by editing a curved spine (rocker) and a small set of transverse cross-sections, lofted into a 3D surface. This is a **shape-generation** prototype, parallel to `stability/` (which is a shape-analysis prototype). They stay independent; eventually we want 3D stability that consumes a loft, but that's out of scope for this prototype.
 
+## Pending TODOs (next session)
+
+User-flagged items, not yet implemented. Listed here so we can pick them up without re-deriving context.
+
+1. **Rotatable light in the 3D view.** A draggable light direction control — orbit the key light around the hull. The current static three-light rig sometimes hides contour features when the camera is on the lit side. Likely a small azimuth/elevation widget in the 3D pane corner, or shift-drag-on-canvas.
+2. **Zoom + pan in the side and top views, with a reset button.** Currently both panes are fixed-fit. Add scroll-to-zoom and click-drag (on empty space) to pan, plus a reset-view button per pane. Re-use the same px/m scale state so the SVG hit areas stay correct under transform.
+3. **Remove the green deck line and the two green endpoint diamonds entirely.** Now that pink station deck-pts drive everything (and dragging green endpoints is no longer load-bearing), the green curve and diamonds can go. Replace them with a **pink line through the pink points** so the deck still reads visually as a continuous curve.
+4. **Recolour bottom (keel) station points to blue** so they match the rocker keel curve. Currently teal — switch to the rocker's blue (`#2563eb`-ish) for visual coherence.
+5. **Drop the green "sheer start" tick + drag handle on the rocker.** It controls where rocker hands off to sheer keel, but with full pink-style station control everywhere this knob is moot. Constraint to keep: the rocker (blue Bézier) is still the underlying curve the keel-points snap to / slide along — i.e. the blue line must remain the keel-point rail. Just remove the explicit handoff knob.
+6. **Full visible history log + undo.** See [history-log section below](#todo-history-log--undo-deferred) for the full design sketch — captured in the previous session.
+
+
 ## Scope
 
 Confirmed:
