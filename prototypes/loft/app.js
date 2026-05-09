@@ -1393,63 +1393,47 @@ function renderSideView() {
 
   const lengths = compositeLengths(state);
 
-  // Helper: dense world-space points of a sheer keel line.
-  const sheerKeelWorldPts = (end) => {
-    const kSampled = sampledSheerKeel(state, end, sampled);
-    return kSampled.pts.map(p => ({ x: p.x, z: p.y }));
-  };
-
-  const sternSheerPts  = sheerKeelWorldPts('stern');
-  const bowSheerPts    = sheerKeelWorldPts('bow');
-  const sternTipPt     = state.sternSheer.tip;
-  const bowTipPt       = state.bowSheer.tip;
   const sternDeckEndPt = state.sternSheer.deckEndPt;
   const bowDeckEndPt   = state.bowSheer.deckEndPt;
-  const spSampledFull  = sampledSpine(state.spine, 64);
-  const bowTopPts   = sampledTopSheer(state, 'bow',   spSampledFull).pts.map(p => ({ x: p.x, z: p.y }));
-  const sternTopPts = sampledTopSheer(state, 'stern', spSampledFull).pts.map(p => ({ x: p.x, z: p.y }));
-
-  // Rocker: sample the active portion (sternSheer.startS → bowSheer.startS)
-  const rockerPts = [];
-  for (let i = 0; i <= 60; i++) {
-    const s = lengths.sternStartS + (i / 60) * (lengths.bowStartS - lengths.sternStartS);
-    rockerPts.push(spineAt(spine, s).p);
-  }
-  // Keel path: stern keel ← stern sheer keel-end (same point) → rocker → bow sheer keel-end → bow keel
-  // = stern rocker join + rocker + bow rocker join (sheer startS points are on the rocker)
-  const sternJoin = rockerPts[0];
-  const bowJoin   = rockerPts[rockerPts.length - 1];
-
-  const spSampled = sampledSpine(state.spine, 64);
-
-  // ── Pink deck perimeter = mesh deck edge ─────────────────────────────
-  // The loft mesh rows[i][N-1] are the deck-centerline vertices of the
-  // 3D surface (k=N-1 is where b≈0, n≈1). Tracing those in side-view
-  // (X-Z projection) gives the exact same curve as the mesh top edge,
-  // so the pink line is pixel-perfect with the rendered hull.
-  // This also eliminates the need for an independent spline fit and any
-  // kink at the deckEndPt junctions.
-  const perimPts = lastLoft
-    ? lastLoft.rows.map(row => ({ x: row[lastLoft.N - 1].x, z: row[lastLoft.N - 1].z }))
-    : [];
+  const spSampled      = sampledSpine(state.spine, 64);
 
   const pt2str = p => `${xOf(p.x).toFixed(2)},${yOf(p.z).toFixed(2)}`;
   const pathD  = pts => 'M ' + pts.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.z).toFixed(2)}`).join(' L ');
 
-  // Silhouette top edge: same mesh deck vertices, so fill matches the line.
+  // ── Mesh-sourced keel + deck edges ───────────────────────────────────
+  // rows[i][0]     = keel-centerline vertex (b=0, n=0) for each loft row
+  // rows[i][N-1]   = deck-centerline vertex (b=0, n=1) for each loft row
+  // Both are projected to side-view X-Z, matching the rendered mesh.
+  // Split the keel edge into three colour-coded segments using the
+  // composite arc-length fractions stored in lastLoft.lengths.
+  let perimPts = [], sternKeelPts = [], rockerPts = [], bowKeelPts = [];
+  if (lastLoft) {
+    const Md = lastLoft.M, N = lastLoft.N;
+    const sf = lastLoft.lengths.sternFrac;
+    const bf = lastLoft.lengths.bowFrac;
+    const jS = Math.round(sf * (Md - 1));        // row index of stern→rocker junction
+    const jB = Math.round((1 - bf) * (Md - 1));  // row index of rocker→bow junction
+
+    perimPts     = lastLoft.rows.map(r => ({ x: r[N - 1].x, z: r[N - 1].z }));
+    const keelPts = lastLoft.rows.map(r => ({ x: r[0].x, z: r[0].z }));
+    sternKeelPts = keelPts.slice(0, jS + 1);
+    rockerPts    = keelPts.slice(jS, jB + 1);
+    bowKeelPts   = keelPts.slice(jB);
+  }
+
+  // Silhouette: top = deck edge (stern→bow), bottom = keel edge (bow→stern).
   const silPts = [
     ...perimPts.map(pt2str),
-    ...[...bowSheerPts].reverse().map(pt2str),
+    ...[...bowKeelPts].reverse().map(pt2str),
     ...[...rockerPts].reverse().map(pt2str),
-    ...sternSheerPts.map(pt2str),
+    ...sternKeelPts.map(pt2str),
   ];
   sideSvg.appendChild(el('polygon', { points: silPts.join(' '), class: 'silhouette' }));
 
   sideSvg.appendChild(el('path', { class: 'keel',              d: pathD(rockerPts) }));
-  sideSvg.appendChild(el('path', { class: 'stern-sheer-curve', d: pathD(sternSheerPts) }));
-  sideSvg.appendChild(el('path', { class: 'bow-sheer-curve',   d: pathD(bowSheerPts) }));
-  // Single continuous pink perimeter through all deck control pts.
-  sideSvg.appendChild(el('path', { class: 'deck-pts-line', d: pathD(perimPts) }));
+  sideSvg.appendChild(el('path', { class: 'stern-sheer-curve', d: pathD(sternKeelPts) }));
+  sideSvg.appendChild(el('path', { class: 'bow-sheer-curve',   d: pathD(bowKeelPts) }));
+  sideSvg.appendChild(el('path', { class: 'deck-pts-line',     d: pathD(perimPts) }));
 
   // ── Bézier rocker spine ──────────────────────────────────────────────
   const sp = state.spine;
