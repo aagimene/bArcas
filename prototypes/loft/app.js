@@ -2162,6 +2162,35 @@ let drag = null;
 
 let topDrag = null;
 
+// Delete the station at the unified-list index (works for interior, bow
+// sheer, and stern sheer — never for tips, which are synthetic). Adjusts
+// the selected-station index, rebuilds the hull, and re-renders all panes.
+function deleteStation(unifiedIdx) {
+  const sel = listAllStations(state)[unifiedIdx];
+  if (!sel) return;
+  if (sel.kind === 'interior') {
+    if (state.stations.length <= 1) return;
+    state.stations.splice(sel.stationIdx, 1);
+  } else if (sel.kind === 'bowSheer') {
+    if (state.bowSheer.stations.length <= 1) return;
+    state.bowSheer.stations.splice(sel.stationIdx, 1);
+  } else if (sel.kind === 'sternSheer') {
+    if (state.sternSheer.stations.length <= 1) return;
+    state.sternSheer.stations.splice(sel.stationIdx, 1);
+  } else {
+    return;
+  }
+  const newCount = listAllStations(state).length;
+  if (state.selectedStation >= newCount) {
+    state.selectedStation = Math.max(0, newCount - 1);
+  }
+  renderStationList();
+  rebuildHull();
+  renderSideView();
+  renderTopView();
+  renderSectionView();
+}
+
 function svgToLocalTop(e) {
   const pt = topSvg.createSVGPoint();
   pt.x = e.clientX; pt.y = e.clientY;
@@ -2210,38 +2239,54 @@ topSvg.addEventListener('pointermove', (e) => {
       if (pi >= 0) { bl.peaks[pi].hdx = -(wx - bl.peaks[pi].x); bl.peaks[pi].hdy = -(wy - bl.peaks[pi].y); }
     }
   } else if (topDrag.kind === 'station') {
-    // Slide a station along X (longitudinal). Mirrors the side-view 'station'
-    // drag: interior stations slide along the rocker (param 's'), sheer
-    // stations slide along their sheer keel curve (param 't').
+    // Slide a station along X. Both points in the (keel, deck) pair move
+    // together: the keel snaps onto its keel curve (rocker for interior;
+    // sheer keel for sheer stations); the deck point translates by the
+    // same (Δx, Δz) so the chord stays rigid.
     const sel = listAllStations(state)[+topDrag.id];
     if (!sel) { rebuildHull(); renderTopView(); return; }
     if (sel.kind === 'interior') {
       const sampled = sampledSpine(state.spine, 32);
       const spine   = { ctrl: state.spine, sampled };
-      const s       = spineXToS(spine, wx);
+      const idx = sel.stationIdx;
+      const st  = state.stations[idx];
+      const oldKeel = spineAt(spine, st.s).p;
+      const sRaw = spineXToS(spine, wx);
       const lo  = state.sternSheer.startS + 0.02;
       const hi  = state.bowSheer.startS   - 0.02;
-      const idx = sel.stationIdx;
       const minS = idx === 0
         ? lo : Math.max(lo, state.stations[idx - 1].s + 0.02);
       const maxS = idx === state.stations.length - 1
         ? hi : Math.min(hi, state.stations[idx + 1].s + 0.02);
-      state.stations[idx].s = Math.max(minS, Math.min(maxS, s));
+      st.s = Math.max(minS, Math.min(maxS, sRaw));
+      const newKeel = spineAt(spine, st.s).p;
+      if (st.deckPt) {
+        st.deckPt.x += newKeel.x - oldKeel.x;
+        st.deckPt.z += newKeel.z - oldKeel.z;
+      }
     } else {
-      // Sheer station: find t along the sheer keel curve nearest to wx.
+      // Sheer station: snap the keel point onto the sheer keel curve at
+      // click X, then translate the deck point by the same offset.
       const end   = sel.kind === 'bowSheer' ? 'bow' : 'stern';
       const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
+      const sst   = sheer.stations[sel.stationIdx];
       const spSampled = sampledSpine(state.spine, 64);
       const kSamp = sampledSheerKeel(state, end, spSampled);
-      // Find t whose pt.x is closest to wx along the sheer keel.
-      let bestT = 0, bestD = Infinity;
+      // Closest point on sheer keel curve to wx (in X).
+      let bestI = 0, bestD = Infinity;
       for (let i = 0; i < kSamp.pts.length; i++) {
         const d = Math.abs(kSamp.pts[i].x - wx);
-        if (d < bestD) { bestD = d; bestT = kSamp.arc[i] / (kSamp.total || 1); }
+        if (d < bestD) { bestD = d; bestI = i; }
       }
-      bestT = Math.max(0.05, Math.min(0.95, bestT));
-      sheer.stations[sel.stationIdx].t = bestT;
-      // Re-sort sheer.stations by t in case drag crossed a neighbor.
+      const newBot = { x: kSamp.pts[bestI].x, z: kSamp.pts[bestI].y };
+      const dxBot = newBot.x - sst.bottomPt.x;
+      const dzBot = newBot.z - sst.bottomPt.z;
+      sst.bottomPt = newBot;
+      sst.topPt = { x: sst.topPt.x + dxBot, z: sst.topPt.z + dzBot };
+      // Re-derive t from bottomPt.x (junction → tip).
+      const junctionX = spineAt({ ctrl: state.spine, sampled: spSampled }, sheer.startS).p.x;
+      const span = (sheer.tip.x - junctionX) || 1e-6;
+      sst.t = Math.max(0.02, Math.min(0.98, (newBot.x - junctionX) / span));
       sheer.stations.sort((a, b) => a.t - b.t);
     }
     renderStationList();
@@ -2270,27 +2315,107 @@ topSvg.addEventListener('click', (e) => {
     const d2 = Math.hypot(wx-(a.x+t*dx), wy+(a.y+t*dy));
     best = Math.min(best, d1, d2);
   }
-  if (best > 0.12) return;
-  const half = state.length / 2;
-  const insertAt = state.beamLine.peaks.findIndex(p => p.x > wx);
-  state.beamLine.peaks.splice(insertAt < 0 ? state.beamLine.peaks.length : insertAt, 0,
-    { x: wx, y: Math.max(0.01, Math.abs(wy)), hdx: half * 0.2, hdy: 0 });
+  if (best <= 0.12) {
+    // Click near the beam curve → insert a beam peak.
+    const half = state.length / 2;
+    const insertAt = state.beamLine.peaks.findIndex(p => p.x > wx);
+    state.beamLine.peaks.splice(insertAt < 0 ? state.beamLine.peaks.length : insertAt, 0,
+      { x: wx, y: Math.max(0.01, Math.abs(wy)), hdx: half * 0.2, hdy: 0 });
+    rebuildHull();
+    renderTopView();
+    return;
+  }
+
+  // Otherwise, treat this click as "add a station at this longitudinal X".
+  // Pick which kind of station (interior / bow sheer / stern sheer) by where
+  // wx falls in the rocker / sheer regions.
+  const SP = sampledSpine(state.spine, 64);
+  const spineObj = { ctrl: state.spine, sampled: SP };
+  const sternJoinX = spineAt(spineObj, state.sternSheer.startS).p.x;
+  const bowJoinX   = spineAt(spineObj, state.bowSheer.startS).p.x;
+  // Don't allow adding inside the tip caps.
+  const sternTipX  = state.sternSheer.tip.x;
+  const bowTipX    = state.bowSheer.tip.x;
+  if (wx <= sternTipX + 0.05 || wx >= bowTipX - 0.05) return;
+
+  if (wx > sternJoinX && wx < bowJoinX) {
+    // Interior. Use the same neighbour-interpolation as the side view click.
+    const sternX = state.sternSheer.deckEndPt.x;
+    const bowX   = state.bowSheer.deckEndPt.x;
+    const neighbours = [
+      { x: sternX, s: state.sternSheer.startS },
+      ...state.stations.map(st => ({ x: st.deckPt.x, s: st.s })),
+      { x: bowX,   s: state.bowSheer.startS   },
+    ].sort((a, b) => a.x - b.x);
+    let lo = 0;
+    while (lo < neighbours.length - 2 && neighbours[lo + 1].x < wx) lo++;
+    const A = neighbours[lo], B = neighbours[lo + 1];
+    const span = (B.x - A.x) || 1e-6;
+    const frac = Math.max(0, Math.min(1, (wx - A.x) / span));
+    const newS = A.s + frac * (B.s - A.s);
+    const sLo  = state.sternSheer.startS + 0.02;
+    const sHi  = state.bowSheer.startS   - 0.02;
+    const sClamped = Math.max(sLo, Math.min(sHi, newS));
+    // Top view has no Z; place deckPt at the deck-spline height at this X.
+    const deckEvalC = buildDeckSpline(state, SP);
+    state.stations.push({
+      s:      sClamped,
+      deckPt: { x: wx, z: deckEvalC(wx) },
+      kind:   'interior',
+      points: defaultSection(),
+    });
+    state.stations.sort((a, b) => a.s - b.s);
+  } else {
+    // Sheer region.
+    const end   = wx >= bowJoinX ? 'bow' : 'stern';
+    const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
+    const kSamp = sampledSheerKeel(state, end, SP);
+    const tSamp = sampledTopSheer (state, end, SP);
+    // Closest curve points to wx (X-only).
+    const nearestAt = (samp) => {
+      let bI = 0, bD = Infinity;
+      for (let i = 0; i < samp.pts.length; i++) {
+        const d = Math.abs(samp.pts[i].x - wx);
+        if (d < bD) { bD = d; bI = i; }
+      }
+      return { p: { x: samp.pts[bI].x, z: samp.pts[bI].y }, t: samp.arc[bI] / (samp.total || 1) };
+    };
+    const bot = nearestAt(kSamp);
+    const top = nearestAt(tSamp);
+    const t   = Math.max(0.05, Math.min(0.95, bot.t));
+    sheer.stations.push({
+      t,
+      bottomPt: bot.p,
+      topPt:    top.p,
+      points:   defaultSection(),
+    });
+    sheer.stations.sort((a, b) => a.t - b.t);
+  }
   rebuildHull();
+  renderSideView();
   renderTopView();
 });
 
-// Right-click a peak to delete.
+// Right-click handler: delete a beam peak OR a station, depending on the target.
 topSvg.addEventListener('contextmenu', (e) => {
-  const target = e.target.closest('[data-drag="beam-peak"]');
-  if (!target) return;
-  e.preventDefault();
-  if (state.beamLine.peaks.length <= 1) return;
-  const sorted = [...state.beamLine.peaks].sort((a, b) => a.x - b.x);
-  const pk = sorted[+target.dataset.idx];
-  const pi = state.beamLine.peaks.indexOf(pk);
-  if (pi >= 0) state.beamLine.peaks.splice(pi, 1);
-  rebuildHull();
-  renderTopView();
+  const peak = e.target.closest('[data-drag="beam-peak"]');
+  if (peak) {
+    e.preventDefault();
+    if (state.beamLine.peaks.length <= 1) return;
+    const sorted = [...state.beamLine.peaks].sort((a, b) => a.x - b.x);
+    const pk = sorted[+peak.dataset.idx];
+    const pi = state.beamLine.peaks.indexOf(pk);
+    if (pi >= 0) state.beamLine.peaks.splice(pi, 1);
+    rebuildHull();
+    renderTopView();
+    return;
+  }
+  const stationT = e.target.closest('[data-drag="station"]');
+  if (stationT) {
+    e.preventDefault();
+    deleteStation(+stationT.dataset.idx);
+    return;
+  }
 });
 
 // ── Side-view drag/click/delete ──────────────────────────────────────────
@@ -2645,36 +2770,23 @@ sideSvg.addEventListener('click', (e) => {
 });
 
 sideSvg.addEventListener('contextmenu', (e) => {
-  // Right-click a station's deck pt to delete the entire station.
-  const stationDeckTarget = e.target.closest('[data-drag="station-deck"]');
-  if (stationDeckTarget) {
+  // Interior station: right-click either the keel pt or the deck pt.
+  const interiorT = e.target.closest('[data-drag="station"],[data-drag="station-deck"]');
+  if (interiorT) {
     e.preventDefault();
-    const sel = listAllStations(state)[+stationDeckTarget.dataset.idx];
-    if (!sel || sel.kind !== 'interior') return;
-    if (state.stations.length <= 1) return;
-    state.stations.splice(sel.stationIdx, 1);
-    if (state.selectedStation >= listAllStations(state).length) {
-      state.selectedStation = Math.max(0, listAllStations(state).length - 1);
-    }
-    renderStationList();
-    rebuildHull();
-    renderSideView();
-    renderTopView();
-    renderSectionView();
+    deleteStation(+interiorT.dataset.idx);
     return;
   }
-  const target = e.target.closest('[data-drag^="sheer-bot-"],[data-drag^="sheer-top-"]');
-  if (!target) return;
-  e.preventDefault();
-  const sIdx  = +target.dataset.idx;
-  const endS  = target.dataset.drag.endsWith('-bow') ? 'bow' : 'stern';
-  const sheer = endS === 'bow' ? state.bowSheer : state.sternSheer;
-  if (sheer.stations.length <= 1) return;
-  sheer.stations.splice(sIdx, 1);
-  rebuildHull();
-  renderSideView();
-
-  renderTopView();
+  // Sheer station: right-click the bottomPt or topPt.
+  const sheerT = e.target.closest('[data-drag^="sheer-bot-"],[data-drag^="sheer-top-"]');
+  if (sheerT) {
+    e.preventDefault();
+    const sIdx  = +sheerT.dataset.idx;
+    const endS  = sheerT.dataset.drag.endsWith('-bow') ? 'bow' : 'stern';
+    const kind  = endS === 'bow' ? 'bowSheer' : 'sternSheer';
+    const uniIdx = listAllStations(state).findIndex(u => u.kind === kind && u.stationIdx === sIdx);
+    if (uniIdx >= 0) deleteStation(uniIdx);
+  }
 });
 
 // ── Cross-section drag / add / delete handlers ───────────────────────────

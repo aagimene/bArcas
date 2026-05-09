@@ -204,3 +204,47 @@ A–C carry most of the work; D–G are layered polish.
 
   None of these are blocking the other phases — flagged here so we revisit
   when the hull form work is far enough along to benefit.
+
+## TODO: history log + undo (deferred)
+
+User flagged this as "a much bigger thing — note it down to refine later".
+The intent isn't just `Ctrl+Z` for one-step undo; it's a **full visible
+history log of every editing action** at a level of detail that an agent
+could later replay or learn from. Two motivations:
+
+1. **Undo / redo and arbitrary-jump rewind.** A scrollable log lets the
+   user step back through any number of edits, not just the last one.
+2. **Training corpus for a future ArcasBoat agent.** Each entry should
+   describe a primitive action with enough information to reproduce it
+   from a clean state — i.e. it should be the same shape as the API-call
+   stream that a programmatic client / MCP agent would emit. This aligns
+   with the "every design action has a corresponding API call" rule from
+   [wiki/project/api-design.md](../wiki/project/api-design.md#principles).
+
+### Sketch of the requirements
+
+- **Append-only event log.** Each entry is a small structured record:
+  `{ ts, kind, params, prev_value, new_value, source }`. `source` lets us
+  distinguish hand-edits from agent-issued or replay-issued ones later.
+- **Action granularity matched to the API surface.** One log entry per
+  semantic action — `setBeamPeak(idx, x, y)`, `addStation(s, deckPt)`,
+  `deleteStation(unifiedIdx)`, `setStationDeckPt(idx, x, z)`, etc. *Not*
+  one entry per pixel of pointer movement; coalesce drag-stream into a
+  single entry on pointer-up.
+- **State = fold(events).** Bootstrap state, then replay the log to get
+  the current state. This is the same "events not mutations" rule from
+  [api-design.md](../wiki/project/api-design.md#principles).
+- **Visible UI.** A timeline pane with one row per entry — timestamp,
+  kind, short human-readable summary. Click a row to jump to that
+  point in history.
+- **Persistence.** Local-storage round-trip at minimum so a refresh
+  doesn't lose history. JSON-export for sharing / training.
+
+### Why not just stuff this into the prototype now
+
+The prototype mutates `state` directly from a dozen drag handlers and
+click handlers. To do this properly we'd want to route every mutation
+through a single dispatcher that emits a log entry — i.e. we'd be
+building the API layer that Phase 1 calls for. It's worth doing carefully
+once, not bolted on per-handler. Capture this when the prototype work
+stabilises and we start the proper TS/Python refactor.
