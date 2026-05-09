@@ -295,6 +295,52 @@ function invalidateLocalFrames(state) {
   }
 }
 
+// ── X-ordering guards ──────────────────────────────────────────────────────
+// Find the X range a point must stay within to avoid crossing its neighbours.
+
+// Interior station deck: must stay between prev/next station deckPt.x (or deckEndPt at the ends).
+function deckPtXBounds(state, stationIdx) {
+  const lo = stationIdx === 0
+    ? state.sternSheer.deckEndPt.x
+    : (state.stations[stationIdx - 1].deckPt?.x ?? -Infinity);
+  const hi = stationIdx === state.stations.length - 1
+    ? state.bowSheer.deckEndPt.x
+    : (state.stations[stationIdx + 1].deckPt?.x ?? Infinity);
+  return [lo + 0.01, hi - 0.01];
+}
+
+// Sheer station pt: must stay between its adjacent fixed X values
+// (junction, neighbouring stations of the same kind, tip).
+function sheerPtXBounds(state, end, excludeSst, ptKind) {
+  const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
+  const sp = sampledSpine(state.spine, 64);
+  const jPt = spineAt({ ctrl: state.spine, sampled: sp }, sheer.startS).p;
+  const getX = s => ptKind === 'bottom' ? s.bottomPt.x : s.topPt.x;
+  const fixed = [
+    jPt.x,
+    sheer.tip.x,
+    ...sheer.stations.filter(s => s !== excludeSst).map(getX),
+  ].sort((a, b) => a - b);
+  const currX = getX(excludeSst);
+  let lo = -Infinity, hi = Infinity;
+  for (const fx of fixed) {
+    if (fx < currX - 1e-4) lo = fx;
+    else if (fx > currX + 1e-4 && hi === Infinity) hi = fx;
+  }
+  return [lo + 0.01, hi - 0.01];
+}
+
+// Sheer tip: must stay outward of every station bottomPt and topPt.
+function sheerTipXBounds(state, end) {
+  const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
+  const allPtX = sheer.stations.flatMap(s => [s.bottomPt.x, s.topPt.x]);
+  if (allPtX.length === 0) return [-Infinity, Infinity];
+  const sp = sampledSpine(state.spine, 64);
+  const jPt = spineAt({ ctrl: state.spine, sampled: sp }, sheer.startS).p;
+  if (end === 'bow')   return [Math.max(...allPtX) + 0.01, Infinity];
+  return [-Infinity, Math.min(...allPtX) - 0.01];
+}
+
 // Helper: compute deckLocal for an interior station from a world deck position.
 function worldToDeckLocal(state, stIdx, wx, wz) {
   const st = state.stations[stIdx];
@@ -2421,10 +2467,13 @@ topSvg.addEventListener('pointermove', (e) => {
       const sst   = sheer.stations[sel.stationIdx];
       const spSampled = sampledSpine(state.spine, 64);
       const kSamp = sampledSheerKeel(state, end, spSampled);
-      // Closest point on sheer keel curve to wx (in X).
+      // Clamp wx within the X range the station is allowed to occupy.
+      const [topShLo, topShHi] = sheerPtXBounds(state, end, sst, 'bottom');
+      const wxClamped = Math.max(topShLo, Math.min(topShHi, wx));
+      // Closest point on sheer keel curve to clamped wx (in X).
       let bestI = 0, bestD = Infinity;
       for (let i = 0; i < kSamp.pts.length; i++) {
-        const d = Math.abs(kSamp.pts[i].x - wx);
+        const d = Math.abs(kSamp.pts[i].x - wxClamped);
         if (d < bestD) { bestD = d; bestI = i; }
       }
       const newBot = { x: kSamp.pts[bestI].x, z: kSamp.pts[bestI].y };
@@ -2657,6 +2706,8 @@ sideSvg.addEventListener('pointermove', (e) => {
     const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
     const sst   = sheer.stations[drag.idx];
     if (!sst) return;
+    const [shLo, shHi] = sheerPtXBounds(state, end, sst, isBot ? 'bottom' : 'top');
+    wx = Math.max(shLo, Math.min(shHi, wx));
     if (isBot) { sst.bottomPt = { x: wx, z: wz }; sst.bottomLocal = worldToSheerLocal(state, end, wx, wz); }
     else       { sst.topPt    = { x: wx, z: wz }; sst.topLocal    = worldToSheerLocal(state, end, wx, wz); }
     // Re-derive t from bottomPt.x for ordering.
@@ -2673,6 +2724,8 @@ sideSvg.addEventListener('pointermove', (e) => {
   } else if (drag.kind === 'sheer-tip-bow' || drag.kind === 'sheer-tip-stern') {
     const end = drag.kind === 'sheer-tip-bow' ? 'bow' : 'stern';
     const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
+    const [tipLo, tipHi] = sheerTipXBounds(state, end);
+    wx = Math.max(tipLo, Math.min(tipHi, wx));
     sheer.tip      = { x: wx, z: wz };
     sheer.tipLocal = worldToSheerLocal(state, end, wx, wz);
     drag.moved = true;
@@ -2747,9 +2800,11 @@ sideSvg.addEventListener('pointermove', (e) => {
     if (!sel || sel.kind !== 'interior') return;
     const stationIdx = sel.stationIdx;
     const st = state.stations[stationIdx];
-    // Don't let the deck point pass below the keel (would invert the chord).
+    // Don't let the deck point pass below the keel or cross X-neighbours.
     const sampled = sampledSpine(state.spine, 32);
     const keel    = spineAt({ ctrl: state.spine, sampled }, st.s).p;
+    const [dkLo, dkHi] = deckPtXBounds(state, stationIdx);
+    wx = Math.max(dkLo, Math.min(dkHi, wx));
     st.deckPt    = { x: wx, z: Math.max(keel.z + 0.02, wz) };
     st.deckLocal = worldToDeckLocal(state, stationIdx, st.deckPt.x, st.deckPt.z);
     rebuildHull();
