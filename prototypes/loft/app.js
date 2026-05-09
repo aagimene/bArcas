@@ -1292,7 +1292,7 @@ function renderTopView() {
     topSvg.appendChild(el('circle', { cx, cy, r: 5,  class: 'spine-anchor', 'data-drag': dragAnchor, 'data-idx': nd.id }));
   });
 
-  // ── Station ticks ────────────────────────────────────────────────────
+  // ── Station marks (matching side-view chord style: magenta) ─────────
   const spSampled = sampledSpine(state.spine, 64);
   const unified   = listAllStations(state);
   unified.forEach((entry, i) => {
@@ -1306,16 +1306,26 @@ function renderTopView() {
     }
     const halfB = beamEvalAt(beamPts, kx);
     const isSel = i === state.selectedStation;
+    // Wide invisible hit strip across the beam — drag anywhere along the
+    // station line to slide it along X.
+    topSvg.appendChild(el('line', {
+      x1: xOfT(-halfB - 0.05), y1: yOfT(kx),
+      x2: xOfT( halfB + 0.05), y2: yOfT(kx),
+      class: 'station-hit',
+      'data-drag': 'station', 'data-idx': String(i),
+    }));
+    // Visible station chord — magenta to match the side-view chord overlay.
     topSvg.appendChild(el('line', {
       x1: xOfT(-halfB), y1: yOfT(kx), x2: xOfT(halfB), y2: yOfT(kx),
-      class: 'station' + (isSel ? ' selected' : ''),
+      class: 'station-chord' + (isSel ? ' selected' : ''),
     }));
+    // Centerline marker dot.
     topSvg.appendChild(el('circle', {
-      cx: xOfT(halfB), cy: yOfT(kx), r: 14,
-      class: 'station-hit', 'data-drag': 'station', 'data-idx': String(i),
+      cx: 0, cy: yOfT(kx), r: 3.5,
+      class: 'station-keel' + (isSel ? ' selected' : ''),
     }));
     topSvg.appendChild(el('text', {
-      x: xOfT(halfB) + 6, y: yOfT(kx) + 4, class: 'station-label',
+      x: xOfT(halfB) + 8, y: yOfT(kx) + 4, class: 'station-label',
     }, entry.label));
   });
 
@@ -2225,8 +2235,45 @@ topSvg.addEventListener('pointermove', (e) => {
       const pi = peakIdx(topDrag.id);
       if (pi >= 0) { bl.peaks[pi].hdx = -(wx - bl.peaks[pi].x); bl.peaks[pi].hdy = -(wy - bl.peaks[pi].y); }
     }
+  } else if (topDrag.kind === 'station') {
+    // Slide a station along X (longitudinal). Mirrors the side-view 'station'
+    // drag: interior stations slide along the rocker (param 's'), sheer
+    // stations slide along their sheer keel curve (param 't').
+    const sel = listAllStations(state)[+topDrag.id];
+    if (!sel) { rebuildHull(); renderTopView(); return; }
+    if (sel.kind === 'interior') {
+      const sampled = sampledSpine(state.spine, 32);
+      const spine   = { ctrl: state.spine, sampled };
+      const s       = spineXToS(spine, wx);
+      const lo  = state.sternSheer.startS + 0.02;
+      const hi  = state.bowSheer.startS   - 0.02;
+      const idx = sel.stationIdx;
+      const minS = idx === 0
+        ? lo : Math.max(lo, state.stations[idx - 1].s + 0.02);
+      const maxS = idx === state.stations.length - 1
+        ? hi : Math.min(hi, state.stations[idx + 1].s + 0.02);
+      state.stations[idx].s = Math.max(minS, Math.min(maxS, s));
+    } else {
+      // Sheer station: find t along the sheer keel curve nearest to wx.
+      const end   = sel.kind === 'bowSheer' ? 'bow' : 'stern';
+      const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
+      const spSampled = sampledSpine(state.spine, 64);
+      const kSamp = sampledSheerKeel(state, end, spSampled);
+      // Find t whose pt.x is closest to wx along the sheer keel.
+      let bestT = 0, bestD = Infinity;
+      for (let i = 0; i < kSamp.pts.length; i++) {
+        const d = Math.abs(kSamp.pts[i].x - wx);
+        if (d < bestD) { bestD = d; bestT = kSamp.arc[i] / (kSamp.total || 1); }
+      }
+      bestT = Math.max(0.05, Math.min(0.95, bestT));
+      sheer.stations[sel.stationIdx].t = bestT;
+      // Re-sort sheer.stations by t in case drag crossed a neighbor.
+      sheer.stations.sort((a, b) => a.t - b.t);
+    }
+    renderStationList();
   }
   rebuildHull();
+  renderSideView();
   renderTopView();
 });
 
@@ -2493,68 +2540,102 @@ sideSvg.addEventListener('click', (e) => {
   const spSampled = sampledSpine(state.spine, 64);
   const spineObj  = { ctrl: state.spine, sampled: spSampled };
 
-  // Check proximity to deck line first.
-  {
-    const spSampledC = sampledSpine(state.spine, 64);
-    const deckEvalC  = buildDeckSpline(state, spSampledC);
-    const deckZ      = deckEvalC(wx);
-    const distToDeck = Math.abs(wz - deckZ);
-    if (distToDeck < 0.10) {
-      // Insert keeping points sorted by x.
-      const insertIdx = state.deckLine.points.findIndex(p => p.x > wx);
-      if (insertIdx === -1) state.deckLine.points.push({ x: wx, z: wz });
-      else state.deckLine.points.splice(insertIdx, 0, { x: wx, z: wz });
-      rebuildHull();
-      renderSideView();
-
-      renderTopView();
-      return;
-    }
-  }
-
-  // Click near bottom or top sheer line → insert a station with both pts.
-  const spSampledC2 = sampledSpine(state.spine, 64);
-  let best = { dist: Infinity, end: null, onTop: false };
-  for (const end of ['bow', 'stern']) {
-    for (const onTop of [false, true]) {
-      const curve = onTop
-        ? sampledTopSheer (state, end, spSampledC2)
-        : sampledSheerKeel(state, end, spSampledC2);
-      for (let i = 0; i < curve.pts.length - 1; i++) {
-        const a = curve.pts[i], b = curve.pts[i + 1];
-        const ddx = b.x - a.x, ddz = b.y - a.y;
-        const lenSq = ddx*ddx + ddz*ddz;
-        let tt = lenSq > 0 ? ((wx-a.x)*ddx + (wz-a.y)*ddz) / lenSq : 0;
-        tt = Math.max(0, Math.min(1, tt));
-        const d = Math.hypot(wx - (a.x + tt*ddx), wz - (a.y + tt*ddz));
-        if (d < best.dist) best = { dist: d, end, onTop };
+  // ── Resolve the click against every editable curve ─────────────────
+  // For each curve we find the nearest point whose X is in that curve's
+  // domain, then pick the global winner within the click threshold. The
+  // domain restrictions prevent a click at the bow region from getting
+  // routed to a stern curve (or vice versa) just because the curves'
+  // numeric distances happen to compare favourably elsewhere.
+  const SP   = sampledSpine(state.spine, 64);
+  const xRng = (pts) => {
+    let lo = Infinity, hi = -Infinity;
+    for (const p of pts) { if (p.x < lo) lo = p.x; if (p.x > hi) hi = p.x; }
+    return [lo, hi];
+  };
+  const nearestOnSampled = (samp) => {
+    // samp is { pts: [{x,y}], arc: [...], total } — y here is world Z.
+    const [lo, hi] = xRng(samp.pts);
+    if (wx < lo - 0.05 || wx > hi + 0.05) return { dist: Infinity, t: 0 };
+    let bestD = Infinity, bestT = 0;
+    for (let i = 0; i < samp.pts.length - 1; i++) {
+      const a = samp.pts[i], b = samp.pts[i + 1];
+      const dx = b.x - a.x, dz = b.y - a.y;
+      const ll = dx*dx + dz*dz;
+      let tt = ll > 0 ? ((wx-a.x)*dx + (wz-a.y)*dz) / ll : 0;
+      tt = Math.max(0, Math.min(1, tt));
+      const px = a.x + tt*dx, pz = a.y + tt*dz;
+      const d = Math.hypot(wx - px, wz - pz);
+      if (d < bestD) {
+        bestD = d;
+        const aT = samp.arc[i]     / (samp.total || 1);
+        const bT = samp.arc[i + 1] / (samp.total || 1);
+        bestT = aT + tt * (bT - aT);
       }
     }
-  }
-  if (best.dist > 0.15) return;
+    return { dist: bestD, t: bestT };
+  };
 
-  const sheerC = best.end === 'bow' ? state.bowSheer : state.sternSheer;
-  const kSamp2 = sampledSheerKeel(state, best.end, spSampledC2);
-  const tSamp2 = sampledTopSheer (state, best.end, spSampledC2);
-  const clickedSamp = best.onTop ? tSamp2 : kSamp2;
-  let bestT = 0, bestD = Infinity;
-  for (let i = 0; i < clickedSamp.pts.length; i++) {
-    const d = Math.hypot(wx - clickedSamp.pts[i].x, wz - clickedSamp.pts[i].y);
-    if (d < bestD) { bestD = d; bestT = clickedSamp.arc[i] / (clickedSamp.total || 1); }
+  // Candidate curves with their insertion handlers.
+  const candidates = [];
+
+  // Deck line (only the interior open span, excluding tip caps).
+  {
+    const sternEnd = state.sternSheer.deckEndPt;
+    const bowEnd   = state.bowSheer.deckEndPt;
+    if (wx > sternEnd.x + 0.02 && wx < bowEnd.x - 0.02) {
+      const deckEvalC = buildDeckSpline(state, SP);
+      const deckZ = deckEvalC(wx);
+      candidates.push({
+        dist: Math.abs(wz - deckZ),
+        kind: 'deck',
+        run:  () => {
+          const insertIdx = state.deckLine.points.findIndex(p => p.x > wx);
+          if (insertIdx === -1) state.deckLine.points.push({ x: wx, z: wz });
+          else state.deckLine.points.splice(insertIdx, 0, { x: wx, z: wz });
+        },
+      });
+    }
   }
-  bestT = Math.max(0.05, Math.min(0.95, bestT));
-  const bPt = sampleAlong(kSamp2, bestT).p;
-  const tPt = sampleAlong(tSamp2, bestT).p;
-  const insertAt = sheerC.stations.findIndex(s => s.t > bestT);
-  sheerC.stations.splice(insertAt < 0 ? sheerC.stations.length : insertAt, 0, {
-    t: bestT,
-    bottomPt: { x: bPt.x, z: bPt.z },
-    topPt:    { x: tPt.x, z: tPt.z },
-    points:   defaultSection(),
-  });
+
+  // Bow sheer keel + top sheer — only when click is in the bow region.
+  // Stern sheer — only when click is in the stern region.
+  for (const end of ['bow', 'stern']) {
+    const sheer = end === 'bow' ? state.bowSheer : state.sternSheer;
+    const tipX  = sheer.tip.x;
+    const junction = spineAt({ ctrl: state.spine, sampled: SP }, sheer.startS).p;
+    const lo = Math.min(tipX, junction.x), hi = Math.max(tipX, junction.x);
+    if (wx < lo - 0.05 || wx > hi + 0.05) continue;
+
+    const kSamp = sampledSheerKeel(state, end, SP);
+    const tSamp = sampledTopSheer (state, end, SP);
+    const onKeel = nearestOnSampled(kSamp);
+    const onTop  = nearestOnSampled(tSamp);
+    const pick = onKeel.dist <= onTop.dist ? onKeel : onTop;
+    candidates.push({
+      dist: pick.dist,
+      kind: `sheer-${end}`,
+      run:  () => {
+        const t = Math.max(0.05, Math.min(0.95, pick.t));
+        const bPt = sampleAlong(kSamp, t).p;
+        const tPt = sampleAlong(tSamp, t).p;
+        sheer.stations.push({
+          t,
+          bottomPt: { x: bPt.x, z: bPt.z },
+          topPt:    { x: tPt.x, z: tPt.z },
+          points:   defaultSection(),
+        });
+        // Sort so neighbour-comparison logic works regardless of t order.
+        sheer.stations.sort((a, b) => a.t - b.t);
+      },
+    });
+  }
+
+  // Pick the closest qualifying candidate.
+  candidates.sort((a, b) => a.dist - b.dist);
+  if (candidates.length === 0 || candidates[0].dist > 0.12) return;
+  candidates[0].run();
   rebuildHull();
   renderSideView();
-
   renderTopView();
 });
 

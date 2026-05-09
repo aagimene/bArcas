@@ -352,10 +352,13 @@ main {
 #top-view .silhouette        { fill: #fdf6e3; stroke: none; opacity: 0.7; }
 #top-view .beam-curve        { fill: none; stroke: #0891b2; stroke-width: 2; stroke-linecap: round; pointer-events: none; }
 #top-view .beam-curve.mirror { opacity: 0.35; }
-#top-view .station           { stroke: #92400e; stroke-width: 1.4; pointer-events: none; }
-#top-view .station.selected  { stroke: #fbbf24; stroke-width: 2.5; }
-#top-view .station-hit       { fill: transparent; cursor: pointer; }
-#top-view .station-label     { font-size: 9px; fill: #92400e; pointer-events: none; }
+/* Stations in top view: magenta to match the side-view chord overlay. */
+#top-view .station-chord          { stroke: #ec4899; stroke-width: 1.6; stroke-dasharray: 5 3; pointer-events: none; opacity: 0.85; }
+#top-view .station-chord.selected { stroke: #be185d; stroke-width: 2.4; stroke-dasharray: none; opacity: 1; }
+#top-view .station-keel           { fill: #0d9488; stroke: white; stroke-width: 1.4; pointer-events: none; }
+#top-view .station-keel.selected  { fill: #0f766e; stroke-width: 1.8; }
+#top-view .station-hit            { stroke: transparent; stroke-width: 16; cursor: ns-resize; fill: none; }
+#top-view .station-label          { font: 9px -apple-system, sans-serif; fill: #be185d; pointer-events: none; }
 #top-view .handle-line       { stroke: #64748b; stroke-width: 0.8; pointer-events: none; }
 #top-view .spine-anchor      { fill: #0891b2; stroke: white; stroke-width: 1.5; cursor: grab; }
 #top-view .spine-handle      { fill: #64748b; stroke: white; stroke-width: 1;   cursor: grab; }
