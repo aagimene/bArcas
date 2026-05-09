@@ -236,11 +236,15 @@ function defaultSection() {
 // the incoming handle is symmetric: C1 continuity.
 function defaultBeamLine(L = 5.2) {
   const half = L / 2;
+  // Kayak-like plan: parallel midsection between two anchored peaks at
+  // ±35% of half-length, both at full half-beam (0.30 m). Long horizontal
+  // handles flatten the curve through the midship. Tips taper smoothly.
   return {
-    sternHandle: { dx:  half * 0.45, dy: 0 }, // outgoing from stern tip
-    bowHandle:   { dx: -half * 0.45, dy: 0 }, // outgoing from bow tip (toward stern)
+    sternHandle: { dx:  half * 0.55, dy: 0 }, // outgoing from stern tip
+    bowHandle:   { dx: -half * 0.55, dy: 0 }, // outgoing from bow tip (toward stern)
     peaks: [
-      { x: -half * 0.10, y: 0.30, hdx: half * 0.35, hdy: 0 },
+      { x: -half * 0.35, y: 0.30, hdx: half * 0.30, hdy: 0 },
+      { x:  half * 0.35, y: 0.30, hdx: half * 0.30, hdy: 0 },
     ],
   };
 }
@@ -1133,23 +1137,26 @@ function renderTopView() {
 
   const beamPts = sampledBeamLine(state);
 
-  // ── Dynamic scales: fill the pane exactly in both axes ───────────────
-  // scaleX and scaleY are computed independently so the hull spans the full
-  // pane height AND width regardless of the hull's physical aspect ratio.
+  // ── Uniform px/m scale: real aspect ratio, letterboxed ──────────────
+  // Both axes share one scale so 1 m along X (longitudinal, screen Y) and
+  // 1 m along Y (transverse, screen X) render at the same pixel size.
   {
     const stX = state.sternSheer.tip.x, bwX = state.bowSheer.tip.x;
     const maxB = Math.max(...beamPts.map(p => p.y), 0.05);
     const padX = 0.25, padY = 0.06;  // world-unit padding (metres)
-    // Use the SVG's own rendered bounds; fall back to pane minus ~title height.
     const bbox  = topSvg.getBoundingClientRect();
     const paneH = Math.max(bbox.height > 10 ? bbox.height : topSvg.parentElement.clientHeight - 44, 100);
     const paneW = Math.max(bbox.width  > 10 ? bbox.width  : topSvg.clientWidth, 60);
-    TOP_SCALE_X = paneH / (bwX - stX + 2 * padX);
-    TOP_SCALE_Y = paneW / ((maxB + padY) * 2);
-    const vbW = (maxB + padY) * 2 * TOP_SCALE_Y;   // == paneW
-    const vbH = (bwX - stX + 2 * padX) * TOP_SCALE_X; // == paneH
+    const Lx = (bwX - stX) + 2 * padX;            // metres needed vertically
+    const Ly = (maxB + padY) * 2;                 // metres needed horizontally
+    const s = Math.min(paneW / Ly, paneH / Lx);   // px/m, isotropic
+    TOP_SCALE_X = s;
+    TOP_SCALE_Y = s;
+    const vbW = paneW;
+    const vbH = paneH;
+    const cxX = (stX + bwX) / 2;                  // world X centre of hull
     topSvg.setAttribute('viewBox',
-      `${(-vbW / 2).toFixed(1)} ${(-bwX * TOP_SCALE_X - padX * TOP_SCALE_X).toFixed(1)} ${vbW.toFixed(1)} ${vbH.toFixed(1)}`);
+      `${(-vbW / 2).toFixed(1)} ${(-cxX * s - vbH / 2).toFixed(1)} ${vbW.toFixed(1)} ${vbH.toFixed(1)}`);
   }
 
   // Centreline reference (Y=0 axis, vertical line).
@@ -1252,6 +1259,16 @@ function renderTopView() {
   // Labels.
   topSvg.appendChild(el('text', { x: 0, y: yOfT(state.bowSheer.tip.x)  - 8, class: 'label', 'text-anchor': 'middle' }, 'bow'));
   topSvg.appendChild(el('text', { x: 0, y: yOfT(state.sternSheer.tip.x) + 16, class: 'label', 'text-anchor': 'middle' }, 'stern'));
+
+  // ── Coordinate-system badge (X-Y plane, top-down) ──────────────────────
+  // Bottom-left corner of the viewBox.
+  const vb = topSvg.viewBox.baseVal;
+  const ax = vb.x + 14, ay = vb.y + vb.height - 14;
+  const L = 28;
+  topSvg.appendChild(el('line', { x1: ax, y1: ay, x2: ax + L, y2: ay,     class: 'axis-arrow' }));
+  topSvg.appendChild(el('line', { x1: ax, y1: ay, x2: ax,     y2: ay - L, class: 'axis-arrow' }));
+  topSvg.appendChild(el('text', { x: ax + L + 4, y: ay + 4,    class: 'axis-label' }, '+Y (port)'));
+  topSvg.appendChild(el('text', { x: ax - 4,     y: ay - L - 2, class: 'axis-label', 'text-anchor': 'start' }, '+X (bow)'));
 }
 
 // ── Side view ─────────────────────────────────────────────────────────────
@@ -1272,6 +1289,15 @@ function renderSideView() {
   sideSvg.appendChild(el('text', {
     x: 320, y: yOf(0) - 3, class: 'label', 'text-anchor': 'end',
   }, 'WL (Z = 0)'));
+
+  // Coordinate-system badge (X-Z plane).
+  {
+    const ax = -332, ay = 110, L = 28;
+    sideSvg.appendChild(el('line', { x1: ax, y1: ay, x2: ax + L, y2: ay,     class: 'axis-arrow' }));
+    sideSvg.appendChild(el('line', { x1: ax, y1: ay, x2: ax,     y2: ay - L, class: 'axis-arrow' }));
+    sideSvg.appendChild(el('text', { x: ax + L + 4, y: ay + 4,     class: 'axis-label' }, '+X (bow)'));
+    sideSvg.appendChild(el('text', { x: ax - 4,     y: ay - L - 2, class: 'axis-label', 'text-anchor': 'start' }, '+Z (up)'));
+  }
 
   // ── Four explicit hull-profile curves ───────────────────────────────
   // keel (rocker, blue), deck line (green), bow sheer (orange), stern
@@ -1661,12 +1687,12 @@ function renderSectionView() {
     const isCenterline = isKeel || isDeck;
     const cls = (isKeel ? 'keel ' : '') + (isDeck ? 'deck ' : '') + (isCenterline ? 'centerline ' : '');
     sectionSvg.appendChild(el('circle', {
-      cx: bOf(p.b), cy: nOf(p.n), r: 14,
+      cx: bOf(p.b), cy: nOf(p.n), r: 16,
       class: ('ctrl-hit ' + cls).trim(),
       'data-drag': 'ctrl', 'data-idx': String(i),
     }));
     sectionSvg.appendChild(el('circle', {
-      cx: bOf(p.b), cy: nOf(p.n), r: 4.2,
+      cx: bOf(p.b), cy: nOf(p.n), r: 6.5,
       class: ('ctrl-pt ' + cls + (p.chine ? 'chine' : '')).trim(),
       'data-drag': 'ctrl', 'data-idx': String(i),
     }));
@@ -1676,6 +1702,15 @@ function renderSectionView() {
     sectionSvg.appendChild(el('text', {
       x: 0, y: 110, class: 'label', 'text-anchor': 'middle',
     }, 'click to add · right-click a point to delete'));
+  }
+
+  // Coordinate-system badge (Y-Z plane, looking forward toward bow).
+  {
+    const ax = -332, ay = 110, L = 28;
+    sectionSvg.appendChild(el('line', { x1: ax, y1: ay, x2: ax + L, y2: ay,     class: 'axis-arrow' }));
+    sectionSvg.appendChild(el('line', { x1: ax, y1: ay, x2: ax,     y2: ay - L, class: 'axis-arrow' }));
+    sectionSvg.appendChild(el('text', { x: ax + L + 4, y: ay + 4,     class: 'axis-label' }, '+Y (port)'));
+    sectionSvg.appendChild(el('text', { x: ax - 4,     y: ay - L - 2, class: 'axis-label', 'text-anchor': 'start' }, '+Z (up)'));
   }
 }
 

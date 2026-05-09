@@ -402,12 +402,12 @@ main {
 
 /* ── SVG: cross-section ──────────────────────────────────────── */
 
-#section-view .axis           { stroke: #cbd5e1; stroke-width: 0.5; }
-#section-view .axis.deck-axis { stroke: #16a34a; stroke-dasharray: 4 3; }
-#section-view .water { stroke: #94a3b8; stroke-dasharray: 4 4; stroke-width: 0.7; }
-#section-view .label { font: 9px -apple-system, sans-serif; fill: #64748b; }
-#section-view .section-curve  { fill: none; stroke: #1f2937; stroke-width: 1.8; }
-#section-view .section-mirror { fill: none; stroke: #94a3b8; stroke-width: 1.2; stroke-dasharray: 3 3; }
+#section-view .axis           { stroke: #cbd5e1; stroke-width: 1.4; }
+#section-view .axis.deck-axis { stroke: #16a34a; stroke-dasharray: 6 4; stroke-width: 1.4; }
+#section-view .water { stroke: #94a3b8; stroke-dasharray: 6 4; stroke-width: 1.4; }
+#section-view .label { font: 14px -apple-system, sans-serif; fill: #475569; }
+#section-view .section-curve  { fill: none; stroke: #1f2937; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+#section-view .section-mirror { fill: none; stroke: #94a3b8; stroke-width: 1.8; stroke-dasharray: 4 4; stroke-linecap: round; }
 #section-view { cursor: crosshair; }  /* signals "click to add" */
 #section-view .section-curve  { pointer-events: none; }
 #section-view .section-mirror { pointer-events: none; }
@@ -416,7 +416,7 @@ main {
 #section-view .label          { pointer-events: none; }
 
 #section-view .ctrl-pt {
-  fill: white; stroke: #2563eb; stroke-width: 1.4;
+  fill: white; stroke: #2563eb; stroke-width: 2.2;
   cursor: grab;
 }
 #section-view .ctrl-pt:active { cursor: grabbing; }
@@ -439,6 +439,19 @@ main {
   fill: #16a34a; stroke: white; cursor: not-allowed;
 }
 #section-view .ctrl-hit               { fill: transparent; cursor: grab; }
+
+/* ── Coordinate-system badge (used in side, top, section panes) ────── */
+#side-view  .axis-arrow,
+#top-view   .axis-arrow,
+#section-view .axis-arrow { stroke: #0f172a; stroke-width: 1.6; pointer-events: none; }
+#side-view  .axis-label,
+#top-view   .axis-label,
+#section-view .axis-label {
+  font: 600 11px -apple-system, sans-serif;
+  fill: #0f172a; pointer-events: none;
+}
+#section-view .axis-label { font-size: 13px; }
+#section-view .axis-arrow { stroke-width: 2; }
 #section-view .ctrl-hit.centerline    { cursor: ns-resize; }
 #section-view .ctrl-hit.keel,
 #section-view .ctrl-hit.centerline.keel { cursor: not-allowed; pointer-events: none; }
