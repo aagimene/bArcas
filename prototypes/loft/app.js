@@ -1172,6 +1172,19 @@ function deckNOf(st) {
 const SIDE_SCALE_X = 100; // px/m horizontal
 const SIDE_SCALE_Z = 200; // px/m vertical (exaggerated so rocker is visible)
 
+// ── Viewport state for zoom / pan ─────────────────────────────────────────
+// Side view: stored as the SVG viewBox (minX, minY, W, H).
+const SIDE_VP_DEFAULT = { minX: -340, minY: -140, W: 680, H: 240 };
+const sideVP = { ...SIDE_VP_DEFAULT };
+
+function applySideViewBox() {
+  sideSvg.setAttribute('viewBox',
+    `${sideVP.minX.toFixed(2)} ${sideVP.minY.toFixed(2)} ${sideVP.W.toFixed(2)} ${sideVP.H.toFixed(2)}`);
+}
+
+// Top view: an extra zoom + pan offset applied on top of the isotropic auto-fit.
+const topVP = { zoom: 1, offX: 0, offY: 0 };
+
 // ── Top view (plan view, X-Y vertical orientation) ────────────────────────
 // World X (longitudinal) maps to SVG Y (hull runs vertically, bow at top).
 // World Y (beam/transverse) maps to SVG X (beam expands horizontally).
@@ -1207,8 +1220,15 @@ function renderTopView() {
     const vbW = paneW;
     const vbH = paneH;
     const cxX = (stX + bwX) / 2;                  // world X centre of hull
+    // Base fit centre in SVG coords, then apply topVP zoom/pan on top.
+    const baseCX = 0;
+    const baseCY = -cxX * s;
+    const fitCX  = baseCX + topVP.offX;
+    const fitCY  = baseCY + topVP.offY;
+    const zW     = vbW / topVP.zoom;
+    const zH     = vbH / topVP.zoom;
     topSvg.setAttribute('viewBox',
-      `${(-vbW / 2).toFixed(1)} ${(-cxX * s - vbH / 2).toFixed(1)} ${vbW.toFixed(1)} ${vbH.toFixed(1)}`);
+      `${(fitCX - zW / 2).toFixed(1)} ${(fitCY - zH / 2).toFixed(1)} ${zW.toFixed(1)} ${zH.toFixed(1)}`);
   }
 
   // Centreline reference (Y=0 axis, vertical line).
@@ -1339,6 +1359,7 @@ function renderTopView() {
 // ── Side view ─────────────────────────────────────────────────────────────
 
 function renderSideView() {
+  applySideViewBox();
   sideSvg.innerHTML = '';
   const xOf = (x) => x * SIDE_SCALE_X;
   const yOf = (z) => -z * SIDE_SCALE_Z;
@@ -2280,6 +2301,52 @@ topSvg.addEventListener('pointermove', (e) => {
 topSvg.addEventListener('pointerup',     () => { topDrag = null; });
 topSvg.addEventListener('pointercancel', () => { topDrag = null; });
 
+// ── Top-view zoom (wheel) and pan (middle-button or alt+left drag) ────────
+let topPanDrag = null;
+topSvg.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const dz = e.deltaY < 0 ? 1.18 : 1 / 1.18;
+  // Mouse position in SVG coords.
+  const pt = topSvg.createSVGPoint();
+  pt.x = e.clientX; pt.y = e.clientY;
+  const loc = pt.matrixTransform(topSvg.getScreenCTM().inverse());
+  // Keep loc fixed: offX moves so the viewBox centre shifts appropriately.
+  // Current viewBox centre = (offX, offY+baseCY) at the current zoom.
+  // After zoom: centre moves so loc stays at same screen position.
+  // Δcentre = (loc - centre) * (1 - 1/dz)
+  topVP.offX = loc.x - (loc.x - topVP.offX) / dz;
+  topVP.offY = loc.y - (loc.y - topVP.offY) / dz;
+  topVP.zoom = Math.max(0.1, Math.min(20, topVP.zoom * dz));
+  renderTopView();
+}, { passive: false });
+
+topSvg.addEventListener('pointerdown', (e) => {
+  const isPan = e.button === 1 || (e.button === 0 && e.altKey);
+  if (!isPan) return;
+  e.preventDefault();
+  topPanDrag = { startX: e.clientX, startY: e.clientY, startOffX: topVP.offX, startOffY: topVP.offY };
+  topSvg.setPointerCapture(e.pointerId);
+}, true);  // capture so it fires before other pointerdown listeners
+
+topSvg.addEventListener('pointermove', (e) => {
+  if (!topPanDrag) return;
+  const bbox = topSvg.getBoundingClientRect();
+  const vb   = topSvg.viewBox.baseVal;
+  const scaleX = vb.width  / Math.max(1, bbox.width);
+  const scaleY = vb.height / Math.max(1, bbox.height);
+  topVP.offX = topPanDrag.startOffX - (e.clientX - topPanDrag.startX) * scaleX;
+  topVP.offY = topPanDrag.startOffY - (e.clientY - topPanDrag.startY) * scaleY;
+  renderTopView();
+}, true);
+
+topSvg.addEventListener('pointerup',     () => { topPanDrag = null; }, true);
+topSvg.addEventListener('pointercancel', () => { topPanDrag = null; }, true);
+
+document.getElementById('top-reset').addEventListener('click', () => {
+  topVP.zoom = 1; topVP.offX = 0; topVP.offY = 0;
+  renderTopView();
+});
+
 // Click near beam curve to add peak.
 topSvg.addEventListener('click', (e) => {
   if (e.target.closest('[data-drag]')) return;
@@ -2576,6 +2643,51 @@ function endDrag(e) {
 }
 sideSvg.addEventListener('pointerup',     endDrag);
 sideSvg.addEventListener('pointercancel', endDrag);
+
+// ── Side-view zoom (wheel) and pan (middle-button or alt+left drag) ───────
+let sidePanDrag = null;
+sideSvg.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const dz = e.deltaY < 0 ? 1.18 : 1 / 1.18;
+  const { x: mx, y: my } = svgToLocal(sideSvg, e);
+  sideVP.minX = mx - (mx - sideVP.minX) / dz;
+  sideVP.minY = my - (my - sideVP.minY) / dz;
+  sideVP.W   /= dz;
+  sideVP.H   /= dz;
+  renderSideView();
+}, { passive: false });
+
+sideSvg.addEventListener('pointerdown', (e) => {
+  const isPan = e.button === 1 || (e.button === 0 && e.altKey);
+  if (!isPan) return;
+  e.preventDefault();
+  // Record screen start; scale is computed fresh each move so we can pan
+  // while the viewBox changes without accumulating floating-point drift.
+  sidePanDrag = {
+    screenX: e.clientX, screenY: e.clientY,
+    vpMinX: sideVP.minX, vpMinY: sideVP.minY,
+  };
+  sideSvg.setPointerCapture(e.pointerId);
+}, true);
+
+sideSvg.addEventListener('pointermove', (e) => {
+  if (!sidePanDrag) return;
+  // Convert pixel delta to SVG units using current viewport scale.
+  const bbox   = sideSvg.getBoundingClientRect();
+  const scaleX = sideVP.W / Math.max(1, bbox.width);
+  const scaleY = sideVP.H / Math.max(1, bbox.height);
+  sideVP.minX  = sidePanDrag.vpMinX - (e.clientX - sidePanDrag.screenX) * scaleX;
+  sideVP.minY  = sidePanDrag.vpMinY - (e.clientY - sidePanDrag.screenY) * scaleY;
+  renderSideView();
+}, true);
+
+sideSvg.addEventListener('pointerup',     () => { sidePanDrag = null; }, true);
+sideSvg.addEventListener('pointercancel', () => { sidePanDrag = null; }, true);
+
+document.getElementById('side-reset').addEventListener('click', () => {
+  Object.assign(sideVP, SIDE_VP_DEFAULT);
+  renderSideView();
+});
 
 // ── Side-view sheer profile editing ──────────────────────────────────────
 //
