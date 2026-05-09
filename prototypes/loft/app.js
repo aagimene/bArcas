@@ -47,6 +47,8 @@ const state = {
   // Loft mesh overlay in side view
   showLoftMesh: true,
   meshOpacity: 70,
+  spineRadius: 0.01,  // metres — translates half-meshes ±r in Y so the
+                      // keel/deck edge has a constant-width spine loop
 };
 
 // ── Rocker spine: cubic Bézier with explicit tangent handles ─────────────
@@ -831,11 +833,15 @@ function buildLoft(state) {
   const Mdense = denseRows.length;
 
   // Starboard mesh + port mirror — ruled quad strips between adjacent rows.
+  // spineRadius translates each half outward in Y so the keel/deck centerline
+  // edges land at ±r, giving a constant-width spine loop around the hull.
+  const r = Math.max(0, state.spineRadius || 0);
+
   const positions = [];
   const indices   = [];
   for (let i = 0; i < Mdense; i++)
     for (let k = 0; k < N; k++)
-      positions.push(denseRows[i][k].x, denseRows[i][k].z, denseRows[i][k].y);
+      positions.push(denseRows[i][k].x, denseRows[i][k].z, denseRows[i][k].y + r);
 
   for (let i = 0; i < Mdense - 1; i++) {
     for (let k = 0; k < N - 1; k++) {
@@ -849,7 +855,7 @@ function buildLoft(state) {
   const stbdVertCount = Mdense * N;
   for (let i = 0; i < Mdense; i++)
     for (let k = 0; k < N; k++)
-      positions.push(denseRows[i][k].x, denseRows[i][k].z, -denseRows[i][k].y);
+      positions.push(denseRows[i][k].x, denseRows[i][k].z, -(denseRows[i][k].y + r));
 
   for (let i = 0; i < Mdense - 1; i++) {
     for (let k = 0; k < N - 1; k++) {
@@ -2138,6 +2144,18 @@ xSubdivEl.addEventListener('change', () => {
   rebuildHull();
   renderSideView();
   renderTopView();
+});
+
+// Spine radius — translates half-meshes ±r in Y.
+const spineRadiusEl  = document.getElementById('spine-radius');
+const spineRadiusOut = document.getElementById('spine-r-out');
+const fmtR = (v) => (v * 1000).toFixed(0) + ' mm';
+spineRadiusOut.textContent = fmtR(state.spineRadius);
+spineRadiusEl.value = String(state.spineRadius);
+spineRadiusEl.addEventListener('input', () => {
+  state.spineRadius = parseFloat(spineRadiusEl.value);
+  spineRadiusOut.textContent = fmtR(state.spineRadius);
+  rebuildHull();
 });
 
 // Hull colors — outside is the material's .color (used on front-facing

@@ -17,7 +17,7 @@
 <body>
 
 <header>
-  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · light-orbit</span>
+  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · spine-radius</span>
   <h1>Loft</h1>
   <p class="subtitle">
     Design a 3D kayak hull from a curved spine (rocker) and a set of cross-sections, lofted live.
@@ -121,6 +121,9 @@
           <button type="button" id="remove-station" disabled title="Phase D">× remove</button>
         </div>
       </div>
+      <label>Spine radius <output id="spine-r-out"></output>
+        <input type="range" id="spine-radius" min="0" max="0.05" step="0.001" value="0.01">
+      </label>
       <div class="state-io">
         <button type="button" id="export-state">Export JSON</button>
         <label class="import-label">Import JSON<input type="file" id="import-state" accept=".json" style="display:none"></label>
