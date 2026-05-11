@@ -79,6 +79,24 @@ When editing or adding wiki pages:
 - Keep the tone factual and citation-friendly — the wiki is meant to be readable by an engineer starting cold.
 - Sentence-case headings; ATX (`#`) style; tables for comparative material (formats, users, candidate tech).
 
+## Prototype TODO maintenance
+
+The loft prototype has an active TODO file at
+[prototypes/loft/TODO.md](prototypes/loft/TODO.md).
+
+**Claude must:**
+- Write down **all user feedback** in the `Feedback / Unprioritized` section
+  immediately, even if the request is vague or not yet actionable.
+- **Never implement from feedback alone** — items move to `Pending` only after
+  they have been explicitly chunked, prioritized, and confirmed by the user.
+- Keep the `Done` table up to date: move completed items there with the
+  build tag at the time of completion.
+- Commit changes to TODO.md alongside any related code changes, or standalone
+  when feedback is captured without a code change.
+
+This applies to **this repo and any other repo** where a similar TODO file
+is established.
+
 ## When code work begins
 
 Once Phase 1 starts, this file should be updated with: build/test/lint commands, the actual project structure, the chosen tech stack (the wiki lists candidates — React + TypeScript frontend, OpenCASCADE via WASM for the geometry kernel, Python/FastAPI backend with possible Rust hot paths, MCP server for agents — but **none are committed**), and conventions for SDK packaging. Until then, this section is a placeholder.
