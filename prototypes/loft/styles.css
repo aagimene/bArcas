@@ -473,6 +473,15 @@ main {
 
 /* ── Footer ──────────────────────────────────────────────────── */
 
+.ref-details summary { font-size: 0.82rem; font-weight: 600; cursor: pointer; color: #334155; padding: 0.2rem 0; }
+.ref-group { display: flex; flex-direction: column; gap: 0.3rem; margin: 0.4rem 0 0.6rem; padding-left: 0.5rem; border-left: 2px solid #e2e8f0; }
+.ref-label { font-size: 0.74rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.1rem; }
+.ref-file-label { display: inline-block; padding: 0.2rem 0.5rem; font-size: 0.78rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 3px; cursor: pointer; }
+.ref-file-label input[type="file"] { display: none; }
+.ref-group label { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; color: #334155; }
+.ref-group label input[type="range"] { flex: 1; }
+.ref-group label input[type="number"] { width: 5rem; padding: 0.1rem 0.3rem; border: 1px solid #cbd5e1; border-radius: 3px; font-size: 0.78rem; }
+.ref-group button { align-self: flex-start; padding: 0.15rem 0.5rem; font-size: 0.74rem; border: 1px solid #fca5a5; color: #991b1b; background: #fff1f2; border-radius: 3px; cursor: pointer; }
 .state-io { display: flex; gap: 0.4rem; }
 .state-io button, .state-io .import-label {
   flex: 1; padding: 0.3rem 0; text-align: center; font-size: 0.78rem;

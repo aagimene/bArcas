@@ -47,8 +47,13 @@ const state = {
   // Loft mesh overlay in side view
   showLoftMesh: true,
   meshOpacity: 70,
-  spineRadius: 0.01,  // metres — translates half-meshes ±r in Y
-  spineSharpness: 0,  // 0 = flat chisel edge, 1 = fully rounded (future)
+  spineRadius: 0.01,
+  spineSharpness: 0,
+  // Reference images for tracing. Stored in world-space metres.
+  // sideRef: left edge at worldX, top edge at worldZ, dims in metres.
+  // topRef:  port edge at worldY (negative), stern edge at worldX, dims in metres.
+  sideRef: { url: null, worldX: -2.6, worldZ: 0.5, worldW: 5.2, worldH: 0.8, opacity: 0.3 },
+  topRef:  { url: null, worldX: -2.6, worldY: -0.4, worldW: 5.2, worldH: 0.8, opacity: 0.3 },
 };
 
 // ── Rocker spine: cubic Bézier with explicit tangent handles ─────────────
@@ -1431,6 +1436,24 @@ let TOP_SCALE_Y = 320;
 
 function renderTopView() {
   topSvg.innerHTML = '';
+  // Reference image (behind everything else).
+  if (state.topRef?.url) {
+    const r = state.topRef;
+    // Top view: SVG X = worldY * SCALE, SVG Y = -worldX * SCALE (bow at top).
+    // The image top-left in SVG: x = portEdge(worldY) * scale, y = -bowEdge(worldX) * scale
+    const imgEl = document.createElementNS(SVG_NS, 'image');
+    imgEl.setAttribute('href', r.url);
+    // SVG x = worldY (portEdge) * scale; worldY port edge = r.worldY (negative = port)
+    imgEl.setAttribute('x',      (r.worldY * TOP_SCALE_Y).toFixed(1));
+    // SVG y = -worldX (bowEdge) * scale; bow edge = r.worldX + r.worldW (stern+length=bow)
+    imgEl.setAttribute('y',      (-(r.worldX + r.worldW) * TOP_SCALE_X).toFixed(1));
+    imgEl.setAttribute('width',  (r.worldH * TOP_SCALE_Y).toFixed(1));   // beam maps to SVG X
+    imgEl.setAttribute('height', (r.worldW * TOP_SCALE_X).toFixed(1));   // length maps to SVG Y
+    imgEl.setAttribute('opacity', r.opacity);
+    imgEl.setAttribute('preserveAspectRatio', 'none');
+    imgEl.setAttribute('data-drag', 'ref-top');
+    topSvg.appendChild(imgEl);
+  }
   const xOfT = (wy) =>  wy * TOP_SCALE_Y;
   const yOfT = (wx) => -wx * TOP_SCALE_X;
   const p2s  = (wx, wy) => `${xOfT(wy).toFixed(2)},${yOfT(wx).toFixed(2)}`;
@@ -1597,6 +1620,20 @@ function renderTopView() {
 function renderSideView() {
   applySideViewBox();
   sideSvg.innerHTML = '';
+  // Reference image (behind everything else).
+  if (state.sideRef?.url) {
+    const r = state.sideRef;
+    const imgEl = document.createElementNS(SVG_NS, 'image');
+    imgEl.setAttribute('href', r.url);
+    imgEl.setAttribute('x',      (r.worldX * SIDE_SCALE_X).toFixed(1));
+    imgEl.setAttribute('y',      (-r.worldZ * SIDE_SCALE_Z).toFixed(1));
+    imgEl.setAttribute('width',  (r.worldW * SIDE_SCALE_X).toFixed(1));
+    imgEl.setAttribute('height', (r.worldH * SIDE_SCALE_Z).toFixed(1));
+    imgEl.setAttribute('opacity', r.opacity);
+    imgEl.setAttribute('preserveAspectRatio', 'none');
+    imgEl.setAttribute('data-drag', 'ref-side');
+    sideSvg.appendChild(imgEl);
+  }
   const xOf = (x) => x * SIDE_SCALE_X;
   const yOf = (z) => -z * SIDE_SCALE_Z;
 
@@ -2462,6 +2499,16 @@ topSvg.addEventListener('pointermove', (e) => {
   if (!topDrag) return;
   const { wx, wy } = svgToLocalTop(e);
   topDrag.moved = true;
+
+  if (topDrag.kind === 'ref-top') {
+    // wx = world Y (beam), wy = world X (longitudinal) — top view axes
+    if (!topDrag.startWX) { topDrag.startWX = wx; topDrag.startWY = wy; topDrag.origX = state.topRef.worldX; topDrag.origY = state.topRef.worldY; }
+    state.topRef.worldX = topDrag.origX + (wy - topDrag.startWY);
+    state.topRef.worldY = topDrag.origY + (wx - topDrag.startWX);
+    renderTopView();
+    return;
+  }
+
   const bl = state.beamLine;
   const sorted = [...bl.peaks].sort((a, b) => a.x - b.x);
   const peakIdx = (id) => bl.peaks.findIndex(p => p === sorted[+id]);
@@ -2745,9 +2792,17 @@ sideSvg.addEventListener('pointerdown', (e) => {
 sideSvg.addEventListener('pointermove', (e) => {
   if (!drag) return;
   const { x, y } = svgToLocal(sideSvg, e);
-  let wx = x / SIDE_SCALE_X;          // mutable — clamped against X-neighbours below
+  let wx = x / SIDE_SCALE_X;
   const wz = -y / SIDE_SCALE_Z;
   drag.moved = true;
+
+  if (drag.kind === 'ref-side') {
+    if (!drag.startWX) { drag.startWX = wx; drag.startWZ = wz; drag.origX = state.sideRef.worldX; drag.origZ = state.sideRef.worldZ; }
+    state.sideRef.worldX = drag.origX + (wx - drag.startWX);
+    state.sideRef.worldZ = drag.origZ + (wz - drag.startWZ);
+    renderSideView();
+    return;
+  }
 
   if (drag.kind.startsWith('sheer-bot-') || drag.kind.startsWith('sheer-top-')) {
     const isBot = drag.kind.startsWith('sheer-bot-');
@@ -2918,6 +2973,58 @@ document.getElementById('side-reset').addEventListener('click', () => {
 });
 
 // ── State export / import ─────────────────────────────────────────────────
+
+// ── Reference image controls ──────────────────────────────────────────────
+
+function wireRefImage(viewKey, fileId, opacityId, opacityOutId, wId, hId, xId, yId, clearId, renderFn) {
+  const refState = () => state[viewKey];
+  const fmtPct = v => Math.round(v * 100) + '%';
+
+  document.getElementById(fileId).addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      refState().url = ev.target.result;
+      renderFn();
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  });
+
+  const opEl = document.getElementById(opacityId);
+  const opOut = document.getElementById(opacityOutId);
+  opEl.addEventListener('input', () => {
+    refState().opacity = parseFloat(opEl.value);
+    opOut.textContent = fmtPct(refState().opacity);
+    renderFn();
+  });
+  opOut.textContent = fmtPct(refState().opacity);
+
+  document.getElementById(wId).addEventListener('input', (e) => { refState().worldW = parseFloat(e.target.value) || 0.1; renderFn(); });
+  document.getElementById(hId).addEventListener('input', (e) => { refState().worldH = parseFloat(e.target.value) || 0.1; renderFn(); });
+  document.getElementById(xId).addEventListener('input', (e) => { refState().worldX = parseFloat(e.target.value) || 0;   renderFn(); });
+  document.getElementById(yId).addEventListener('input', (e) => {
+    const k = viewKey === 'sideRef' ? 'worldZ' : 'worldY';
+    refState()[k] = parseFloat(e.target.value) || 0;
+    renderFn();
+  });
+
+  document.getElementById(clearId).addEventListener('click', () => {
+    refState().url = null;
+    renderFn();
+  });
+}
+
+wireRefImage('sideRef',
+  'side-ref-file', 'side-ref-opacity', 'side-ref-opacity-out',
+  'side-ref-w', 'side-ref-h', 'side-ref-x', 'side-ref-z',
+  'side-ref-clear', renderSideView);
+
+wireRefImage('topRef',
+  'top-ref-file', 'top-ref-opacity', 'top-ref-opacity-out',
+  'top-ref-w', 'top-ref-h', 'top-ref-x', 'top-ref-y',
+  'top-ref-clear', renderTopView);
 
 document.getElementById('export-state').addEventListener('click', () => {
   // Serialise the full state object (all hull geometry + UI settings).
