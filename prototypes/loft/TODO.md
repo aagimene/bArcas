@@ -62,12 +62,7 @@ Needs design before coding:
 - How does this interact with P2 (spine edge sharpness)?
 - Export: two separate shells or one mesh with seam metadata?
 
-### P4 — Default starting state looks like a kayak
-Save/load (JSON export/import) is done. The starting default shape is still
-lemon-like. Path: user shapes a kayak in the editor, exports JSON, hands it
-back for embedding as the hard-coded default state.
-
-Blocked on: user completes the modeling session and provides the JSON.
+### ~~P4 — Default starting state~~ → Done ✓ (see Done table)
 
 ### P5 — X-ordering constraint tuning
 The constraint (each control point's X cannot cross its immediate neighbour's X)
@@ -124,3 +119,4 @@ right, or does it need softening / adjustment after real modeling?
 | Reference image tracing (side + top views) | ref-image |
 | History log design note (deferred, not implemented) | loft-plan.md |
 | State: `spineSharpness` field added for future use | spine-closed |
+| Default starting state — user-modelled kayak shape from dumbstart.json | kayak-start |
