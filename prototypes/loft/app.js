@@ -47,8 +47,8 @@ const state = {
   // Loft mesh overlay in side view
   showLoftMesh: true,
   meshOpacity: 70,
-  spineRadius: 0.01,  // metres — translates half-meshes ±r in Y so the
-                      // keel/deck edge has a constant-width spine loop
+  spineRadius: 0.01,  // metres — translates half-meshes ±r in Y
+  spineSharpness: 0,  // 0 = flat chisel edge, 1 = fully rounded (future)
 };
 
 // ── Rocker spine: cubic Bézier with explicit tangent handles ─────────────
@@ -928,6 +928,31 @@ function buildLoft(state) {
       const c = stbdVertCount + (i + 1) * N + k, d = stbdVertCount + (i + 1) * N + k + 1;
       indices.push(a, b, c);
       indices.push(b, d, c);
+    }
+  }
+
+  // ── Spine closure strips ────────────────────────────────────────────────
+  // When spineRadius > 0 the two half-meshes have their centerline edges at
+  // y = +r (starboard) and y = −r (port). Connect them with a flat strip at
+  // the keel (k=0, n=0) and at the deck (k=N-1, n=1), closing the hull into
+  // a watertight shell. Re-uses existing vertex indices — no new positions.
+  //
+  // Keel strip winding → outward normal faces away from hull bottom (downward).
+  // Deck strip winding → outward normal faces away from hull deck (upward).
+  // spineSharpness (future): controls strip cross-section from flat→elliptical.
+  if (r > 0) {
+    for (let i = 0; i < Mdense - 1; i++) {
+      // Keel edge (k = 0)
+      const Ak = i * N,              Bk = stbdVertCount + i * N;
+      const Ck = (i + 1) * N,       Dk = stbdVertCount + (i + 1) * N;
+      indices.push(Ak, Bk, Dk);
+      indices.push(Ak, Dk, Ck);
+
+      // Deck edge (k = N-1)
+      const Ad = i * N + N - 1,              Bd = stbdVertCount + i * N + N - 1;
+      const Cd = (i + 1) * N + N - 1,        Dd = stbdVertCount + (i + 1) * N + N - 1;
+      indices.push(Ad, Dd, Bd);
+      indices.push(Ad, Cd, Dd);
     }
   }
 
