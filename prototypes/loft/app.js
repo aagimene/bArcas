@@ -2713,7 +2713,7 @@ sideSvg.addEventListener('pointerdown', (e) => {
 sideSvg.addEventListener('pointermove', (e) => {
   if (!drag) return;
   const { x, y } = svgToLocal(sideSvg, e);
-  const wx = x / SIDE_SCALE_X;
+  let wx = x / SIDE_SCALE_X;          // mutable — clamped against X-neighbours below
   const wz = -y / SIDE_SCALE_Z;
   drag.moved = true;
 
