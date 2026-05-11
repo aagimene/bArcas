@@ -1066,6 +1066,13 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, -0.05, 0);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
+// Standard CAD/3D-modelling mouse map: middle = pan, right = orbit, scroll = zoom.
+// Left is kept as orbit too so single-button mice still work.
+controls.mouseButtons = {
+  LEFT:   THREE.MOUSE.ROTATE,
+  MIDDLE: THREE.MOUSE.PAN,
+  RIGHT:  THREE.MOUSE.ROTATE,
+};
 
 // Reset view on double-click.
 renderer.domElement.addEventListener('dblclick', () => {
