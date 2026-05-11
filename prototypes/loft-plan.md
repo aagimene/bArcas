@@ -11,11 +11,16 @@ User-flagged items, not yet implemented. Listed here so we can pick them up with
    - **Sheer stations:** store `bottomLocal`, `topLocal`, `tipLocal`, `deckEndLocal` as (Δx, Δz) offsets from the sheer junction point `spineAt(sheer.startS).p`. When rocker moves, the junction moves with it, carrying all attached sheer geometry.
    - **Migration:** `reconcileStationDeckPts` computes locals from existing absolute values on first build (lazy init, backward-compatible). Drag handlers update locals immediately after a move.
    - **Result:** dragging the bow tip up curves the bow of the whole boat — keel, deck pts, and sheer profiles all rise together; any user-configured chord angle at each station is preserved.
-1. **Stern/bow sheer visual artifacts from legacy `startS` junction.**
-   Three related issues, all stemming from the old "start of sheer" junction point (`sheer.startS`) still being active in geometry even though its drag handle was removed:
-   - **Amber/yellow straight line** from the stern tip to the sheer junction (`startS`): this is the silhouette polygon auto-closing edge. The silhouette is built as `perimPts → bowKeel(rev) → rocker(rev) → sternKeel`, where `sternKeel` goes *tip→junction*. The polygon then auto-closes from *junction* back to *tip* (first perimPt), drawing a straight amber stroke. Fix: reverse `sternKeel` to go *junction→tip* so the auto-close is a zero-length edge. Same issue mirrored at bow.
-   - **Purple sheer keel line ends at `startS`**: expected given the current model, but becomes confusing now that `startS` is no longer user-visible. May resolve naturally once the junction concept is removed or simplified.
-   - **3D loft bottom dips below blue rocker line** in the sheer transition zone: the cubic spline densification between the sheer station bottomPt and the first interior station can overshoot (natural cubic splines are not monotone-preserving), creating a kink/dip in the mesh keel at the sheer→rocker boundary. The `startS` junction row is not an explicit base row, so the densification has no anchor there. Fix options: (a) add an explicit junction row to the base row list; (b) remove `startS` entirely and let the sheer region be defined purely by the bottomPts relative to the interior station positions.
+1. **Remove `startS` from geometry — sheer should connect directly to interior stations.**
+   All the visual artifacts (amber closing line in the side-view silhouette, purple sheer keel terminating at a phantom junction, and geometry kink at that junction in 3D) have one root cause: `sheer.startS` is still participating in the geometry even though its drag handle was removed. The junction point at `startS` is inserted into the sheer keel spline and the composite arc-length boundary, creating a ghost control point the user never touches.
+   
+   The correct model: sheer stations connect **directly** to the nearest interior (blue) station, with no intermediate junction. Applies to both bow and stern.
+
+   What needs to change:
+   - `sampledSheerKeel` currently builds `[junction@startS, ...bottomPts, tip]` — remove the junction; make it `[...bottomPts, tip]` only.
+   - `compositeLengths` uses `sheer.startS` to split the composite arc into stern-sheer / rocker / bow-sheer bands. Instead, define the sheer boundary as the first/last interior station's keel S-position (already on the rocker), so the junction is exactly where the interior rocker begins — no phantom point.
+   - `sampledTopSheer` similarly starts from `sheer.deckEndPt`; that endpoint should remain (it's still a user control point for the top edge), but the bottom-side junction goes away.
+   - The side-view silhouette `sternKeel` / `bowKeel` splits need to follow the updated boundaries so the polygon closes cleanly.
 
 2. **X-ordering constraint (resolved as of `let-wx`).** The bug across three earlier attempts (`x-ordering`, `x-bounds-fix`, `simple-bounds`) was not the constraint math — it was a `const wx` declaration in the side-view pointermove being reassigned by the clamp, throwing `TypeError: Assignment to constant variable` and silently aborting the handler. The fix was `const → let`. The neighbour-based bounds (each point clamped to its immediate ±X same-line neighbour) work as intended.
 
