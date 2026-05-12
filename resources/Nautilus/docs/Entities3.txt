@@ -1,0 +1,447 @@
+
+Geometric Entities for Pilot3D
+
+
+
+
+
+
+
+
+Copyright 2001 by New Wave Systems, Inc.
+All Rights Reserved
+
+
+
+
+Introduction on Geometric Entities for Pilot3D
+
+
+The best way to develop a good understanding of any Computer-Aided Design (CAD) program is by studying the geometric entities provided by the program and by studying the commands required to create a new entity, modify an existing entity, and to delete an entity.  Entities are basic geometric objects used to construct more complicated 2-dimensional (2D) and 3-dimensional (3D) objects.  Entities are also the lowest level of geometry that can be created and manipulated by the program.  This tutorial introduces you to the entities and the basic entity operations provided by the Pilot3D program.
+ 
+
+
+Pilot3D provides the following basic geometric entities:
+
+Points
+Lines
+Poly-lines
+NURB Curves
+Combo line/curves
+NURB Surfaces
+
+
+As you will see, Pilot3D combines entities 2 - 5 (lines, poly-lines, curves, combo curves) into one multi-purpose entity (generally called a ‘curve’).  This may seem more complicated than necessary, but it does simplify many tasks and makes it very easy to define complicated wire-frame objects.  You may find these ‘curve’ entities much easier to use than your general-purpose CAD program (referred to as GP-CAD in this tutorial)
+
+Aside:  You will notice that there can be a good size overlap in functionality between Pilot3D and your GP-CAD program (like AutoCAD LT).  Although Pilot3D specializes in surface shaping and smoothing, it can also do some tasks usually done in your GP-CAD program.  After some experience with the Pilot3D program, you may find there are many more tasks that can be performed in Pilot3D and then sent over to your GP-CAD program using a ‘DXF’ or ‘IGES’ geometry transfer protocol.
+
+
+In the following sections of this tutorial, keep in mind these questions:
+
+What are the basic geometric entities?
+How can the entities be used?
+How do I create a new entity?
+How do I manipulate an existing entity?
+How do I delete an entity?
+
+
+This tutorial assumes that you know how to start up the Pilot3D program and you know how to perform the basic operations of any Windows-type program.
+
+
+
+Point Entities
+
+
+Point entities define a single point in space.  They have no size, although they are drawn on the screen using some type of user-defined tick mark (the default is a small circle).  For the design process, point entities are mostly used to define target points where the model has to pass through. Since points do not have any size, they cannot be used to define surface geometry of a 3D model, but they can be used for a variety of other tasks.
+
+
+The following section discusses the process of defining, modifying, and deleting point entities.
+
+
+
+
+
+
+
+This screen image shows an empty Pilot3D screen with 5 point entities entered at arbitrary locations.  These points were defined as follows:
+
+Pull down the Point menu commands and select the “Add Point” command.  This will turn on the add-point command and make it the “current” command (see the command label shown in the lower right corner of the screen).
+To add a point entity, position the cursor anywhere and “click” the left mouse button.
+Each time you “click” the left mouse button, a new point entity is created at the current cursor location.
+The “Add Point” command will stay current until you select another command.  Always look in the lower right corner of the window to see the current command.
+
+Later on, you will see how to set a point to a specific [X,Y,Z] position, if necessary.
+ 
+
+
+
+
+All geometric entities have properties or attributes associated with them, such as point type and entity color.  This screen shows an attribute dialog box for one particular point entity.  It was displayed as follows:
+
+Pull down the Point set of commands and select the “Point Attributes” command.  Nothing will happen except that this becomes the “current” command and the label “Point Data” is displayed in the lower right corner of the window.
+Move the cursor near one of the point entities and “click” the left mouse button.
+A dialog box, like the one shown above, will appear.
+The attribute fields are:
+
+Point Name  -  The point’s name, created by the program.  You can change it, if you wish.
+Point Type  - The type of symbol to use to mark the point’s position.
+Overlay  -  The overlay layer of the entity.  (Currently not used by the program)
+Color - Color to use for the point’s marker.
+Draw Point - Option to turn off the display of the entity.  Use the Display All Points command to turn 
+on the display of the point.
+Edit Point - This allows you to display the point, but to disable the ability to change its position.
+Symmetrical – If this box is checked, the program automatically mirrors the point about the Y = 0 centerplane.  This is useful for objects that are symmetrical about a plane.  You must orient the model to use Y = 0 as the symmetry plane.
+
+
+
+
+
+
+
+Once you have some points defined, you need to be able to modify their positions.  The commands to do this are located in the “Edit” pull-down menu, as shown above.  Right now, you will find out how to use the Move Point and Set Point commands.  The Move, Rotate, and Scale Entity commands will be discussed in another tutorial.  Keep in mind that the Move Point and the Set Point commands will be used for points defining all entity types (lines, curves, surfaces, etc.).
+
+
+
+
+
+This screen shows how all of the point entities were moved by eye to form a straight line.  This was done as follows:
+
+Pull down the “Edit” set of commands and select the Move Point command.  You will notice that the “Move Point” label is displayed in the lower right corner, since this is now the current command.
+Place the cursor near one of the points you wish to move.
+Press and hold down the left mouse button.
+Drag the point (mouse) to the desired new position.
+Release the left mouse button.
+
+The dragged point will now be located in its new position.  You can now repeat the process with the same or any other point on any type of entity.
+
+If you want the point to be located in some specific position, see the Set Point command explained below.
+
+
+
+
+
+This screen shows the position dialog box for a particular point.  It was displayed as follows:
+
+“Right Click” on the point.
+
+Or, you could follow these steps:
+
+Pull down the “Edit” set of commands and select the “Set Point” command. You will notice that the “Set Pnt” label is displayed in the lower right corner, since this is now the current command.
+Place the cursor near one of the points you wish to set.
+“Click” the left mouse button.
+A dialog box, like the one above, will be displayed.
+Make your changes and select OK, or Cancel to ignore.  Many times this command is used just to determine the coordinates of a point.
+
+
+You can change any or all of the coordinate values.  Note that sometimes the full number will not appear in the visible field.  This will require you to place the cursor in the field and press the “Home” and “End” keys.
+
+Curve Entities
+
+
+A curve entity for Pilot3D defines a connected series of points in space.  This entity type includes lines, polylines, NURB curves, and combo curves, which are combinations of lines, polylines, and NURB curves.  This entity type can be used for a variety of purposes where there is no need for full surface definitions.  One use of these entities is to define key curves and lines of the 3D model in its very early design phase.  Later, surfaces can be constructed to fit the previously defined curve entities.  For Pilot3D, curve entities can be attached to surfaces to define trimmed portions or to define surface trace lines.  Although entities of this sort are always found in CAD programs, you may find it much easier to perform certain tasks in Pilot3D and then transfer the resultant geometry to the CAD program.
+
+The very unique aspect of this entity is that it covers both polylines and NURB curves in one entity type, which makes it extremely easy to adapt to a variety of curve and line design problems.  [Note that Pilot3D does not create these polyline segments using multiple knots or vertex points.]
+
+
+The following section discusses the process of defining, modifying, and deleting curve entities.
+
+
+
+
+
+This first screen for the curve entity type shows the main set of commands for creating and manipulating these entities.  In particular, it shows the sub-menu listing the two methods for defining this type of entity.  As you will see, this entity starts off as a polyline or a NURB curve, but can be easily changed back and forth and can be converted to a combination polyline/NURB curve.
+
+
+The next screen shows and discusses how these entities are created.
+
+
+
+
+
+
+This screen shows several examples of both polylines and NURB curves.  They were created as follows:
+
+Select either the Add Curve or the Add Polyline command.  Notice that the command becomes the current command and the proper label appears in the lower right.
+To enter a polyline or a curve, “click” the left mouse button for each point along the entity.  You will notice that the program dynamically shows you the shape of the entity as you are creating it.
+After you “click”-enter the last point of the entity, terminate the entity by pressing the right mouse button.  The position of the cursor when you press the right mouse button is not added to the entity.
+If only two points are entered for a polyline or a NURB curve, the entity defaults to a simple line.
+You can continue to enter polylines or NURB curves as long as the associated command label appears in the lower right.  (It will change if you select a different command.)
+
+
+
+
+
+
+This screen shows the results of moving various points that define each of the entities.  To do this, you need to first select the “Move Point” command under the “Edit” set of pull-down commands.  You can then move as many points as you wish without re-selecting the “Move Point” command, as follows:
+
+Select the “Move Point” command under the “Edit” set of pull-down commands.
+Position the cursor near the point you wish to move.  (Actually, the Move Point command works for any point on any entity type: point, curve, polyline, and surface.)
+Press down and hold the left mouse button.
+While holding down the left mouse button, “drag” the point to a new position.
+When the point is placed in its new position, release the left mouse button.
+The polyline or NURB curve will dynamically change to reflect the new point position.
+
+You can continue this Move Point process until you select another command.  Always look in the lower right corner to see the current command.
+
+
+
+
+
+
+This screen shows the results of inserting points into two of the entities: one polyline and one NURB curve.  Inserting points into this entity type is done with the “Insert Pnt” command in the Curve pull-down menu.  The process is as follows:
+
+Select the “Insert Pnt” command in the “Curve” pull-down menu.  Notice that the command becomes the current command and the proper label appears in the lower right.
+Position the cursor anywhere along any of the polyline or curve entities.
+“Click” the left mouse button to insert the point.  If you are not “close enough” to the entity, the program will tell you to re-position the cursor and try again.
+If you are close enough (you actually do not have to be very close), the program will erase and redraw the entity showing an edit (‘+’) mark at the new position.
+You can continue this insertion process as long as the insert command remains current.
+
+
+
+NOTICE:  The points are inserted without affecting the position of the other points that define the entity, although the shape of a NURB curve may change slightly.  The screen above shows the results of inserting two points and the results of moving those two points.
+
+One thing not discussed here is the deletion of polyline/curve points.  This is done with the “Delete Pnt” command under the Curve or Point set of pull-down commands.  
+
+
+
+
+
+
+
+
+So far, you have seen how to create, modify, and insert into polylines and curves.  To see how polylines and curves are variations of the same entity type, you need to use the “Knuckle Pnt” toggle command in the Curve set of pull-down menus.  As shown in the screen above, the two points which were previously inserted into the entities have been converted from knuckle point to “smooth” point (or vice-versa).  A “knuckle” point is a point along a curve (or polyline) which makes a hard turn.  This knuckle point “toggle” command allows you to pick any interior polyline or curve point and convert it from smooth to knuckle point or from knuckle point to smooth point.  If the point is smooth, it will convert it to a knuckle point.  If the point is a knuckle point, this command will convert it to a smooth point.  The process works as follows:
+
+Select the “Knuckle Pnt” command from the “Curve” set of pull-down menus.  Notice that the command becomes the current command and the proper label appears in the lower right.
+Position the cursor near the point you wish to convert (toggle) and “click” the left mouse button.  The entity will be immediately redrawn with the converted curve shape.
+You can repeat this command immediately for any other curve/polyline interior point.
+
+As you can see, this command allows you to convert a polyline to a curve (or vice-versa) very quickly.  Many logical design entities are combinations of polylines and curves.  You would start by entering a rough polyline shape and then use the Knuckle Pnt command to refine the polyline shape with the appropriate curve sections.  Most all general-purpose CAD programs do not allow you to combine polyline and curve entities together as one entity.  They force you to create them separately and to join them as required - a tedious process.  Our entity type allows you to quickly toggle between the polyline and curve shapes, or some combination of each.
+
+
+
+
+
+
+All geometric entities have properties or attributes associated with them, such as point type and entity color.  This screen shows an attribute dialog box for one particular curve entity.  It was displayed as follows:
+
+Pull down the Curve set of commands and select the “Curve Attributes” command.  Nothing will happen except that this becomes the “current” command and the label “Curve Data” is displayed in the lower right corner of the window.
+Move the cursor near one of the curve entities and “click” the left mouse button (anywhere along the curve).
+A dialog box, like the one shown above, will appear..
+The attribute fields are:
+Curve Name  -  The curve’s name, created by the program.  You can change it, if you wish.
+Curve Point Type  - The type of symbol to use to mark the curve point’s position.
+Segments Between - The number of straight line segments used to display the curve between each set 	of defining points.
+Overlay  -  The overlay layer of the entity.  (Currently not used by the program)
+Color - Color to use for the curve.
+Draw Curve - Option to turn off the display of the entity.  Use the Draw All Curves command to turn 	on the display of the curve.
+Edit Curve - This allows you to display the curve, but to disable the ability to change its position.
+Symmetrical – If this box is checked, the program automatically mirrors the curve about the Y = 0 centerplane.  This is useful for objects that are symmetrical about a plane.  You must orient the model to use Y = 0 as the symmetry plane.
+
+
+
+Surface Entities
+
+
+
+A surface entity for Pilot3D is defined by a rectangular B-spline or NURB (Non-Uniform, Rational, B-spline) surface.  Each surface consists of a rectangular grid of “rows” and “columns” which can be stretched or distorted into various 3D surface shapes.  These rows and columns are spread over and define the complete surface, but they are generally not any particular planar cut line.  This is the biggest change that you will have to deal with in going from designing by hand to designing by computer.  
+
+The advantage of using these NURB surfaces is that you do not have to deal with matching up the lines in the 3 views.  With the 3D NURB surfaces, the model is guaranteed to be completely defined with all three views matching up exactly.  If you change the surface shape in one view, the change is automatically reflected in all of the other views.  You can even dynamically alter the shape of the model in the 3D view to see this effect in action.
+
+Another difficulty associated with NURB surfaces is their rectangular nature and their four hard corner points.  As you stretch a NURB surface into a more non-rectangular shape to fit a particular model, you will begin to have problems in shaping and fairing the surface.  To minimize this effect, the most important rules regarding NURB surfaces are to break a model into multiple, rectangular regions (one NURB surface for each region) and to space the rows and columns evenly over the surface.  There is often more than one way to model an object using NURB surfaces. After a little bit of practice, you will quickly learn the idiosyncrasies of designing an object with NURB surfaces.
+
+Another thing to keep in mind is that the model is completely and uniquely defined by NURB surfaces, and each surface is defined by its grid of rows and columns.  The number of rows and columns you use for each surface depends on the detailed shape of the object.  When you are designing the object with these NURB surfaces, do not worry about any derived planar intersection shape locations.  These plane cut locations can be changed at any time and do not affect the shape of the model (since the surface is defined by the rows and columns).  Think of it like a word processor document.  You type in the words without regard to the format of the output.  After you are done, you can format the document and print it out.  With this 3D design technique, you design the object using these NURB rows and columns and then later on decide where you want your planar intersection cuts.  The program can then automatically cut and display a complete cut lines drawing for the model.  The cut lines are often referred to as “derived” plane cuts, since they are determined from the NURB surfaces rather than define the surface.
+
+
+The following section discusses the process of defining, modifying, and deleting surface entities.
+
+
+
+
+
+
+
+This screen shows the “Surf” set of pull-down menus for creating, modifying, and deleting NURB surface entities.  The commands with the small horizontal “carets” indicate that those commands have a list of sub-commands associated with them.  This tutorial will cover only the basic set of commands to create and modify surfaces.
+
+
+
+
+
+
+
+
+This screen shows the results of creating a new surface with the “Add Surf” command.  When you add a new surface, it always starts out as a simple, flat, two row and two column surface defined by its four corner points.  This surface was added as follows:
+
+Select the “Add Surf” command from the Surf set of pull-down menus.  This will become the current command and its label will appear in the lower right corner of the window.  The program will also prompt you to:  “Pick point for row 1, column 1”.  (See the status line on the screen above.)
+The points need to be entered in a back-and-forth fashion, rather than in a circular (clock-wise or counter clock-wise) fashion.  For the above surface, the first corner point was defined by positioning the cursor at the lower right corner of the surface and “clicking” the left mouse button.  A box  appears at that point.
+The program will then prompt you with:  “Pick point for row 1, column 2”.  You will then position the cursor at the lower left corner of the surface and “click” the left mouse button.  A box will appear at that point.
+The program will then prompt you to enter points for row 2, column 1, and for row 2, column 2.  When the fourth (last) corner point has been entered, the program will draw lines connecting all four corners of the surface, which spans the area between the two rows and two columns.  That area is now completely defined by a NURB surface.
+
+What is the difference between rows and columns?  Nothing.  You do not have to be concerned about whether you have the rows going horizontally or vertically on the screen.  In fact, you will notice that many of the Surf commands seem to apply to both rows and columns at the same time, such as the “Add Row/Col” command.  This means that you do not have to keep track of which lines are the rows and which lines are the columns: the command work for either type of line.  In Pilot3D, there is no distinction made between rows and columns.  Internally, in the program, there is a difference between the usage of rows and columns, but all of that is hidden from the user.  However, for practical purposes and for discussion sake, we often refer to surface lines that flow horizontally as rows, whether or not they really are rows.  Likewise, for columns, we often refer to vertically oriented lines as columns.  This usage may not be completely accurate, but it does make it easier to distinguish between the lines when talking over the phone.
+
+The Add Surf command adds a very simple surface to your model.  To modify and add to its shape, follow the directions given below.
+
+
+
+
+
+
+
+This screen shows the results of moving the four corner points of the simple surface.  This is done with the “Move Point” command in the “Edit” set of pull-down menus.  Remember that the Move Point command work on any point for any entity type.  Note that the surface is completely defined by the intersections of the two rows and two columns.  This means that the shape of the surface can only be controlled by repositioning these points (defined by small boxes).  The next screen will show you how to add more rows and columns to increase the flexibility and control of the surface.
+
+To move points on the surface, follow these instructions.
+
+Select the “Move Point” command in the “Edit” set of pull-down menus.  The Move Point command becomes the current command and its label is displayed in the lower right of the window.
+Position the cursor near the point you wish to move.
+Press down of the left mouse button to select the point of the surface.
+Drag (keeping the button held down) the point to the new position and release the button.  (This process works the same for any entity type.)
+Repeat this process for the same or any other point on any entity.
+
+
+For detailed surface shaping or fairing, see the tutorial on curve and surface fairing.
+
+
+
+
+
+
+
+
+If a surface is limited to only two rows and two columns, its use as a modeling tool would be non-existent.  The only way to increase the flexibility and shape of a surface is to add additional rows and columns to the surface.  This process adds more defining points located at the intersections of the rows and columns.  The screen above shows the previous surface with one additional “column” added to it.  (Remember that we really don’t care which is a row and which is a column.  We will generally refer to horizontal lines as rows and vertical lines as columns.)  To add a column like this, follow these steps:
+
+Select the “Add Row/Col - Add Row/Col Angle” sub-command in the “Surf” set of commands.  This command will become the current command and will show its label in the lower right of the screen.
+Position the cursor somewhere along either of the two horizontal rows approximately where you want the new column to be inserted.
+“Click” the left mouse button to insert the new column.  The program will insert the column at the point where you position the cursor and click the button.  The process of inserting the column may slightly change the shape of the surface.
+
+
+Remember that one of the basic rules of NURB surfaces is to evenly (as best as possible) space the rows and columns.  Notice that for the above example, the new column was inserted half-way between two other columns.  In general, it is best if you always insert a new column (or row) half-way between two other columns (or rows).  This may force you to have more rows and columns than you think you need, but the extra evenly-spaced rows and columns will help greatly when it comes to doing detailed surface shaping and fairing.
+
+
+
+
+
+
+
+To add a row, follow these steps:
+(Remember that we will refer to horizontally oriented surface lines as rows and vertically oriented surface lines as columns.  This may not be the case internally, but for the sake of clarity, we will use this terminology.)
+
+Select the “Add Row/Col - Add Row/Col Angle” sub-command in the “Surf” set of commands.  This command will become the current command and will show its label in the lower right of the screen.
+Position the cursor somewhere along any of the three vertical columns approximately where you want the new row to be inserted.
+“Click” the left mouse button to insert the new row.  The program will insert the row at the point where you position the cursor and click the button.  The process of inserting the row may slightly change the shape of the surface.
+
+
+Remember that one of the basic rules of NURB surfaces is to evenly (as best as possible) space the rows and columns.  Notice that for the above example, the new row was inserted half-way between two other rows.  In general, it is best if you always insert a new column (or row) half-way between two other columns (or rows).  This may force you to have more rows and columns than you think you need, but the extra evenly-spaced rows and columns will help greatly when it comes to doing detailed surface shaping and fairing.
+
+By adding rows and columns to the NURB surface, you increase the flexibility and number of shape control points, which appear at the intersections of all rows and columns.  This is the only way to add additional shape to NURB surfaces.  Unfortunately, there is no way to add control points to a surface without adding a full row or a full column.
+
+
+
+
+
+
+
+This screen shows what happens when you move a column point to create a surface with very uneven spacing of columns.  This is move is perfectly legal, but causes the surface to have an unwanted bump in the upper right portion of the surface.  Try moving points on a simple NURB surface to see how the shape behaves for different numbers of rows and columns, and for different positions of the defining points.
+
+
+
+
+
+
+
+
+This screen shows a surface with 5 rows and 5 columns that are all fairly evenly spaced.  This makes it easier to control and fair the shape of the surface.  One rule-of-thumb is to always add rows or columns by inserting them half way between two existing rows or columns.  This will always guarantee that the spacing between two consecutive rows or two consecutive columns is no more than a 2 to 1 ratio of spacing.  Another way of saying this is that if the distance between two adjacent rows (or columns) is one foot, then the next row (or column) in sequence should not be more that 2 feet further along or less than ½ foot away.  This 2 to 1 ratio is maintained if you always insert the row (or column) half way between two existing rows (or columns).
+
+
+Compare this spacing to the positioning of “ducks” along a mechanical spline or batten.  In flat areas of the spline you space the ducks widely, but in the tighter curvature areas you start to position the ducks much more closely using a gradual change in spacing of the ducks.  Try to compare the spacing of the rows and columns to the spacing of the ducks on a batten.  Although you are allowed to place the rows and columns where ever you like, you will notice some very odd surface shapes occur with uneven spacing.  Try an example and see what happens.
+
+An important guideline is to define the surface using as few rows and columns as possible.  If you shape and fair the surface as you add rows or columns, you will most likely be able to achieve this goal.   For NURB surfaces, do not add a bunch of rows and columns and then try to shape and fair the surface.  Shape and fair as you go.
+
+
+
+
+
+
+
+
+This screen shows the same surface after several rows and columns have been deleted.  Just as you can insert any number of rows and columns, you can likewise delete any row or column.  The only case where this is not true is if you have a surface with just two rows and two columns, which is the smallest surface you can have.  At this point you would have to delete the whole surface using the Delete Surf command, rather than to delete one row or one column.
+
+To delete rows or columns, follow these steps:
+
+Select the “Del Row/Col” command from the “Surf” pull-down menu.  This command will then become the current command and its label will be displayed in the lower right corner of the window.
+Position the cursor along the row or column you wish to delete.  Make sure that you position the cursor away from one of the row/column intersection points because the program might delete a row instead of a column (or vice-versa).
+“Click” the left mouse button to delete the row or column.  The surface will be redrawn without that row or column and the surface might change shape slightly.
+You can continue to delete other rows or columns as long as the “Del Row/Col” command stays current.
+
+Remember that any change to any entity can be undone using the UNDO command in the Edit pull-down command set or by picking the counter-clockwise arrow on the tool bar.
+
+
+
+
+
+
+Another important surface command is the ability to split one large surface into two smaller surfaces along a selected row or column.  This command is equivalent to the “Knuckle Pnt” command for curves.  When you pick a row or column to split the surface, the program converts that row or column to a “knuckle” line, thereby creating two separate surface entities from one larger surface entity.  As seen in the screen above, the middle “row” from the surface in the previous screen has been converted to a knuckle line, which you might think of as a chine line.  You can now add rows and columns to each surface.  The row was converted as follows:
+
+Select the “Cvt Row/Col Knuckle” command from the Surf pull-down set of commands.  This becomes the current command and will remain in effect until you select another command.
+Move the cursor to some position along the row or column you wish to convert.  Avoid positions near defining point intersections since the program will have difficulty in determining whether you are selecting a row or a column to convert.
+“Click” the left mouse button to select the curve.  The program will immediately erase and redraw the surface as two new subsurfaces.
+You can continue this process as long as this command remains current.
+
+
+Note that this command can also be used to join two surfaces into one, larger surface.  The command acts as a toggle, which means that:
+
+If you pick an internal row or column of a surface, the program will split it into two subsurfaces, joined at a common knuckle line (this becomes a “bonded edge”).
+If you pick a common knuckle line (bonded edge) between two surfaces, the program will join the two surfaces as one and the knuckle line will disappear.
+
+
+This command performs these two opposite operations.  To see how this works, use this same command to pick an internal row to split the surface into two and then immediately pick the same row (now a surface edge) to convert the two surfaces back to the single, original surface.  
+
+This is an odd, but extremely powerful command.  It allows you to create and modify knuckled or polysurfaces quickly and easily.  
+
+
+
+
+
+
+
+All geometric entities have properties or attributes associated with them, such as point type and entity color.  This screen shows an attribute dialog box for one particular surface entity.  It was displayed as follows:
+
+Pull down the Surf set of commands and select the “Surface Attributes” command.  Nothing will happen except that this becomes the “current” command and the label “Surf Data” is displayed in the lower right corner of the window.
+Move the cursor near a row or column of one of the surface entities and “click” the left mouse button. 
+A dialog box, like the one shown above, will appear..
+The attribute fields are:
+Surface Name  -  The surface’s name, created by the program.  You can change it, if you wish.
+Surface Point Type  - The type of symbol to use to mark the curve point’s position.
+Row Segments - The number of straight line segments used to display each row between each set 	of defining columns.
+Row Divisions - The number of “sub-row divisions” to display on the surface between each set of 	defining rows.
+Col Segments - The number of straight line segments used to display each row between each set 	of defining rows.
+Col Divisions - The number of straight line segments used to display each row between each set 	of defining columns.
+Overlay  -  The overlay layer of the entity.  (Currently not used by the program)
+Color - Color to use for the surface.
+Draw Surface - Option to turn off the display of the entity.  Use the Draw All Surfaces command to 	turn on the display of the surface.
+Edit Surface - This allows you to display the surface, but to disable the ability to edit its shape.
+Trimmed Edit Pts ON – If this box is checked, the program displays all of the trimmed-off edit points and lets you modify their positions.
+No Interior Rows/Cols - When checked, this means that the program will draw only the outside 	edges of the surface (first and last rows and columns).  This is useful if you wish to turn on the plane cuts for the surface and remove the display of the interior rows and columns.
+Surface Intersection – If this box is checked, the program will automatically calculate and display all surface-surface intersections with other surfaces that have this check box selected – including self-intersections.
+Symmetrical – If this box is checked, the program automatically mirrors the surface about the Y = 0 centerplane.  This is useful for objects that are symmetrical about a plane.  You must orient the model to use Y = 0 as the symmetry plane.
+
+
+
+Conclusion
+
+
+This concludes a fairly brief discussion of the entities used in Pilot3D.  You are now prepared to tackle many design tasks using the program. Although it did not go into the process of creating common shapes using NURB surfaces, the background information presented in this tutorial will be very important to your design tasks.  Please refer to some of the other tutorials for details on applying these techniques to creating specific shapes.
+
+See also the tutorial on detailed shaping and fairing of NURB curves and surfaces.  The use of the “K”-curves and Gaussian curvature display was not covered here, but their understanding is critical in being able to fair a curve or surface to within construction tolerances.  Since a computer screen is small compared to the size of the traditional lines drawing, it is impossible to fair a curve or surface by eye.  Due to the small screen sizes and the “jagged” resolutions, you need to have some way to magnify the bumps and wiggles of curves and surfaces.  This is done in Pilot3D using the “K”-curves and the Gaussian curvature color mapping.  You can then use the Ooch Point and the Move% commands to perform the detailed fairing of the surfaces.
+
+
+Geometric Entities
+
+Geometric Entities
+
+PAGE  2
+
+
+PAGE  3
+
+
+
+

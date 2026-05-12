@@ -1,0 +1,398 @@
+
+Overview of ProSurf, ProBasic, and ProChine
+
+
+Copyright 1996 – 2001, by New Wave Systems, Inc.
+All Rights Reserved
+
+
+
+
+
+
+Contents
+
+OVERVIEW TUTORIAL for ProSurf, ProBasic and ProChine
+
+
+If you wish to follow all of the steps of this tutorial, you should start at the beginning and follow along straight to the end.  Otherwise, feel free to jump in and read any topic in any order.
+
+
+
+Start ProSurf, ProBasic, or ProChine 
+Screen Layout 
+Basic Views 
+Basic Hull Editing 
+Geometric Entities 
+Surface Row/Col 
+Hydrostatic Calculations 
+Lines Drawings 
+Plate Development 
+10. Conclusion 
+
+
+
+
+
+Start ProSurf, ProBasic, or ProChine
+
+
+Now that you have installed your copy of the program, this tutorial will give you a quick introduction to its layout and basic functions.  It assumes that you know about Windows capabilities like pull-down menus, dialog boxes, scroll bars, double clicking, and window manipulation.  If you have used other Windows programs, you should not have any problem with this program.  Even if your Windows experience has been limited, give this tutorial a try.  The best way to learn about computers and programs is to jump right in.
+
+
+This program is called multi-view and multi-document program.  This means that you can open up windows to show multiple views of a boat (multi-view) and open up windows to view and edit different boats (multi-document).  At first, however, you should start with displaying just one view of one boat at a time.  That is what this tutorial does.
+
+-------------------------------------------------------------------------------------------------------------------------------
+Tutorial Notes:
+
+1.  Whenever the tutorial uses the “o” symbol, you should perform the step described.
+
+2.  To refer to a particular pull-down menu choice, the tutorial will list its location as a series of hyphenated command strings.  For example, to perform the hydrostatic calculations, you need to select the “Calcs” pull-down menu, followed by the “Hydro” selection, followed by the “Hydro Calcs” selection.  To shorten this up for the tutorial, it will simply say: “Select the “Calcs-Hydro-Hydro Input + Calc” menu choice.
+-------------------------------------------------------------------------------------------------------------------------------
+
+
+Starting the Program
+
+To start up the program, follow these steps:
+
+o  Open up the program group (Start-Program) containing the icons for these programs and tutorials.
+
+o  Double click on the ProSurf, ProBasic, or ProChine icon.  If you are using the Demo version of the program, then the icon will be labeled ProDemo.  (By the way, the icon is a picture of a pilot schooner.)
+
+
+The program starts by displaying its framework program window and 4 empty view windows inside.  This is called the “4 view mode” showing the Profile (Front or Back), Plan (Top or Bottom), Section (Right or Left), and 3D views of the hull.  For this tutorial, all but one view window is closed to allow the largest display area for the boat. To eliminate a view, just left-click on the ‘X’ in the upper right corner of the view window.  If you want, you can have the program automatically start up in a “1 view mode” by changing a setting in the program’s “.ini” file.  Changing the INI file is discussed elsewhere.
+
+Instead of creating a boat from scratch, this tutorial uses an existing boat provided to you with the program.  Another tutorial discusses the process of creating a boat from scratch.  Follow these steps to open the “power23” boat.
+
+o  Close the current (empty) view window that was opened when the program started up.  This is done with the File-Close command.  
+
+This leaves just the program framework window open.  Notice that there are fewer menu choices located at the top of the window.  This will change when we open the existing “power23” boat file using the following steps.
+
+o  Under the “File” pull-down menu, select the “Open” command.  Remember that the tutorial will normally refer to this as the “File-Open” command.
+
+The program will display the standard Windows-type of file selection dialog box.  Notice that the filename field contains the pre-defined file extension “.srf”.  This means that the program stores all of its information about the boat in a file (using a name that you select), with the filename extension “.srf”.
+
+o  To open the “power23” data file, type in “power23.srf” or double click on that filename.  Note that the default file directory that is used by the program is the directory you used when you installed the program.  This is where the sample boat data files are located.  If you wish, you may put your own boat data files in some other directory.  You might want to brush up on how Windows organizes files into folders (directories and sub-directories).  You should also look up information on the “default” or “current” file directory, the file “pathname”, and the “Path” command.  With Windows, it is very easy to misplace files unless you pay attention to the current directory (pathname) in the file open and close dialog boxes.
+
+Once you have selected this boat data file, the profile view of the boat will be displayed in a new view window of the main program framework window.
+
+o  Maximize this window to use the entire program framework window.  (For this tutorial, we will display only one boat view at a time – not the 4 view mode.)
+
+o  Maximize the display of the boat in the window by selecting the “View-Resize to Fit” command.  (The “Resize to Fit” command is located in the “View” pull-down menu.)
+
+So far, there has been a lot of talk and very little progress.  For the experienced Windows user, however, these steps should be very familiar.
+
+
+The next section discusses the layout and organization of the program.
+
+
+
+
+Screen Layout
+
+
+This section discusses the layout and organization of the program.  Let’s start by looking at a “snapshot” of the screen as you see it now.  Please not that for this tutorial, only one view of the boat is shown.
+
+
+
+
+
+This view shows the profile view of “power23” maximized to use the entire program framework window.  The screen consists of the following areas:
+
+1.  The Program Framework Window  -  This is the overall window for the program, which is displayed on the screen for the entire duration of the program.  It contains the outside border of the window, the title of the program, the list of pull-down menus, and the toolbar.
+
+2.  The Boat-View Window  -  This is the window (inside of the program framework window) that contains one view of one boat.  This window can be maximized or resized using standard Windows techniques.  When you start up the program, a “New” (empty) boat view window is displayed for you to create a new boat or to start entering geometric entities.  For this tutorial, you have closed this initial boat-view window and have opened up one for the profile view of the “power23” hull.
+
+3.  The Pull-Down Menu List  -  This is the horizontal list of command “groups” for the program.  It consists of the group commands: File, View, Edit, and so forth.  All of the commands for the program are grouped under all of these pull-down menu choices according to function.  For example, all file manipulation and printing commands are located under the “File” pull-down menu, and all of the viewing-type of commands fall under the “View” pull-down command.  Although there are some standard command locations for all Windows programs, the location and grouping of most commands are determined by the program developers.  Although we tried to group the commands logically, you may find yourself searching around looking for a command or wondering what a command does.  If this is the case, the main help file for the program will give you an answer very quickly, since it is organized by pull-down menu command list.
+
+4.  The Toolbar  -  This is the horizontal line of icons located just below the pull-down menu list.  These icons are shortcuts for commonly used commands located in one of the pull-down menu lists.  Some of these icons are common for all Windows programs, such as the “Save” icon and the “Print” icon.  Most of the icons, however, relate to functions associated with viewing and manipulating a boat.
+
+
+
+
+
+5.  The Status Line  -  This is the text line at the bottom of the Program Framework window that is used for command prompts, warnings, and error messages.  Since some commands require multiple steps to complete, this line will contain prompts to let you know what the program expects.  For example, when you select the “Surf-Add Surf” command, the program requires you to “pick” the four corners of a simple, starting surface.  The program will prompt you to pick each of these corner points with a message on this status line.
+
+6.  The Current Cursor Location  -  This [X,Y,Z] coordinate value is located towards the right of the status line and is updated continuously when you move the cursor in the boat-view window.  These values will refer to the full-size model coordinates of the boat.
+
+[Aside:  The default coordinate system for the boat is:  ‘X’ is positive going towards the stern (station),  ‘Y’ is positive going in the beam direction (half-breadth), and ‘Z’ is positive going upwards (height).  ‘X’ is zero (usually) at the bow or the forward end of the waterline), ‘Y’ is zero on the centerline, and ‘Z’ is zero on the baseline, which is usually at or below the canoe-body of the hull.]
+
+7.  The Current Mode Command  -  This is located at the far right of the status line.  It displays the menu command that is currently in effect.  For many commands, after you select it, its label is placed in the Current Mode field and that command is current until another mode command is selected.  What this means is that you do not have to reselect most commands each time you wish to perform the operation.  For example, once you have picked the “Edit-Move Point” command and it has become “current”, you do not need to reselect the menu choice to move the point, you just pick any point and drag its position.  To change the current mode command, just select another menu command.  Note that some commands do not change the current command mode.  An example of this is any of the View commands.  This limitation allows you to change between views without having to re-establish the current mode command.
+
+8.  Scrollbars  -  If you “Zoom-In” on a portion of the currently displayed boat so that only a portion of the hull is displayed, the program will display scrollbars of the side and/or bottom of the boat-view window.  These scrollbars allow you to move or “pan” the view left, right, up, or down.
+
+
+
+Basic Views
+
+When you open a new boat file (as you have done in this tutorial), the first or default boat view that is displayed is the profile (back) view of the boat.  The principal views of that can be displayed are “View-Profile Right” (back), “View-Plan Right” (bottom), “View-Section Right” (right), and “View-3D View”.  Each of these views has shortcut icons on the toolbar.  The profile view is the icon with the side view of the boat, the plan view is the icon with the top view of the boat, the section view is the icon with the front view of the boat, and the 3D view is the icon with the letters “3D”.  Try each of these views to see what you get.
+
+o  Pick the profile (back) view icon button.
+
+o  Pick the plan (bottom) view icon button.
+
+o  Pick the body plan (right) view icon button.
+
+o  Pick the 3D, 3D view icon.  Note that the boat is now displayed in an angled, 3D view.  Now pick the icons to the right of the 3D icon to see what happens to the view of the boat.  The clockwise ‘Z’ icon rotates the boat clockwise about the ‘Z’ axis (by 15 degrees) and the counter-clockwise ‘Z’ rotates the boat in the opposite direction.  The “UP” icon moves the bow up and the DN (down) icon moves the bow down.  For complete control over 3D animation, display, and rotation, see the “View-View 3D” commands and the full help manual.
+
+
+If you wish, you may open many view windows of the same boat at one time.  This is done with the “Window-New Window” command.  You can “tile”, “cascade”, or arrange the multiple windows any way you see fit.  As mentioned before, this tutorial will stick with the display of only one boat-view at a time.
+
+
+These are not the only views that can be put into their own windows.  For example, you can display the “Lines View” in a separate window.  You can also display the hydrostatic calculations in their own window so that you can see how every change in hull shape affects the displacement of the boat.  You can even put a plate development in its own view window.
+
+
+
+
+
+Basic Hull Editing
+
+The most common command for changing the shape of the boat is the “Edit-Move Point” command.  (Remember that “Edit” refers to the major pull-down command and “Move Point” refers to the actual command.)  The Move Point command is used to perform the overall rough shaping of the boat.  As you move part of the hull in any one view, the hull is guaranteed to match up in all other views.  This is a function of the Non-Uniform Rational B-spline (NURB) surfaces being used.  The NURB surfaces guarantee a unique surface with curvature continuity in all directions, but it doesn’t guarantee fairness.  There is no mathematical definition of fairness; it is only a human perception.  Move Point is used for rough shaping, and the “Edit-Move Point%”, “Edit-OOCH Point”, and curvature curve commands allow you to perform the final fairing, even on a small computer screen.  Fairing and fairness are discussed in another tutorial on curve and surface fairing.
+
+The best way to learn about moving points is to try out the Move Point command.
+
+o  Start by displaying the profile view of the boat
+
+o  Select the “Edit-Move Point” command.  Notice that the Current Command field at the far right in the Status Line says “Move Pnt”.  This means that you can continue to pick and drag points until you select another command.  You do NOT have to select the Move Point command each time you wish to move a point.
+
+o  Position the cursor near one of the sheer points near amidships.
+
+o  Press down and hold the left mouse button.
+
+o  Move the mouse vertically with the button depressed.  The boat will dynamically move on the screen.  This is called dragging the point.  If you can’t seem to move the point in the longitudinal direction, this means that the point is fixed to remain in that transverse section.  This is an option that can be turned on or off, but will be discussed later.
+
+o  When you release the left mouse button, the boat is redrawn and left in that new position.  This process of dragging hull points can be repeated indefinitely.
+
+
+After moving the sheer point up in the profile view, you should see something like this:
+
+
+
+
+
+This is an exaggerated example just to demonstrate a point.  Normally, your moves will be much less.
+
+
+o  Switch to the section view (body plan view) to verify that the hull changed consistently in that view.  This view is shown below.
+
+
+
+
+
+
+
+Undo Command
+
+For ALL hull editing changes there is an “Edit-Undo” command, which allows you to undo up to 25 of the last hull editing changes.  Therefore, do not hesitate to try out the different commands, because you can always undo your mistakes.  The toolbar symbol for this command is the counter-clockwise circle-arrow.  You can also use the “View-Undo List” command to display a list of the last 10 hull editing changes.
+
+o  Pick the undo command to restore the sheer curve point to its original position.
+
+
+
+Geometric Entities
+
+
+Although you may use just NURB surfaces to design a boat, ProSurf, ProBasic, and ProChine behave more like general-purpose CAD programs, since they provide point, line, polyline, curve, and surface geometric entities.  There is now a greater overlap between our program and other CAD programs.
+
+The following picture shows a sample of each type of entity.
+
+
+
+
+
+
+
+Point Entities
+
+At the top of the picture are point entities, shown by the small circles.  One of their uses can be as “tick marks” which identify target shape positions for the boat.
+
+
+Curve Entities
+
+A curve entity, as defined in this program, can be a line, a polyline, a NURB curve, or a combination of the two.  Examples of these entities are shown in the picture above.  The “Curve-Add-Add Polyline” command allows you to add a line or polyline to the model.  Each point of the polyline is entered by clicking the left mouse button, and the polyline is terminated by clicking the right mouse button.  The “Curve-Add-Add Curve” command allows you to add a NURB curve to the model.  Each point of the curve is entered by clicking the left mouse button and the curve is terminated by clicking the right mouse button.
+
+These “curves” can be used for anything you like.  For example, you might use the surfaces to define a 3D sailboat hull, but use the curve entities to define a 2D outboard profile of the rig and sails in profile view.  Of course, you could define the rig and sails using 3D surfaces, but this extra work may not be necessary.
+
+A combination polyline and NURB curve entity is obtained by using the “Curve-Knuckle Pnt” command.  This command acts like a toggle switch that converts any interior polyline or curve point to or from a hard knuckle point.  Therefore, any point of a polyline or curve can be converted to or from a knuckle point.  This might seem odd since most CAD programs define separate curve and polyline entities.  This technique, however, is more powerful, since there is no difference between the two entities and you do not have to break and join different entities together.  You can start by roughing out a shape using a polyline and then convert portions into curves and then use the curvature curve indicator to fair the curve.  For many CAD tasks, it might be easier to start in ProBasic or ProSurf, and then convert the entities over to your general-purpose CAD program.
+
+
+
+Surface Entities
+
+The surface entity is a NURB (Non-Uniform Rational B-spline) surface defined by a number of points at the intersections of the surface rows and columns.  These defining points are displayed using small squares.  The NURB surface defines a complete, unique, rectangular-like, smooth, membrane, drawn using a number of rows and columns.  Surfaces are added by defining their four corner points (with only two rows and two columns).  You can then add in more rows or columns to add more flexibility and control points.  The example in the picture above shows a surface with three rows and five columns.
+
+
+The program uses controlling points that lie ON the NURB surface.  (The same technique is used for NURB curves.).  NURBS and B-splines are officially defined, however, using “vertex” points which do NOT lie on the surface, except for the four corner points.  The original intent for B-splines was to provide a way to create a smooth surface that was “influenced” by these controlling vertices.  By not requiring that the surface pass through the points, B-splines can create a relatively smooth surface even though the vertex points aren’t perfectly positioned.  The thought was that this was perfect for interactive design of free-form surfaces on a small computer screen.  In practice, however, many users disliked the fact that the controlling vertices were floating off in space and that many programs connected the vertex points with a mesh that obscured the surface itself.  In addition, most designers wanted very accurate shape control over the surface, because not just any smoothly curved shape will do.  This accuracy requires direct control of the surface and some form of surface fairing technique.
+
+When we started providing B-spline surface modeling in 1985, we decided to allow the user to control the shape of the B-spline surfaces using points on the surface.  This had not been done by any other commercial CAD program in any industry.  By eliminating the display of the vertex points, we cleaned up the display of the boat and gave the user more precise shape control over the boat, including the ability to input offsets and automatically fit surfaces to those offsets.  Since we provided curvature curve display and control to use for fairing, the user had the best of both worlds:  accurate shape control and detailed fairing.
+
+With this new Windows version of the program, you can select from three ways to control the surface shape using points.  You can use the traditional defining vertex points (floating off in space), or you can use either of two methods for defining points on the surface.  Remember that we use industry standard NURB curves and surfaces.  For every vertex point, there is an associated point on the surface.  When you move the point on the surface, we calculate backwards to determine the associated move in the defining vertices.
+
+We continue to follow the latest research papers on NURB surface techniques, plus add our own shaping and fairing techniques that are not found in any other CAD program.
+
+
+Surface Row/Col
+
+A NURB surface is defined by a rectangular-like grid of control points organized into a number of “rows” and “columns”.  The defining points are located at the intersections of the rows and columns and can be located anywhere in space.  For shaping and fairing purposes, however, you need to try and maintain a “nice” spacing for the rows and columns.  When you use the “Surf-Add Surf” command, you are prompted to enter the initial four corner points of a two row and two column surface.  Since you can control the shape of the surface only at the defining points, you need to add in more rows or columns to the surface for more complicated shapes.
+
+You cannot add individual defining points to a surface.  You can only add complete rows or columns.  This is an absolute requirement for all (rectangular) B-spline surfaces.  As you might expect, if you want more control points to better define a small portion of a surface, you need to add rows and columns which extend over the entire length and width of the surface.  This means that you then have to deal with the extra shape control of these added rows and columns at the other end of the surface.  Ugh!
+
+[Aside:  Just because you see a lot of pretty, shaded pictures of 3D CAD models doesn’t mean that it was easy to create the 3D model, or that there weren’t a lot of fundamental, mathematical limitations imposed on the user.  (Remember:  rendering and shading is simple; 3D modeling is difficult.)  There is nothing more flexible than a pencil, a piece of paper, and the human mind.  As soon as you start using the computer for design, you are forced to adapt to the limitations and idiosyncrasies of the program’s underlying mathematics and the program’s user interface.  Of course, you will get a lot in return: speed, automatic matching of stations, waterlines, and buttocks, full calculations, full-size templates, etc.]
+
+
+The next step of this tutorial is to add a (row/col) to the “power23” model.  Follow these steps:
+
+o  Display the profile view of the hull.
+
+o  Select the “Surf-Add Row/Col-Add Row/Col VertFix” command.  (this just turns on the command)
+
+o  Position the cursor near the point shown by the arrow in the picture below
+
+
+
+
+
+o  Click the left mouse button.  The program will add a new (row/col) at that location in all of the surfaces.  If something went wrong, you can always use the undo command and start over.
+
+The program finds the row or col position closest to the picked point and inserts a row/col at that location.  Notice that the arrow position is located approximately half way between the two surrounding row/cols.  It is always a good idea to add in row/cols halfway between any two existing row/cols.  This may mean that you will end up with more row/cols than you think you need, but in the end, it will make the shaping and fairing process easier.  The smoothness of a NURB surface is greatly influenced by the spacing of the rows and columns.  The more unevenly spaced they are, the more bumps and wiggles you will have in the surface.  In general, you should keep the consecutive spacing of the rows and columns to a ratio of less than 2 to 1.
+
+Also note that the program inserted the row/col as being fixed in a vertical plane for the profile view.  This means that none of the points can move back and forth in the ‘X’ direction (longitudinally) and it means the added row/col is equivalent to a station at that point.  Normally, B-spline points can be located anywhere in space, but for practical purposes and for ease of use, we suggest that these row/cols be fixed in the transverse plane.  This can’t always be done, however, since up near the bow (and for some boats, near the stern), the row/cols must begin to “angle over” to make a transition in shape from amidships to the bow (or to the stern).  If you do not make this transition, then the boat will be more difficult to shape and fair.  Remember that for B-spline surfaces, the rows and columns should be spaced as evenly as possible.
+
+
+The overall rules for adding row/cols can be summed up as follows:
+
+1.  Evenly space (as much as possible) all rows and columns.  Do this by inserting all new row/cols halfway between two existing row/cols.  It will be easier to shape and fair the boat.  You may end up with extra row/cols, but the boat will be smoother.
+
+2.  Add all new row/col in the amidships area as vertically fixed in profile view.  These are the row/cols that will be equivalent to stations.  (You can always “un-fix” the row/cols later, if you wish.)
+
+3.  Near the ends of the boat, add the new row/cols as “angled” (not fixed) (this is the “Surf-Add Row/Col-Add Row/Col Angle” command), so that you can begin to make the transition from the vertically fixed “station-row/cols” to the angled row/col at the bow and stern.
+
+4.  Always reshape the boat (with the “Edit-Move Point” command after adding 1-3 new row/cols.  If you add in a lot of rows and columns first, before shaping the boat, then the shaping task will become more tedious.  You can wait until the end to do the detailed fairing (with the Move Point% and Ooch Point commands), but use the “Edit-Move Point” command along the way.
+
+So far you have seen how to add more shape to a boat (Add Row/Col) and you have seen how to change the shape of a boat (Move Point).  These are the basic tools for modeling your boat.
+
+
+Hydrostatic Calculations
+
+At any time during the shaping and fairing of the boat, you can calculate its hydrostatic and stability information.  You can even display the calculation results in their own window along side the display of the boat.  The program will immediately recalculate the results after each change in hull shape.  This is important if you wish to reach a target displacement for a fixed draft.  This tutorial, however, will only use one window for the hull and the hydrostatic results.
+
+
+To obtain the hydrostatics for the “power23” boat in this tutorial, follow these steps:
+
+
+o  Select the “Calcs-Hydro-Hydro Input + Calc” command to show the following dialog box
+
+
+
+
+
+Although this dialog box provides many input fields to control the calculations, all of the fields have default values.  The calculations can be done for any upright or heeled condition and can even search for the draft that matches a target displacement.  This tutorial won’t go into all of the options (see the program manual), so, to accept the default input values, do the following.
+
+[Note:  These calculations are done using the “PlaneCut” stations (YZ Cuts) that you define along the length of the hull.  You must make sure that you define enough stations (15 – 20) before doing these calculations. ]
+
+
+
+
+o  Select the OK button. The results of the hydrostatic calculation will be displayed.  Use the scroll bar to move through the results.  A part of the results should look like this:
+
+
+
+
+
+
+
+If you enter a heel angle into the Hydro input dialog box, the program will first perform the calculation in the upright condition to determine the longitudinal center of buoyancy (LCB) (which is the same as the boat’s longitudinal center of gravity (LCG)).  The program will heel the boat and then sink and trim the boat to match the upright condition’s values for displacement and LCB.
+
+
+
+Lines Drawings
+
+As with the hydrostatic results, you can display either of two different formats for the complete lines drawing: “Overlay” and “Separate”.  Overlay displays the body plan on top of the profile view of the boat, with the centerline of the body plan located at amidships in the profile view.  Separate displays the body plan to the right of the profile view.  The Overlay format maximizes the size of the profile and plan views of the boat and the Separate format allows you to see a clean view of the sections.
+
+To obtain a display of the power23 vessel, follow these commands:
+
+o  Select the View-Lines View: command to see a “Overlay” display the lines.  An Overlay lines drawing of the power23 vessel is shown below:
+
+
+
+
+
+This view can also be displayed in its own window, if desired.
+
+To display the Separate format of the lines drawing view, use the following steps:
+
+o  Select the “PlaneCuts-Cut Options” command to display a dialog box.  Select the Separate option for the Lines Display Format menu.
+
+o  Select the OK input button.  The program will erase the Overlay lines view and display the Separate lines drawing.
+
+Plate Development
+
+For ease of construction, many boats are designed so that their plates can be cut out of sheet material (plywood, aluminum, steel, etc.) and wrapped onto the frames without introducing compound curvature or twist (at least, not too much twist!).  Plate “development” implies that there is no (or very little) twist introduced into the plate.  Plate “expansion” implies that the plate has quite a bit of compound curvature and must be subdivided into smaller pieces along butts and seams.  This program currently performs plate development and plate expansion. 
+
+To see how the development process works, follow these steps:
+
+
+o  Display the profile view of the boat.
+
+o  Select the “Develop-Develop Plate” command
+
+o  Position the cursor in the middle of one of the vertical row/cols on the top-side plate.
+
+o  Click the left mouse button to pick the surface you wish to develop.  The program will display a dialog box that will guide the plate layout process.  Accept all of the default values and select the OK button.  The program will display the plate marked with all of the frames, as shown below:
+
+
+
+
+
+
+This program will try to develop (layout) any surface consisting of any number of rows and columns.    If you look at the power23 hull’s top-side plate in section view, however, you will notice that this surface is not perfectly developable.  This raises a very important point.  Although a surface may not be perfectly developable, it may be buildable, depending on the material used, the size of the plate, and the thickness of the plate.  This program can give you some feedback on whether the plate is close to developable or far from developable (using the Gaussian curvature display - “Surf-K_Patch-Kpat All” command - developable plates are colored dark blue), but as the shape changes away from perfect developability, this program cannot tell you the exact point where it becomes un-buildable.  In addition, as the surface of the hull becomes less developable, the accuracy of the plate layout shape is reduced.  When you have to stretch and twist the material to get it to fit the frames, the material changes shape slightly.  To accurately determine the pre-stretched shape of the plate would be very difficult.  We usually tell builders that as the plate becomes more non-developable, add additional scrap material along a couple of the edges before cutting out the plate.  This means that you may have to scribe and recut the plate, but this is preferable to finding out that the plate is 1/2 inch too short.
+
+The best advice we can give for boats with not-quite-developable plates is to plot out the frames and plates at a small scale and try building a model out of stiff cardboard.  This can also be important the first few times you use the program to build your confidence that the program works correctly.  Keep in mind that if you cut out the frames and plates exactly, you must be very careful in setting up and aligning the frames.  If something is slightly out of position, you will cause a chain-reaction of errors and find that the plates might not fit in the ends.  This leads us to the following recommendations:
+
+1.  Use “enough” frames along the length of the boat, especially in high curvature areas.  If you don’t, then the plate will wrap onto the frames incorrectly and you may not get it all to fit.
+
+2.  Make very sure that the frames are positioned correctly and are not canted or twisted.  If even one frame is slightly incorrect, you may cause a progression of errors.
+
+3.  Use the frame markings on the plate layout to align the plate to the frames.  If something doesn’t quite fit, stop and try to find out why.  Many builders are used to cut-and-fit techniques, but the whole idea of plotting these templates is to avoid this extra work.  If, however, you know that the plate is not quite developable, you may wish to add additional scrap material along a couple of the plate edges.
+
+4.  If in doubt, plot scale drawings of the frames and plates and build a model out of cardboard.
+
+5.  To develop a feel for how close to perfect developability you have to be, use the program to define a boat that you have already built out of sheet material.  Then look at the colors displayed by the Gaussian curvature display.  Dark blue indicates almost perfect developability.  As the colors change to light blue, to green, all the way to red, it indicates more and more twist in the plate.  If you know that this boat was buildable, you can see what curvature colors are acceptable.  Then when you design a new boat, you can use those colors as a guideline.
+
+
+Plate development is not an exact process, since there is no well-defined point where a plate goes from being buildable to being non-buildable.  Of course, you can use the program to create a perfectly developable boat, but you may not like that hull shape.  We have found that many designers and builders prefer a little bit of twist in the plates.  It allows for a much wider range of hull shapes.
+
+
+
+
+Conclusion
+
+This has been a quick tutorial overview of ProSurf, ProBasic, and ProChine.  It was designed to be your first look at what the programs can do.  From here, you can go on to the other tutorials (as they become available), or simply start using the program.  (Remember the UNDO command.)
+
+Notes:
+
+1.  Look in the program manual for details on how each program command works.
+
+2.  Look in the tutorials to see short, task-oriented examples for you to get up-to-speed quickly.
+
+3. Read the articles for overviews of the area of computer-aided boat design.
+
+If you have any questions about the program or about computer-aided boat design, do not hesitate to call, we will be glad to spend time on the phone talking with you.
+
+Tel:  (401) 423-1852
+Fax:  (401)423-1810
+
+
+
+Overview
+
+Overview
+
+PAGE  2
+
+
+PAGE  3
+
+
+
+

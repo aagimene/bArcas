@@ -1,0 +1,284 @@
+Creating a New Boat Shape Tutorial
+
+
+
+Copyright 1996-2001, by New Wave Systems, Inc.
+All Rights Reserved
+
+
+
+
+
+
+Contents
+
+
+This tutorial describes the different ways you can create or input an initial boat or ship shape for the ProSurf, ProBasic, and ProChine programs.
+
+
+Using the Create Boat Command
+Entering a Table of Offsets From a Text File
+Reading a Station Definition File (SHCP, GHS, NWS, OFF)
+Setting Offsets in ProChine, ProBasic, or ProSurf
+Digitizing an Existing Hull Body Plan
+Reading Stations or Shape Data From Other CAD Programs
+Scanning in Drawings
+Fitting Surfaces to Station Curves
+
+
+
+Tutorial Note 1:  All menu commands are identified in this manual as a series of labels separated by a dash (-).  For example, the “Create Boat” command under the “File” pull-down menu will be identified as File-Create Boat.
+
+
+Tutorial Note 2:  The steps described in this tutorial fall under the category of reverse engineering.  Please see the general article and examples on reverse engineering to get a better understanding of the difficulties of this process.
+
+
+Tutorial Note 3:  The recommended way to organize your hull is to have the X-axis start at the front of the boat and increase towards the stern.  This means that each station would have a fixed X-location.  The half-breadths (width measurement) would be the Y-axis values and the centerplane of the boat would be at Y = 0.  The heights (vertical measurement) would be the Z-axis values, measured from a convenient baseline (Z = 0.).  Don’t worry too much about the coordinate system for the input data.  You can always rotate or flip the stations around after they are read into ProSurf.  Also, note that ProSurf only requires you to define one half of a symmetrical boat.  It has the ability to automatically mirror the shape of the hull around the centerplane (Y = 0).
+
+
+1. Using the Create Boat Command
+
+
+To create a starting boat shape from its target principal dimensions, you need to use the File-Create Boat command.  This will display the dialog box shown below.
+
+
+
+
+
+As you can see, the program fills in the values for a 23 foot chine hull boat.  There is no purpose for these initial values, except that you can just press the “OK” button and try out the program without having to come up with your own design values.
+
+
+If you wish to enter your own values, the meaning of each field is given below.  Remember that these are target values and do not have to be exact.  You can (and probably will) depart from these values during the hull shaping and fairing process.
+
+
+Length on Waterline (LWL)  -  This is the desired waterline length of the vessel.  The forward end of the waterline is set at X=0.  (You can shift the boat around later if you wish.)
+
+Bow Overhang  -  This is the distance from the forward end of the waterline to the tip of the bow.
+
+Stern Overhang  -  This is the distance from the aft end of the waterline to the aft end of the boat.
+
+Distance to Amidships  -  This is the distance from the forward end of the waterline to the position where you want the amidships position to be located.  This distance is usually set to one-half the waterline distance.  Some users also set it near the maximum beam of the boat.
+
+Draft  -  This is the distance from the bottom of the boat (baseline) to the waterline (at amidships, with zero trim).  The bottom of the boat starts out on the baseline (Z=0), but does not have to remain there.  This value must be smaller than any of the sheer height values entered below.
+
+Sheer Height at Bow  -  This is the distance (height) from the baseline to the tip of the bow.
+
+Sheer at Amidships  -  This is the distance (height) from the baseline to the sheer at the amidships location.
+
+Sheer Height at Stern  -  This is the distance (height) from the baseline to the sheer at the stern of the boat.
+
+Beam at the Bow  -  This is the beam or half-breadth of the boat at the bow point.  If this value is non-zero, then you are defining a pram-type of bow.
+
+Beam at Amidships  -  This is the beam or half-breadth of the boat at the amidships point.
+
+Beam at Stern  -  This is the beam or half-breadth of the boat at the stern of the boat.
+
+Hull Type  -  This is a menu choice between “Round Bilge” and “Chine Hull”.  Don’t worry about this value too much, since you can very easily add or delete chines at a later time.
+
+
+The origin of the coordinate system is placed at the forward end of the waterline (X=0), at the centerline (Y=0), and at the bottom of the hull (Z=0).  Positive X points toward the stern, positive Y points to starboard, and positive Z point upwards [a right-handed coordinate system].  This is the most common orientation of a hull in the coordinate system.  Therefore, to keep the boat pointing to the right on the screen, [Didn’t you know that boats can only go to the right?] the X-axis must be pointing to the left [backwards] for the profile and plan views.  You can, however, flip this around whenever you want.
+
+
+NOTE:  Do not worry too much about selecting the exact numbers to put into these fields, since the goal is to create a simple starting shape for the boat.  Afterwards, as you rough out the overall shape of the boat, the hull shape can be changed dramatically.  This command simply saves you time in creating a rough starting shape.  In the worst case, you can Undo the Create Boat command or simply start over.
+
+
+
+If you do select the default dialog box values, you will see the boat shown below:
+
+
+
+This is the profile or front view of the boat.
+
+
+
+
+This is the plan or bottom view of the boat.
+
+
+
+
+This is the “body plan”, section, or right view of the boat.  Note that the stations aft of amidships are flipped over and displayed on the left of the centerline.  The exact location of the “flip” can be changed in the Options-Display Options dialog box.
+
+
+
+
+
+This is the body plan view of the same boat if you had selected “Round Bilge” for the hull type.  This round bilge can also be obtained by applying the Surf-Cvt Row/Col Knuckle command to the chine.
+
+
+The Create Boat command creates a simple boat with only three columns: one at the bow, one at amidships, and one at the stern.  See the tutorial on the “Entities”:  points, lines, polylines, NURB curves, and NURB surfaces for more details.
+
+
+
+Note 1:  Remember that this command is only performed one time.  Once you have created the initial shape of the boat, any other refinement of the hull can be done with other commands in the program.  Refer to the tutorial on shaping and fairing and the hull design tutorial.
+
+Note 2:  The hull that gets created here is very simple.  This was done on purpose.  The program could have added more rows and columns to create a more realistic design, but you might end up having to delete them to get the shape that you want.  This command gives you a simple starting shape that you can quickly refine to your desired shape.
+
+
+2.  Entering a Table of Offsets From a Text File
+
+
+If you have a full table of offsets (more than 25 offsets or so) for an existing boat/ship that you wish to match up exactly using the ProSurf package, you should follow the steps below.  If you have less that 25 offsets, it may be faster to use the File-Create Boat command and the Edit-Set Point command method described in the section on “Setting Offsets in ProChine, ProBasic, or ProSurf”.
+
+The general process described here involves typing in all offsets for each station into a text file or spreadsheet program.  This data is then read into ProSurf as a collection of station curves spaced along the hull.  These stations are then fit with one or more NURB surfaces using the Skin/Loft command.  The reason that these methods are available only for ProSurf is that ProBasic and ProChine do not include the Skin/Loft Surface command that allows you to fit a surface through a set of curves.
+
+
+
+Step 1 – Type the offsets into a text file or a spreadsheet
+
+For text files, there are two approaches. The first is to use a text editor [like NotePad] to type in the offset information using the TXT file PLINE3D or COMBO3D polyline or curve input format.  This is a simple format that is described in the File-Data File Input-TXT Input command write-up.  Note that you can read the station offsets into ProSurf as a polyline and then use one command to convert the polyline to a curve.  Don’t feel that you have to define the station as a curve (COMBO3D) in the text file.
+
+If you want to enter the offsets into a spreadsheet [some people prefer this to editing a text file], then you must enter the data using the same layout format as the TXT file input format for PLINE3D or COMBO3D.  You would enter one number per spreadsheet grid location.  The reason for this is that you have to output the offsets in the spreadsheet to a TEXT file so that it can be read into ProSurf using the TXT file input command.  This will probably require you to edit and “fix-up” the TXT file output from the spreadsheet before you read it into ProSurf.
+
+
+
+Step 2 – Read the text file station data into ProSurf
+
+Use the File-Data File Input-TXT File Input command to read in your station definitions.   Once done, you should see these separate, independent stations in ProSurf.  Look at them in all views and rotate them around to see if they look OK.  You may have to rotate or flip them around, since ProSurf requires that the length of the boat be oriented along the X-axis, the starboard side of the boat is the positive Y-axis, and the height of the boat is in the positive Z-axis.
+
+If some of the data points were typed-in wrong, it might be easier to check them inside of ProSurf, rather than to go back to the original text or spreadsheet file.  To display or change the [X, Y, Z] coordinate value of a point entity, or a point on a curve or surface, all you have to do is “right-click” on that point to display a dialog box containing the point’s position.  If it is incorrect, you can change it right there.
+
+
+Once the raw station data has been read into ProSurf, follow the steps described in the section on fitting surfaces to station curves.
+
+
+
+3.  Reading a Station Definition file (SHCP, GHS, NWS, OFF)
+
+
+ProSurf has the ability to read several industry standard station offset files.  These files are SHCP, for the US Navy’s Ships’ Hull Characteristic Program, GHS, for the General Hydrostatics program by Creative Systems, NWS, for the Damaged Stability System by New Wave Systems, and the OFF format used for US Sailing’s VPP sailboat analysis program.  If you have a text file containing the station definition of a hull in one of these formats, you can use ProSurf to read the station curve shapes directly into the program.
+
+These input commands are located in the File-Data File Input set of commands.
+
+
+Once the raw station data has been read into ProSurf, follow the steps described in the section on fitting surfaces to station curves.
+
+
+
+
+4.  Setting Offsets in ProChine, ProBasic, or ProSurf
+
+
+ProChine and ProBasic dos not come with the Skin/Loft command that allows you to automatically fit surfaces to a set of curves.   You can, however, create a boat and use a variety of methods for forcing the hull shape to match pre-defined offset points.  This technique is also useful for ProSurf users if they do not have “too many” offsets to match.  
+
+Either way, matching an existing shape on the computer can be a tedious and non-exact process.  Imagine giving a table of offsets to five different loftsmen.  Each would come up with a different full-size lofted shape.  Presumably, the shapes would be close, but there is still a lot of room for interpretation in any table of offsets.
+
+The reason that ProChine, ProBasic, and ProSurf can match up existing hulls relatively easily is that these programs use B-spline (NURB) surfaces where the defining points lie directly on the surface.  That way, if you want a defining hull surface point to have a specific offset value, you can use the Edit-Set Point command [you can also “right-click” on the edit point] to force it to that position.  You can also use the Point-Add Point command (along with the Edit-Set Point command) to set target points or tick marks through which the hull must pass.  Then with the dynamic hull dragging capability (Edit-Move Point), you can drag the hull surface to pass through the “tick point”.
+
+
+This overall hull matching process follows these steps:
+
+A.  Use the File-Create Boat command to create a starting shape boat that has the same principal dimensions as the target boat.  This simple hull shape has only three columns: one at the bow, one at amidships, and one at the stern.  We now want to rough up the hull shape by adding-in additional columns at each of the defining stations in the table of offsets.  If the offsets that you have are scattered all over the hull, then you may wish to add the offsets as point entities and use them only as target points (tick marks).
+
+B.  Use the Surf-Add Row/Col-Add Row/Col Angle command to add in columns approximately at each station where you have offsets.  Remember that it is important to add rows and columns such that they are evenly spread over the length of the hull.  If rows or columns are added un-evenly, then it may become very difficult to shape and fair the boat.  
+
+Note 1:  B-spline surfaces are made up of a rectangular-like grid of “rows” and “columns”.  For convenience and clarity, the tutorials will refer to the vertically oriented lines as columns and the horizontally (lengthwise) lines as rows.  This orientation and labeling is not required by the program and is only used to make the explanation more clear.  The program marks all commands with “Row/Col” type labels because the user need not care which are the rows and which are the columns.  
+
+Note 2:  If you want a new column to be located at a FIXED station position (X-value), then you need to use the Surf-Fix Row/Col-Vertical command on that column in the profile view of the boat.  If you use the Surf-Add Row/Col-Add Row/Col Vertical command to fix the column when you enter it, the column will be fixed, but it might not be located in exactly the proper position because you pick the new column position using the cursor.  You can, however, UN-FIX the column using the Surf-Fix Row/Col-Fix Row/Col Vertical command.  It acts like a toggle to turn off the fixing of the column.  You can then move the column and re-fix it if you wish.  Generally, it’s best to keep the columns that are in the middle of the boat fixed so that they represent stations.  In the ends of the boat, however, you may need to angle the columns so that they make an even transition to the angle of the bow or stern.
+
+C.  After you have added in the evenly spaced columns at the required offset station locations, you can use the Edit-Set Point command to alter the hull shape.  (Remember to add in enough columns along the length of the hull to create a nice, even spread of columns, even if it means adding columns where you do not have offsets.)  It is best to start by using the Edit-Set Point command to set the offsets on the sheer, chine(s), and hull profile.  This will fix the boundary shape to known values.
+
+D.  Next, use the Edit-Move Point command to fix-up the rest of the hull to match the (now) exact offset values on the hull.  Don’t worry about detailed fairing yet.  
+Just try to rough up the general shape.
+
+E.  For the curved portions of each station (column), it may be best to use the Point-Add and the Edit-Set Point commands to create target “tick marks” through which the hull must pass.  This is because the defining hull points at the intersections of the rows and columns may not fall near your offset values.  It is better, then, to add and set points as tick marks so that you can drag the hull to pass through the tick marks.  This is not as bad as it sounds, since you already have the surface edges fixed exactly and boat is close to the desired shape.
+
+
+This process of using “tick points” and dragging the surface is more tedious than automatically fitting the surface using the Skin/Loft command, but it can get the job done.  
+
+
+
+5.  Digitizing an Existing Body Plan
+
+
+If you have a body plan (cross-sections) of a boat and you have a digitizing tablet with a cross-hair “puck”, you can digitize or trace the sections of the boat and convert them to B-spline surfaces.
+
+Right now, ProSurf is not able to use a digitizing tablet.  It can be used to simulate a mouse, but it cannot be used to input absolute coordinate data.  We do, however, have a DOS-based utility program that can digitize body plans.  It is available free, upon request, for ProSurf users.
+ 
+You can also investigate using other CAD programs to digitize body plan hull cross-sections.  Check to make sure that these other programs can output the digitized stations to a DXF or IGES file as simple polylines.  If so, then you won’t have any problems reading them into ProSurf.
+
+
+Once the raw station data has been read into ProSurf, follow the steps described in the section on fitting surfaces to station curves.
+
+
+6.  Reading stations or shape data from other CAD programs
+
+
+Another way to get started with a hull shape or to import hull stations is to transfer the shapes from other CAD or design programs using a DXF or IGES file format.  It is a common practice to use multiple CAD or design programs during product development.  Each program has its own strengths and weaknesses and each user may be more familiar or comfortable with specific programs.
+
+The major difficulty in passing geometry between design programs is to verify that the geometry is transferred accurately.  Many times geometry is altered somewhat when it is either written out to a DXF or IGES file or when it is read in from one of these files.  This can cause problems, so be sure to test out the transfer ahead of time.  Also, check out the output and input options for these transfer commands.  Some options work much better than others.  For example, in ProSurf’s DXF and IGES output dialog box, there are options to convert a surface to a mesh before sending it to the transfer file.  This may be needed for import into other programs, but there is a loss of surface definition.  It would work better if you can transfer the surface as a true NURB surface instead.
+
+
+Once the raw station data has been read into ProSurf via a DXF or IGES input command, follow the steps described in the section on fitting surfaces to station curves.
+
+
+
+7.  Scanning in Drawings
+
+
+The problem with scanners is that they read drawings in as a collection of black and white (or colored) dots (based on the scanner’s dots-per-inch resolution) with no information on how the black dots are connected into polylines (stations, in our case).  This is fine if all you want to do is to trim or resize the picture and to put it into a document.  If, however, you want to obtain the shapes of individual stations, you need to somehow connect the station dots into correct stations shapes as polylines.
+
+There are utility programs (raster dots-to-vector converters) that automatically try to connect the dots into connected polylines.  Unfortunately, most body plans of hulls include stations that overlap or cross each other.  This means that the raster-to-vector converter may get confused during the conversion.  You could, however, fix-up the converted polylines in ProSurf, but this could take as much time (or more) than digitizing the stations by hand with a tablet.
+
+Things are getting better, however.  Newer versions of raster to vector converters do a much better job at playing connect the dots.  They have many different options so that within a few minutes you will end up with a vector definition of your stations that require very little clean up in ProSurf.  You have to make sure that once the vectors are created (usually polylines), they can be output to DXF, IGES, or text files.  Otherwise, you won’t be able to import them into ProSurf.
+
+You may already have a raster to vector converter and not know it.  Many programs, like Corel Draw, have a command called AutoTrace that will do this conversion.  Also, check out  HYPERLINK "http://www.wintopo.com" http://www.wintopo.com which has both a free and professional version of a raster to vector converter.  The free version will read BMP files and output DXF vector files that can be read into ProSurf.
+
+
+Once the raw station data has been read into ProSurf via a DXF or IGES input command, follow the steps described in the section on fitting surfaces to station curves.
+
+
+
+8.  Fitting Surfaces to Station Curves
+
+
+Once you have the raw hull station data read into ProSurf (from any source), you need to follow these steps to skin or fit one or more surfaces to the station curves.
+
+
+Step 1 – Make sure that each station is one ProSurf curve entity 
+
+To be able to fit all of the stations with one or more NURB surfaces, you must make sure that each station that is read in is one “curve” entity. [See the Skin/Loft command description.]  Remember that in ProSurf, a “curve” entity can consist of any number of connected curve and polyline segments.  This allows you to skin a set of curves with multiple surfaces all with one command.  The key is that the Skin/Loft command requires that each station be just one curve entity.  You can check the extent of any entity by using the “View-Highlight” command or by changing the color of the station to see if the whole station has changed color.  This can be done by right-clicking on the entity to display its attribute dialog box and its change color button.  If only part of the station is highlighted or has changed color, then it was defined using two curve entities.  To combine two parts of a station into one curve entity, you need to make sure that they have a common join point and use the Curve-Join Curves command.  Remember that in ProSurf, you can have one cure entity define a curve consisting of several curve and polyline segments.
+
+
+Step 2 – Make sure that the stations are in their proper [X, Y, Z] locations
+
+When you scan in or digitize a drawing of a hull body plan, the data goes into the file as 3D data, but one of the dimensions is set to zero, because the drawing is just 2D and there is no information about where the stations are located along the length of the hull.  In addition, the raw data for the stations might have the widths or half-breadths defined in the X-direction and the heights defined in the Y-direction.  You may need to use one of the rotate commands in ProSurf to first rotate the half-breadths to the Y-direction and the heights to the Z-direction.  Next, you can use the Modify-Set All Coordinates command to set each curve station to its proper X-location.  After this step, all stations should consist of one curve entity and be located and oriented in its proper position.
+
+
+Step 3 – Create station curves with equal numbers of knuckle points
+
+If the raw station data is read as polylines, then you must use the Surf-CurveFit command to fit a curve through the points before skinning the curves using the Skin/Loft command.  If the stations include multiple sections that are separated by hard, “knuckle” points [like a chine hull boat], then your job becomes more difficult.  The difficulty arises because the Skin/Loft command needs to know how to fit multiple surfaces through all of the stations.  
+
+If you have a chine hull, for example, the Skin/Loft command needs to be able to fit one surface through the stations below the chine knuckle point and one surface above the chine knuckle point.  The only way that the Skin/Loft command can do this is if each station curve is divided into two separate curves joined at the chine knuckle point.  The Skin/Loft command will then say that everything up to the knuckle point on each curve is surface one, and everything after the knuckle point is surface two.  [Remember that in ProSurf, a “curve” entity can consist of boat curve and polyline sections. See the tutorial on Entities for more details.]  For the Skin/Loft command to work correctly, each station curve needs to divided into the same number of curve segments, separated by hard, knuckle points.  This is the only way that the Skin/Loft command can figure out how to fit multiple surfaces to the station curves.  For a chine hull boat where the chine vanishes as it goes towards the bow, you might have to pretend that there is a chine that goes all the way to the bow just so that the Skin/Loft command knows where the lower and upper surfaces end.
+
+However, the Skin/Loft command will work even if you do not meet these criteria.  If the stations to skin do not have the same number of curve segments, the command will fit one surface across the whole length of all of the curves, thereby ignoring any specific knuckle points.
+
+
+Step 4 – Fair or smooth the stations
+
+Now that the stations are single entities, now that they are in their proper locations and orientations, and now that each station has the same number of curve and polyline segments (optional), you can do some curve fairing before the surfaces are fit to the stations.  It is generally easier to fair the station curves before the skinning command than it is to fair the surface after the skinning command.  This is especially so if you expect to skin the curves with a surface containing many rows.  If you think of the stations as the columns of the surfaces, then the rows would be the defining lines that are located girth-wise along all of the stations.  The more of these rows that you request in the skinning command, the more accurately the surface will fit the stations.  However, the more rows you use to create the surface, the more difficult it will be to shape or fair the end product.  Therefore, if you expect to skin the stations with many rows, then you should spend extra time fairing the station curves before you apply the skin command.  Keep in mind, however, that even though you fair the curves before the skinning process, the final surfaces that get generated might need a lot of fairing work.  It all depends on how accurate the stations are in the first place.  Most traditional loftsmen have seen body plans where the stations look very nice, but the resultant hull surface needs lots of work.
+
+If you are using these stations to create a hull to use as the starting point of a significant change to the hull, then you might want to skin the station curves with fewer longitudinal surface rows.  If, however, you are trying to recreate an existing boat as accurately as possible and you don’t expect to change the shape, then you might want to use more longitudinal rows.
+
+
+Step 5 – Loft/Skin the stations with NURB surfaces
+
+Now that the curves are all prepared, it is time to skin the surfaces. See the Skin/Loft command write-up for complete details on the options that you have available.
+
+Conversion from an arbitrary table of offsets to a surface definition is a complex process, since the hull being defined might have many chines separating many surfaces and the stations might not accurately define the 3D shape.  More a more general perspective on this process, see the articles and examples that talk about reverse engineering.
+
+
+
+
+Create New Boat Shape
+
+Create New Boat Shape
+
+PAGE  20
+
+
+PAGE  3
+
+
+
+

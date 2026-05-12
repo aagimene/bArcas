@@ -17,10 +17,11 @@ A survey of prior art. Grouped by intended use. For each, we note: what it does 
 - **What it lacks.** Desktop Windows app, small user base, minimal programmatic API, older rendering.
 - **What to learn.** The "design by curve family" approach — users describe the four or five signature longitudinal curves and the software lofts the rest.
 
-### ProSurf (New Wave Systems)
-- **What it does well.** Faired-surface kayak/canoe design with B-spline surfaces and hydrostatic reporting. Used by some professional kayak designers.
-- **What it lacks.** Commercial, desktop-only, no web, no AI hooks.
-- **What to learn.** Willingness to surface the B-spline net directly to the user.
+### ProSurf / ProBasic / ProChine — the Nautilus System (New Wave Systems)
+- **What it does well.** Full 3D NURB curve + surface hull design with **edit points on the surface** (Hollister's signature contribution since 1985), dynamic-curvature "K-curves" + Move%/Ooch-Point fine fairing, Gaussian-curvature color mapping, four bundled resistance models (**Holtrop, Delft 3, Kaper, DispMode/Savitsky-style**), hydrostatics, stability + cross-curves, constrained automatic hull variation (**Lackenby** "one-minus-prismatic" shift), ruling-line developable-plate layout. Ships with a kayak-class sample library going back to a 1990-dated `Greenland Kayak` SRF.
+- **What it lacks.** Commercial, Windows desktop only (PE32 + InstallShield), no web, no programmatic API, no AI hooks.
+- **What to learn.** Almost the entire interactive surface-editing vocabulary modern hull-design tools use — Nautilus either invented it or made it conventional. **Read [nautilus-system.md](nautilus-system.md) first.** Single most important takeaway: expose edit points *on* the surface in both local and global-interpolation modes; expose a Lackenby-style parametric variation as a first-class verb.
+- **Lineage caveat.** Community lore (still to be confirmed) is that several Mariner Kayaks production hulls were designed in Nautilus; see [nautilus-system.md](nautilus-system.md#mariner--bearboat--nautilus--what-we-know-and-what-we-dont).
 
 ### CarvedBoat / strip-builder scripts
 - A long tail of individual-builder scripts (Python, MATLAB, Excel) that generate offsets from simple parametric families. Useful reference material but not "products."
@@ -99,5 +100,6 @@ Point (3) is the biggest differentiator. Every existing tool assumes a human sit
 ## Related
 
 - [bearboat-history.md](bearboat-history.md)
+- [nautilus-system.md](nautilus-system.md) — deep dive on the second primary-source lineage.
 - [kayak-design-literature.md](kayak-design-literature.md)
 - [../project/architecture.md](../project/architecture.md)

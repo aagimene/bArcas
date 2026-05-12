@@ -185,6 +185,37 @@ Where we calibrate:
 - Published drag measurements for rowing shells (Lazauskas papers).
 - Tank tests on kayak hulls (a handful of published datasets exist).
 - Comparison to BearBoatXL's own resistance output on identical hulls (we can run it manually from `~/Applications`).
+- Comparison to the **Nautilus / ProSurf** resistance stack (Holtrop / Delft 3 / Kaper /
+  DispMode-Savitsky). See [../research/nautilus-system.md](../research/nautilus-system.md#resistance--four-named-models).
+  Nautilus's `Kaper` option is the **canoe/kayak-specific empirical regression** and is the
+  closest direct analog to what we want in the kayak speed range.
+
+---
+
+## Alternative empirical models (selectable, citation-tracked)
+
+Per the wiki's commitment to surface the formula behind every reported number, ArcasBoat
+should also expose the following empirical methods alongside the Michell-thin-ship default.
+Each runs from the same hydrostatic state and is selected by the user (or an agent) per
+hull:
+
+| Method | Regime | Citation | When to prefer |
+|---|---|---|---|
+| **Michell thin-ship + ITTC 1957** | Slender displacement (default for kayaks) | Michell 1898; ITTC 1957 | Default. |
+| **Kaper (Winters / Killing)** | Canoes and kayaks | John Winters, *The Shape of the Canoe*; Steve Killing regression | Short, beamy hulls where Michell's slenderness assumption gets thin. |
+| **Holtrop & Mennen** | Displacement ships and powerboats | Holtrop & Mennen, *Int. Shipbuilding Progress* Vol 29 (1982); Holtrop, ISP Vol 31 (1984) | Powerboats / canoes-with-engine extreme case; mostly out of kayak scope but easy to include since the same Geosim decomposition fits. |
+| **Delft Series III** | Sailboats | Delft Yacht Hydrodynamics group regressions | Out of scope. Recorded for completeness. |
+| **Savitsky / DispMode** | Planing hulls | Savitsky, *Marine Tech* (1964) | Out of scope. |
+
+The decomposition stays the same in all cases:
+
+```
+R_total = R_friction + R_wave + R_correlation + R_appendage + R_air
+        + (model-specific terms: bulb, transom, planing lift)
+```
+
+(form per `HullVary §Geosim Coefficient Resistance Evaluation` in
+[`resources/Nautilus/docs/HullVary.txt`](../../resources/Nautilus/docs/HullVary.txt)).
 
 ---
 

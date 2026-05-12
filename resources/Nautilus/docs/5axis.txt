@@ -1,0 +1,158 @@
+CNC Milling for Plugs, Molds, and Tooling
+
+
+Stephen M. Hollister
+New Wave Systems, Inc.
+
+
+Introduction
+
+[Note: Although this article talks about 3D CNC cutting for boat hull shapes, the information can be applied to any 3D sculpted shape that needs to be cut.]
+
+Now that designers are adopting computer methods for modeling and fairing 3-dimensional hull surfaces, it seems reasonable to use the computer surface model to mill full-size male or female plugs, or even produce complete tooling by CNC machine.  The promise is better accuracy, less cost, and faster turn-around time.  This article discusses some of the things you need to know about the process before you jump in with both feet.  Although the focus of this article will be on using outside services, the information will still be useful for those considering whether to buy their own equipment.
+
+Actually, the real question is not about CNC machines or computers, but whether it is better to do the work yourself or to contract out the business.  The use of the computer and 5-axis milling machines is only one part of that decision.   If someone can do the job better by hand, then that is the service you should use.  Do not assume that you will automatically get better results by computer.  The following will discuss the process of CNC milling and the problems associated with obtaining the benefits.
+
+
+CNC Milling Process
+
+Before going into the evaluation of benefits, let’s review the basic machining process.
+
+
+1.  Design the boat using some form of CAD hull or surface design program.
+
+Several programs exist which allow you to define and fair the 3-dimensional shape of a hull on the computer.  You want a design program which will allow you to describe the hull as a group of complete surfaces, rather than as a series of curves.  This will allow you to easily transfer the hull geometry to a CAM milling program without the need to recreate the shape of the boat.
+
+
+2.  Write a transfer geometry file (DXF, IGES, etc.) of the hull
+
+Once the surface shape of the hull is complete in the design program, you need to be able to output the geometry to a file in a format compatible with the CNC CAM software.  If this cannot be done, then the CNC machining service will need to recreate the hull shape using their own software, which could take quite a bit of time.
+
+
+3.  Read the geometry file into the CAM program
+
+Once you create a standard geometry transfer file, you can put the file on a diskette and send it to the CNC machining service.  You could even send the file immediately by e-mail.  The company machining the part does not need to have the same hull design program that you have.  They will have their own software which specializes in the machining of surfaces.
+
+
+4.  Adapt or correct the geometry to meet the needs of the CAM software
+
+Depending on the complexity and details, the CNC program operator may have to adapt the CNC process to meet the needs of the part.  For example, concave creases and local cutouts may require special cutting procedures.  Smooth or sculpted surfaces are easier to handle than creased surfaces.
+
+
+5.  Define the cutter tool paths over the surfaces using the CAM software
+
+There are many ways to have the CNC machine cut the plug.  The skill and experience of the CNC operator can have a big effect on the outcome and how much finishing work is needed.
+
+
+6.  Break the job into pieces that will fit on the machine
+
+Many hulls are too large to be cut as one piece.  In addition, you may want smaller pieces to be able to truck the parts to the construction site.
+
+
+7.  Mill the individual pieces
+
+Each piece of foam to be cut has to be oriented in the machine coordinate system and the CNC program set up to cut that piece.
+
+
+8.  Drill the connection pin locations or alignment marks for the milled parts
+
+If a part is to be cut into pieces, the CNC machine needs to cut or drill alignment holes or marks while the piece is still fixed in place.  This is critical for large parts cut into several pieces.  You want a system which is accurate and foolproof when the pieces get to the construction site.
+
+
+9.  Prepare the plug for use or use it to create the final mold
+
+After the plug is cut out of foam (or some foam variation), there is always a certain amount of finishing required to make the plug (male or female) usable.  The amount of processing depends on the type of foam used, the type of coatings used, and the desired end product; a one-off prototype boat or a master mold for production use.
+
+
+The promise of CNC milling is accuracy (including perfect symmetry), speed, and cost savings, each of which will be discussed in detail.
+
+
+Accuracy
+
+If the full 3D hull surface is completely designed on the computer, then a milling machine will reproduce the shape exactly as it is defined on the computer.  The following problems, however, can arise.
+
+
+The input surfaces are not accurate for construction purposes.
+
+The goal in CNC milling is to be able to cut the plug automatically without any lengthy final preparation by hand.  The assumption is that the input 3D computer surface shape is accurate to begin with.  This depends on the program used to define and fair the hull and the skill of the program’s operator.  Since there is no automatic way for a hull design program to guarantee fairness, it is up to the designer to make sure that what is sent to the milling machine is accurate and smooth.  Surface irregularities which are nearly invisible on a small computer screen get magnified greatly when the hull plug is milled  full size.  In addition, a hull model may look smooth when rendered in 3D with colors, lights, and reflections, but the underlying surface may not be accurate enough for construction purposes.  Most photo-realistic rendering software gloss over and hide many surface irregularities.  That may be fine for the company brochure, but it is not accurate enough for the milling machine.
+
+The traditional approach to hull construction is to base the shape on a number of frames, where there is a lot of hand work which can deal with any inaccuracies and unfairness in the design.  To get the best advantage from computer milling, however,  you need to start with a very accurate 3D computer model.  This is a problem with all CNC cutting and construction.  To eliminate expensive cutting and fitting, everything has to be very accurate every step along the way.  Designers need to spend extra time evaluating the entire fairness of the computer model beforehand.  Do not rely on examining just the standard stations, waterlines, and buttocks, because the goal is to avoid having to fair the milled plug.
+
+
+Conversion problems from the CAD program to the CAM program.
+
+Now that you have a fair and accurate hull surface model, you want to transfer it to the milling software without losing any accuracy or fairness.  The only way to do this is if the hull modeling technique you are using is mathematically equivalent to one used by the machining software.  This means that the hull model should be some variation or subset of a NURB (Non-Uniform Rational B-spline), because all of the major surface milling CAM software (e.g., MasterCAM, SurfCAM, Catia, CADAM) use NURB surfaces to define the milling paths.
+
+If your hull is defined using some technique other than a NURB surface, you must make sure that the milling CAM software can accept your hull definition and match the shape accurately using NURB surfaces.  For example, if your hull design software does not use NURBs, you still may be able to produce a detailed surface mesh and have it accepted by the CAM software.  The CAM program must be able to read  this mesh file format and it must be able to interpolate or fit the surface mesh accurately.  Fitting a surface mesh with a NURB surface is not a precise process.  Depending on the density and shape of the mesh, the resultant NURB surface might not be accurate or fair enough for milling purposes, or the milled plug might require too much hand fairing.  If the surface mesh fitting process is not accurate enough, then the CAM software must be able to correct the problems.  This might be impossible, since most CAM programs are geared toward milling and have little or no control over detailed surface shape.
+
+A more basic problem is that the CAM software must be able to read the geometry file produced by your hull design program.  The two main geometry transfer file formats are DXF (Data Exchange File) and IGES (Initial Graphics Exchange Specification).  The DXF format was defined by Autodesk and IGES is defined by a national standards committee.  The main difference between the two formats is that DXF does not allow for the definition of NURB surfaces, but does allow for the definition of mesh surfaces.  IGES, on the other hand, does allow for definition of NURB surfaces, and is the most common file type used for transfer of NURB surfaces.  You have to be careful, because the IGES specification (630 pages) defines many types of geometric entities and it is rare that a CAD or CAM program will handle all geometry types.  This means that you must make sure that the hull design software that you use can produce the proper entity type required by the CAM software.  The IGES entity type used most for transfer of NURB geometry is entity type 128: Rational B-Spline Surface Entity.  This is one of those details that can cause a big problem unless you check it out beforehand. 
+
+
+Geometric problems due to fillets, creases, cutouts, etc.
+
+Once you have tested the transfer of the hull geometry to the CAM program, you need to determine if there are going to be any special shape problems related to the detailed geometry.  Are there certain shapes that cannot be done accurately by the machine?  Do these detailed shapes require extra pre-processing in the CAM software (more time means higher costs)?  It is hard to describe many of these problems ahead of time.  Usually, when the CAM software operators see the geometry, they will be able to immediately pick out difficulties and problem areas.  Try to find out whether these problems are due to the CAM software they are using, or if it is a limitation of the milling machine, or if it is a problem with the transferred hull geometry.  Also, determine if the difficulties affect only the time of setup and milling, or if they affect the accuracy of the milling process.  The more post-milling  hand work that is required, the less cost effective is the whole process.  Provide a sample geometry file to various milling services to see what kind of feedback you receive about the model and the final accuracy of the milled plug.  Remember that even though the milling machine might be very accurate, the input geometry and details it is cutting might not be as accurate.  After the geometry conversion process is complete, try to obtain some form of output from the CNC program of the hull geometry for validation purposes.  Some CAM programs can output 3D renderings or tool-path diagrams.  These may not be perfect for validation, but anything is better than being surprised after the plug has been milled.
+
+
+Plug finishing problems
+
+The amount of post-milling finishing that is required depends on the accuracy of the input geometry, the required hull details, the capability of the CAM software, the accuracy of  the machine, and the type of material being cut.  The difficulty of finishing a plug depends on the accuracy of the cut and the type of material being used.  Most milling services use some form of foam, which can vary greatly in density and bubble size.  Some materials require less preparation than others and which type of material you choose might depend on your goal.  Are you going to construct a prototype boat from the plug, or are you going to use the plug to produce a master mold?  Discuss your goals with several milling services, since each seems to have their own strong opinions about the subject.  There are a number of tradeoffs depending on what you plan to do with the milled plug.  Keep in mind that more hand finishing means more inaccuracies in surface shape.  This may be a critical concern for parts such as airfoil keels and rudders.
+
+
+Fitting pieces together - progressive errors
+
+Depending on the size of the boat and the size of the milling machine, you may have to mill the plug in pieces.  You may also have to mill the plug in smaller pieces than the machine is capable of because you need to truck the plug to your construction site.  Errors can occur when fitting plug pieces together.  The typical solution is to have the milling machine drill alignment holes so that the plug pieces can be pinned together at the construction site.  The accuracy of this process depends on how tightly the pinned alignment holes hold the pieces together.  Very small alignment problems between the plug pieces can have a dramatic effect on the finished hull.  The slightest continuity problem between two connected curved surfaces might be easily visible in the reflected surface of the finished part.  In addition, when multiple plug pieces are pinned together, you may get progressive or additive errors.  It would be best to align each piece to some accurate external structure or grid.
+
+
+
+
+Fast Turn-Around
+
+One of the main advantages of CNC milling is the promise of a fast turn-around time.  Often, the success of a project may depend on how quickly you can get a product to market.  Whether it is to build a prototype to bring to the show or to build a master mold for production use, CNC milling promises speed.  Let’s review some of the areas that can help or hinder a fast turn-around.
+
+
+Experience of the CNC milling company
+
+Although the speed of the CNC milling machine is main reason for the speed of plug production, there are many other factors that can contribute.  One is the experience of the CNC company providing the service.  The more and varied jobs they have done, the better they will be able to solve any unusual hull geometry you may have.  In certain cases, the milling time ends up being only a small portion of the time it takes to do the overall job, and the “special” problems dominate.  Depending on your goal (one-off or production boat), the experienced tooling company can foresee problems and suggest optimum choices in things like the type of foam used and whether to mill a male or female plug.
+
+
+Hull geometry preparation time
+
+Before milling, the geometry has to be as perfect as possible, and this can take time.  As mentioned before, if you provide your hull geometry using the same mathematical type and format as the CAM software, then you are 80 percent there.  The last 20 percent will be needed to take care of special details such as cutouts, creases, and fillets.  If you do not provide the hull geometry using the same mathematical definition as the CAM program, then the pre-processing time can go up dramatically, especially if the geometry translation is not done accurately.  In addition, if you cannot produce the proper DXF or IGES input file for the CAM software, then the CNC milling company will have to define the hull geometry from scratch.
+
+
+Plug finishing and other tooling time
+
+As mentioned before, the time it takes to mill the plug may be just a fraction of the time it takes to do the whole job.  If the goal is to produce just the milled plug out of foam, then the process can be very quick.  If the job is to produce the master mold or the complete tooling for a production boat, then the time savings are less dramatic.  This whole process can still provide a lot of savings in terms of time and cost,  especially if your yard does not have the experienced labor to do the task quickly.
+
+
+
+
+
+Lower Cost
+
+The major benefits of CNC milling are accuracy and fast turn-around.  It is more problematical to expect a great savings in cost.  The following discusses some of the reasons.
+
+
+Cost of the equipment
+
+Large gantry, 5-axis milling machines are very expensive and require a huge capital expenditure.  Even if you keep the machine busy all of the time, the company providing the service still has to charge enough to obtain a reasonable return-on-investment.  In addition to the cost of the machine, there are the facility costs, the maintenance costs, the insurance costs, the software costs, the people costs, and the training costs.  For example, CAM software can cost up to $50,000 or more and the operators have to be highly trained.  Eventually, cost will become more of a benefit for this process, but for now, it remains more difficult to prove.
+
+
+Traditional methods vs. in-house, vs. subcontract
+
+Your choices are to continue to do things the way you always have, vs. buying the CNC milling machine for in-house use, vs. subcontracting the work to one of several companies who specialize in the task.  This is not a new decision.  Even before CNC machines, there were companies who offered complete tooling services.  As you might expect, however, it takes quite a large volume of work to justify the cost of machinery, facilities, people, and training for in-house work.  Traditional in-house methods will also become more difficult due to the increased lack of skilled tooling labor and its slow turn-around time.  It seems that as more and more hulls and parts are designed by computer, there will be a greater cost benefit to using CNC milling and tooling services.
+
+
+Cost depends on the part
+
+Some parts that are difficult to construct by hand are easy to produce by CNC machine.  Do not assume that the CNC machining costs will be relative to traditional methods.  Some stylized or complicated part shapes that you would normally avoid due to difficulties of hand construction might be very inexpensive to construct by CNC machine.  This might open up whole new styling options that you have never considered.  The point is that you might find that for certain projects the cost, accuracy, and turn-around time are all benefits.  The only way to know for sure is to submit the geometry and obtain quotes from many CNC machining services.  The quotes can vary greatly.
+
+
+
+
+Conclusion
+
+The promise of accuracy, fast turn-around time, and lower costs can be achieved using CNC milling machines if you have a good understanding of the process and its advantages and limitations.  Some people expect too much and are disappointed with the results.  You should start with an easy project and progress to more difficult projects.  Don’t wait until a complicated hull has to be built in a short time to learn about the CNC process.
+
+As companies learn to use this service appropriately, they will begin to obtain secondary and tertiary benefits from the results.  When more and more parts are CNC machined accurately, the boat will be built faster and go together with less rework and hand fitting.  Hull modules can be built outside of the hull and dropped into the hull with no fitting problems.  This lack of hand fitting has a multiplying effect throughout the boat and can result in dramatic construction savings.
+

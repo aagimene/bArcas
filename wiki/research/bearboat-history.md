@@ -47,6 +47,20 @@ We intentionally do **not** run the binary during this research phase. When we d
 
 See [../designs/ursa-and-mariner.md](../designs/ursa-and-mariner.md) for the design genealogy.
 
+### Which program designed which hull?
+
+The historical record on the kayak side splits between two NURB-era programs of the same
+generation:
+
+- **BearBoatSP** (Livingston, Seattle) — confirmed to have been used for the **Ursa** designs.
+- **Nautilus / ProSurf** (Hollister, Jamestown RI) — community claim is that several
+  **Mariner Kayaks** production hulls were designed in this family. Plausible (timing,
+  feature-fit, and the fact that Nautilus shipped kayak-class samples as early as 1990),
+  but **not yet directly documented in this repo**. See
+  [nautilus-system.md](nautilus-system.md#mariner--bearboat--nautilus--what-we-know-and-what-we-dont)
+  for the open question. Both programs share the same underlying NURB-surface formalism,
+  so a hull moving from one to the other loses very little.
+
 ---
 
 ## Why ArcasBoat cites this lineage explicitly

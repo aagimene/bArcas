@@ -1,0 +1,1658 @@
+
+
+
+
+
+
+
+The Design Spiral for Computer-Aided Boat Design
+
+
+
+
+
+
+Copyright 1994 by Stephen M. Hollister, N.A., P.E.
+
+All Rights Reserved
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ABSTRACT
+
+
+This article describes the overall boat design spiral process and its relationship to modern computer-aided design and engineering tools.  Each major phase of design (design statement, conceptual design, preliminary design, and detailed design) is discussed in detail with examples of how the computer can effectively optimize the boat and speed the design process.
+
+
+
+
+
+
+
+
+Stephen M. Hollister, N.A.,P.E.
+
+Mr. Hollister, the owner of New Wave Systems, Inc., a developer of CAD/CAM software for boat and ship design and construction, is a licensed Professional Engineer with an M.S.E. degree in Computer, Information, and Control Engineering, and B.S.E. and M.S.E. degrees in Naval Architecture and Marine Engineering, all from the University of Michigan.  Since 1975, he has worked and taught in the areas of naval architecture, computer-aided engineering, computer graphics, database management systems, and mathematics.  He is an Associate Member of the Society of Naval Architects and Marine Engineers, a Member of Siggraph and the Association for Computing Machinery, a Member of the Institute of Electrical and Electronics Engineers, and a Member of The Society of Boat and Yacht Designers.
+
+
+
+
+
+
+
+
+
+INTRODUCTION
+
+
+The first step in boat design is to define very clearly the main function or purpose of the boat. (I'll call this the design statement).  Without a clear idea of how the boat will be used, you will not be able to adequately resolve the many conflicting choices that will confront you during the design process.  Define the main function of the boat and use that vision to guide you through the various trade-offs which must be made to achieve the final result.  Although a boat consists of a series of compromises, how you select between the trade-offs will determine the success or failure of the boat.
+
+
+Often times owners (and designers) have unrealistic ideas about the characteristics which can be combined into one boat.  For instance, can you have a sailboat which is fast, weatherly, contains full accommodations, and has shallow draft?  Maybe, but it depends on how you quantify these attributes.   One person's idea of fast may not agree with another's.  The answer to this question is ... perhaps, but not necessarily achieving your (or the owner's) expected goals.  You must quantify the design goals and state which are the most important in order of decreasing importance.  This can be done in a short design statement that can be used to keep you focused on the overall purpose of the boat.  It is then the goal of the design process to help you design the boat and determine if all of the specified criteria can be met.  If these goals are not possible to achieve, then their ordering will help you determine how to select an adequate compromise.
+
+
+Another common boat design approach is to prepare a design proposal in competition with other designers for a design contract.  The design proposal is a result of a conceptual design process and will be discussed in a following section.  Before you begin the conceptual design process, however, you still need some form of design or concept statement which describes the major attributes of the design.  Preparing a competitive proposal for a client who can't seem to write down a clear design statement is a no-win situation, unless you're good at mind reading or you're involved with helping the client formulate the design statement.
+
+
+
+
+The overall boat design process can be described by the following steps:
+
+
+Step 1.  The Design Statement.  -  Define the purpose of the boat and quantify and list the major design attributes in decreasing order of importance.  Include a measure of merit for the vessel, if needed.
+
+
+Step 2.  The Conceptual Design Phase.  -  This step determines whether the boat described in the design statement is feasible and how you will have to modify the stated goals in the design statement to achieve a successful boat design.  Principal dimensions, general arrangements, major weights items, and powering options are chosen and concept drawings are produced.  This information is often included in a design proposal which is submitted to a prospective client.  This step is often done on speculation in the hopes that the client will select the design for construction.
+
+
+Step 3  The Preliminary Design Phase.  -  This step determines the details of exactly how the boat will implement the results from the conceptual design process.  The hull shape is finalized and more exact calculations are performed, including stability, performance, and structural calculations.
+
+
+Step 4.  The Detailed Design Phase.  -  This step is concerned with producing the "deliverables" of the design project:  a faired set of lines, a table of offsets, arrangement drawings, structural drawings, construction details, and specifications.
+
+
+
+
+
+
+This paper will discuss each step of the overall boat design process in detail.
+
+THE DESIGN SPIRAL
+
+
+The Conceptual Design Phase, the Preliminary Design Phase, and the Detailed Design Phase (steps 2 through 4 of the overall boat design process described in the previous section) are often referred to as a design spiral (see the figure below).  The design spiral process consists of iterations through a sequence of design tasks, with each iteration refining the boat to the next stage of design.  The design spiral is a nice general concept, but most designers end up modifying it to suit their own design sequence based on finding solutions to the major trade-offs of a particular boat.  I will use the spiral design process as a framework for discussing the major design trade-offs and iterations required by most designs and no single approach will be emphasized.  [KISS80] discusses the spiral in terms of large ship designs and includes a phase between steps 3 and 4 called the Contract Design Phase.  [BERM79] discusses specific design spirals for both displacement and planing power boats.  [BUXT72] describes a design spiral where "..each successive cycle is made with an increasing degree of complexity, but a decreasing number of possible designs".
+
+
+
+
+
+Typical Design Spiral
+
+
+The key to a successful boat design is the Design Statement, the Conceptual Design Phase, and the resolution of all major design trade-offs.  If you discover a problem in the Detailed Design phase (for example: not enough room for the fuel tanks to achieve the desired cruising range), then you might have to completely rework the design.  The sooner you resolve the major design trade-offs, the less work you will have to do to complete the design and the more successful it will be.
+
+
+It is also wise to make sure the owner understands the cost implications of changes late in the design cycle.  If the owner wants the boat to cruise at 25 kts, but keeps telling you to add additional equipment to the boat during the design process (causing the weight to increase by 10 percent), will the owner be happy when it is later discovered that the boat will float below its lines and the cruising speed and range of the boat is decreased by more than 10 percent?  Using computers, you can speed-up the whole design process by getting detailed shape and calculation information early in the Concept Design Phase and evaluating a great number of design possibilities and trade-offs with very accurate numbers.
+
+
+
+
+
+THE DESIGN STATEMENT
+
+
+The Design Statement is a short document which is used to clarify the purpose and goals of the vessel.  It is also used to determine the requirements of the owner and to guide you in making rational choices between design trade-offs during the design process.
+
+
+A Design Statement consists of the following parts:
+
+	1.  The Purpose or Mission of the Vessel
+	2.  A Measure of Merit for the Vessel
+	3.  The Owner's Design Requirements
+	4.  The Design Constraints
+
+
+
+Part 1.  The Purpose or Mission of the Vessel
+
+Define the purpose or mission of the vessel using one sentence or paragraph.  If you can't write this down in a sentence or two, then you might have difficulty creating a successful design.  A boat which is designed to perform many jobs may end up being inadequate for all jobs.
+
+
+For example, a mission statement for a commercial passenger vessel might be:
+
+
+"A boat designed to carry passengers between Hyannis, Massachusetts and Nantucket, Massachusetts in a fast, safe, and comfortable manner that will maximize profits over the life of the vessel."
+
+
+This is nice and simple.  It emphasizes speed, comfort, and safety without disregarding the need to make a profit.  Any specific owner's requirements or limitations can be defined later, in one of the subsequent parts of the design statement.  A simple mission statement like this is important to keep the designer (and owner) focused on the overall purpose of the boat and to help with the resolution of the enormous number of design trade-offs that will be evaluated.  (Note:  If you say that the only goal is to maximize profits, then many would tell you to invest in something other than a boat!)
+
+
+A mission or purpose statement for a pleasure vessel might be:
+
+
+"A coastal cruising power boat designed for a retired couple to live aboard year-round."
+
+
+This statement tells the designer an enormous amount about the overall purpose of the boat with very few words.  There is a temptation to include many of the requirements and limitations here (such as speed and range), but the goal here is to define one or two key elements which uniquely define the design.  Now is not the time to specify the type of engines, the size, or the cost, unless they are major design constraints (Note: all boats have some sort of cost constraint).
+
+
+
+Part 2.  A Measure of Merit for the Vessel
+
+
+Some designers try to translate the purpose or mission of the vessel into an objective, mathematical equation.  This measure of merit is a specific formula that converts the complete design into one number which tells you if boat design "A" is better than boat design "B" and helps you select between major design trade-offs.  Measures of merit are possible for all craft, not just for commercial designs where the goal is to maximize profit.  For yachts, a specific measure of merit is possible for competitive craft, such as the America's Cup class.  Their measure of merit is to win 4 out of 7 match races.  This can be converted into a formula, based on the dimensions of the boat and constrained by the class rules, which will predict the elapsed time of a design over the race course for a variety of expected wind speeds.  For non-competitive yachts, it is possible to define weighting factors for the major design requirements and assign ratings to each one to determine an overall, single number rating for the boat.  Although the weighted rating technique is a subjective approach to design evaluation, it can help the you and the owner better understand different design alternatives. 
+
+
+
+
+
+o  Commercial passenger boat measure of merit example
+
+
+Let's look at the example of the commercial passenger boat ferry.  You can formulate the measure of merit for this vessel in a number of ways:  total profit, the fee required per passenger to break even (no profit), or use more formal economic techniques, such as Net Present Value (NPV) or Internal Rate of Return ( IRR) (See [BENF70] for an explanation of NPV, IRR, and the time value of money).  To keep it simple, I'll calculate the fee required per passenger to break even based on yearly costs.  This approach has the added benefit of telling you explicitly what fee must be charged so that you don't lose money.  Anything charged over that amount is considered to be profit.  Cargo ship designers use a measure of merit like this called a Required Freight Rate (RFR) which tells them the amount of money that must be charged per ton of cargo to break even.
+
+
+
+I'll look at a partial breakdown of the formulas for the vessel for just one year because the analysis of the costs over the lifetime of the vessel is complicated by potential overhaul costs, unexpected maintenance, and the value of the vessel at the end of its life (For many economic analyses, the life of a vessel corresponds to the time it takes to pay off its construction loan.).  The boat may be very profitable after its construction costs have been paid off, but the critical economic constraints exist while the boat is being paid off.  (Note: you really shouldn't ignore lifetime costs, since they can be greatly affected by design variables, such as the type of power plant chosen and the hours of operation.)
+
+
+
+
+
+
+Measure of Merit:   Minimize Required Passenger Fee (RPF)
+
+
+RPF = Operating Costs per Year (OCY) / Number of Passengers per Year (NPY)
+
+Where:
+
+	OCY = Monthly Boat Loan Cost (MBLC) * 12 Months per Year
+		+ Yearly Insurance (YI)
+		+ Marketing and Sales Costs
+		+ Number of Crew  (NC) * Average Yearly Salary
+		+ Yearly Consumable Costs (YCC) (fuel, water, stores)
+		+ Yearly Maintenance Costs (YMC)
+		+ etc.
+
+		MBLC	= function of the construction cost of the vessel and the interest rate
+		YI	= function of the safety features of the design (Coast Guard Approval)
+		NC	= function of the ease of operation and automation
+		YCC	= function of the type of engines and the speed of the vessel, etc.
+		YMC	= function of the type of engines and their hours of use, etc.
+
+
+NPY = Number of Round Trips per Year (NRTY) * Number of Passengers per Trip (NPT)
+
+	NRTY	= a function of	speed of the vessel
+					the seaworthiness of the vessel
+	NPT	= a function of	the size of the vessel
+					the market demand
+					the cost of the ticket
+					the speed of crossing
+					the comfort of the trip
+
+
+These formulas can be written many ways, depending on how you label the costs and your own interpretation of how the design parameters affect the cost.  No matter how you write your equations, you should identify all design variables which have a significant effect on costs.  This passenger vessel analysis is obviously not a complete example, although it does begin to tell you how the design variables affect the purpose of the vessel.  Of course, there are a lot of unknowns and "fudge factors" involved in a simulation like this, but writing down some formulas is much better than trying to do the analysis in your head.
+
+
+
+
+
+o  America's Cup sailboat measure of merit example
+
+
+For this type of boat, let's start by assuming that money is no object.  That's never really the case, but for this measure of merit, it isn't good to limit your options right from the start.  The goal or purpose of the boat is to win the best 4 of 7 match races around a specific course made up of known angles and distances.  Let's simplify this a little bit by saying that the goal is to determine a formula which specifies the elapsed time around the course for the sailboat for a variety of expected wind strengths.
+
+Note: This isn't the same as winning 4 of 7 races because we are averaging all wind speeds into one formula.  What if 75% of the time the sea breeze blows at 15 - 20 knots and 25% of the time it is from the shore between 5 - 10 knots?  If you optimize a boat for just the 15 - 20 knot range, what is the probability that at least 4 of the 7 races will be held in the higher wind speed range?  Can you use "lay-days" for the sole purpose of avoiding certain wind conditions?  This type of analysis falls under the category of game theory and can add an important understanding of the design problem.
+
+
+
+Measure of Merit:   Minimize Elapsed Time (ET) Around the Race Course
+
+
+ET	= Sum of the Leg Times (LT) of the boat on the race course
+
+	Leg Time  =  Average velocity of a leg * Distance of a leg
+
+	Velocity  =  a function of	the hull and rig shape
+					the various wind speeds
+					the sailing angle (defined  by the course)
+
+	Distance  =  Distance of a leg, as defined by the course
+
+		Wind Speed  =	Assume that the boat races a portion of each leg of the
+					course for each expected wind speed, the duration
+					depending on the probability of that wind occurring.
+
+
+The biggest job is to determine a formula for relating the velocity potential of a design to the wind speed, sailing angle, and the dimensions of the hull and rig.  This type of sailboat velocity prediction model has been developed by US Sailing and has been applied to handicapping sailboats for racing (the IMS rule).  There are a number of variations of this computer model currently being used around the world to optimize racing sailboat designs (these programs are called Velocity Prediction Programs).  They are all variations of this US Sailing velocity prediction model and are based on the overall shape of the hull and rig.  This means that you can use it to optimize values such as length, beam, draft, prismatic coefficient, LCB, and rig dimensions.  It is not, however, able to distinguish between the speed differences caused by slight changes in canoe-body shape or keel shape.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+o  Pleasure boat measure of merit
+
+For boats that cannot be evaluated by a mathematical equation, you need to determine a set of important design attributes, their weightings, and their ratings.  This is done as follows:
+
+
+1.  Determine a list of major design attributes (see the next section on requirements),
+     such as cruising speed, range, ease of operation, cost, comfort, etc.
+
+2.  Determine a weighting number for the attribute which relates the relative importance
+     of that attribute compared to other attributes.
+
+3.  For each concept design alternative, assign each attribute one of the following ratings:
+     Excellent, Very Good, Good, Satisfactory, Poor, Unacceptable
+
+4.  Apply a percentage value to each rating, for example:
+	Excellent	100%
+	Very Good	75%
+	Good		62.5%
+	Satisfactory	50%
+	Poor		25%
+	Unacceptable	0%
+
+5.  Multiply the rating percent times the weighting factor for each attribute and sum the result.
+
+6.  This single sum value is the measure of merit of the vessel.  You may wish to divide this number by the best rating a boat could receive so that all scores are between 0 and 100.
+
+
+
+A simple weighted rating example for comparing two power boat designs might look like this:
+
+
+DESIGN A
+
+Attribute		Weight	Rating				Weighted Rating
+
+Cost			250		Good (62.5%)			156.25
+Beauty			200		Very Good (75%)		150
+Size/space		150		Excellent (100%)		150
+Arrangements		150		Excellent (100%)		150
+Comfort		150		Excellent (100%)		150
+Ease of Operation	150		Good (62.5%)			93.75
+Maintenance		150		Satisfactory (50%)		75
+Cruising Speed	100		Satisfactory (50%)		50
+Range			100		Satisfactory (50%)		50
+			------						---------
+Maximum Rating = 1400		Rating for Design A		1025
+
+Measure of Merit Rating for Design A as a percentage = 1025/1400 = 73.2%
+
+
+
+
+DESIGN B
+
+Attribute		Weight	Rating				Weighted Rating
+
+Cost			250		Excellent (100%)		250
+Beauty			200		Very Good (75%)		150
+Size/space		150		Very Good (75%)		112.5
+Arrangements		150		Very Good (75%)		112.5
+Comfort		150		Very Good (75%)		112.5
+Ease of Operation	150		Good (62.5%)			93.75
+Maintenance		150		Satisfactory (50%)		75
+Cruising Speed	100		Satisfactory (50%)		50
+Range			100		Satisfactory (50%)		50
+			------						---------
+Maximum Rating = 1400		Rating for Design A		1006.26
+
+Measure of Merit for Design B as a percentage = 1006.25/1400 = 71.9%
+
+
+This example analysis says that Design A, rating 73.2% is a "better" boat than Design B, rating 71.9%.  All of these numbers are subjective and can be manipulated to create any result you want.  The goal, however, is to be consistent in your subjectivity so that you can work toward an optimal design.
+
+
+
+
+
+Design Optimization Using a Measure of Merit
+
+
+Once you have a measure of merit formula, how do you use it to create an optimum design?  Start by using your design experience to evaluate the formula for a few promising design variations, concentrating on those that show the most promise.  Then change slightly those designs to locate further optimizations.  Start by varying the principal dimensions and major components of the vessel and then work on the minor design variables.  This process is called parametric analysis and requires you to alter each major and minor variable in small steps and re-calculate the measure of merit.  Evaluation of the results will direct you toward an optimum solution (graphing the measure of merit shows the trends quite visibly).  Although the computer allows you to cycle through a great number of iterations quickly and easily, there are potentially hundreds, thousands, or even millions of variations that must be calculated in an exhaustive search for an optimum design.
+
+
+This obstacle has led some designers to set up computer programs that automatically cycle through innumerable design variations and search for the combination of design variables which results in the best value of the measure of merit.  This isn't as easy as it sounds, since the number of calculations goes up geometrically depending on the number of independent design variables and the complexity of the measure of merit formula.  This whole area of automatic design optimization, based on a mathematical measure of merit is an interesting one.  It involves economics, mathematics, and engineering, all rolled into one problem (that's why boat design optimization is so fascinating and challenging!).  In theory, given this measure of merit formula, you should be able to determine one unique, ultimate design.  Unfortunately, there are many problems that make this difficult, if not impossible:
+
+
+1.  The measure of merit formula might be missing some critical values.
+
+2.  There are an infinite number of design variables (such as the shape of the hull) that must be 
+     reduced to just a few variables for the measure of merit analysis
+
+3.  Five designers might come up with five different formulas with five different results
+
+4.  Since the equations are nonlinear, you must use a search technique to find an optimum 
+     result
+
+5.  There are usually many false optimums (local optimum designs) and one global optimum
+     result (you really want to find the one overall or global optimum design)
+
+
+
+
+
+This is just a partial example of what can go into a definition of a measure of merit formula.  Although defining this equation can be very difficult and many of the equations or numbers will be vague, a well-developed measure of merit can spell the difference between a marginal design and a successful design.  Even if you don't perform automatic design optimization, the measure of merit helps you understand the relationships between the various trade-offs you will have to make.  Some have referred to these complicated formulas as design simulations or synthesis models, whose goal is to guide you toward an optimum design.
+
+
+
+
+
+Part 3  Owner's Design Requirements
+
+
+This section of the Design Statement consists of any or all of the following parts:
+
+
+	A.  A list of design requirements and their values or ranges,
+	     listed in decreasing order of importance
+	B.  A checklist of design options, assigning each a desirability factor
+	C.  An owner's description of exactly how the boat will be used
+	D.  Pictures and descriptions of other boats and options important to the owners
+
+
+
+
+
+A.  List of design requirements in decreasing order of importance
+
+List all major design attributes and assign them some ranking or level of importance.  Some sort of target value or range can also be applied to each requirement.  For example, most power boat owners specify a target cost, speed, cruising range, and some description of accommodations for the boat.  Try to fix as few requirements as possible, since the best design might involve an unusual or unique combination of design variables.
+
+
+
+For the pleasure boat example, the owners might list the following requirements:
+
+
+	1.  Tug style motor yacht (about 40')
+	2.  Cost  (less that $200,000)
+	3.  Easily handled by two people
+	4.  Cruising speed of 8 knots
+	5.  Cruising range of at least 1000 miles
+	6.  Large owner's stateroom with private head and shower
+	7.  Comfortable guest stateroom with private head and shower
+	8.  Very easy to maintain
+
+
+Don't get carried away with this section.  Just list the most important requirements (try to keep it less than 10 items).
+
+
+
+
+
+
+B.  A checklist of design options assigning each a desirability factor
+
+
+Present the owners with a design checklist (see below) which they must review and mark with one or more of the following "Design Option Classifications".
+
+
+Owner's Design Option Classifications
+
+	1.  Must Have (MH)
+	2.  Very Desirable (VD)
+	3.  Desirable (D)
+	4.  Desirable, if there is Enough Room (DER)
+	5.  Desirable, if there is Enough Money (DEM)
+
+
+The following is a partial example of a checklist for the owner to evaluate preferences in equipment and systems and mark each with one or more of the categories listed above (MH, VD, D, DER, DEM).  You can easily adapt the checklist and classification options to meet your own needs.
+
+
+	1.  List of optional electronics/Nav station options
+		SATNAV
+		GPS
+		Loran
+		Autopilot
+		Electronic charts
+		Nav station layout options
+		etc.
+
+	2.  Plumbing system options
+		Hot/cold water
+		Pressurized water
+		Number of heads
+		Shower
+		Head/waste system options
+		etc.
+
+	3.  Galley options
+		Stove
+		Sink
+		Oven
+		Galley layout options
+		etc.
+
+	4.  Electrical system options
+		Air conditioning
+		Desalinator
+		Television
+		Stereo
+		etc.
+
+	4.  Propulsion system options (single/twin screw, gas/diesel, etc.)
+		Single vs. twin screw
+		gas vs diesel
+		etc.
+
+	5.  Accommodation options
+		Number of staterooms
+		Number of berths
+		Space requirements
+		etc.
+
+	6.  Rig Options
+		Roller furling jib
+		Roller furling main
+		Asymmetrical spinnaker
+
+
+
+As the designer, you know what equipment and options are available, and this checklist is a good way to discuss and classify the options with the owner.
+
+
+
+
+
+C.  An owner's description of exactly how the boat will be used
+
+
+Have the owners describe exactly what they'll do with the boat when it is completed and how it will be used.  Tell them to write it down in a step-by-step fashion.  This technique conveys the needs of the owner without unduly restricting the designer’s options.
+
+
+
+For the power boat example, the owners might write:
+
+"When we retire, we will sell our main house and move into our waterfront condo in Stonington harbor, Connecticut.  Our boat will be docked at our condo during the summer, where we will cruise extensively the coast to Maine.  In the fall, we will cruise the boat along the intra-coastal waterway (ICW) to Florida, where we have a slip in a marina in Ft. Lauderdale and will live on the boat.  At some later date, we may decide to leave the boat in Florida during the summer and fly back to our condo in Stonington for the summer."
+
+
+With a description like this, you may be able to suggest to the owners a number of design alternatives that they might not have thought about.
+
+
+
+
+
+D.  Pictures and descriptions of other boats and options
+
+
+Ask the owners to show you or tell you about other boats or design features that they like and explain why they like them.  Use this list to help develop a ranking and weighted measure of merit for the boat.  If you do not agree with the owner, you can suggest design alternatives and explain the affect of the different choices on the boat.
+
+
+
+
+
+
+
+Part 4.  Design Constraints
+
+
+This section describes all of the fixed constraints to which the design is subjected.
+
+
+For example:
+
+	1.  Height limits for clearances under bridges
+	2.  Draft limits for shallow water
+	3.  Dock, slip, canal, or lock size limits
+	4.  Rating rule constraints for racing sailboats or powerboats
+	5.  Width and weight limits for trailering on the highway
+	6.  Size or weight to meet U.S. Coast Guard classification
+
+
+
+Include any constraints which are imposed on the design by the expected operating environment, or by various outside organizations.  In short, include any limits over which you have no control.
+
+
+
+
+Design Statement Summary
+
+
+The Design Statement should be written and reviewed by the owner before the Concept Design stage is begun.  It is advisable to write up each of these 4 sections, including a warning about how changes can affect the overall design process, and have the owner sign off on them.  You might include a provision which talks about a design review stage after the Conceptual Design process is complete.  Although this sounds a bit formal, it can prevent many misunderstandings between the designer and the owner.  If you wait to get feedback from the owner until after you've gone through several variations of the Concept Design stage, you may then find that the owner really didn't like a design feature that you thought was required.  The Design Statement process gets the owner to focus on the details of the boat very early in the design process.
+
+
+All techniques utilized to help get the owner focus on and think through the ownership and uses of the boat are important.  (You don't want the owner changing the requirements while you're in the middle of the Detailed Design stage.)  With this vision for the boat, the detailed design goals, and an understanding of the design trade-offs involved, you are now ready to begin the design process.
+
+
+
+
+
+
+THE CONCEPTUAL DESIGN PHASE
+
+
+
+The Conceptual Design Phase determines whether the boat described in the design statement is feasible and how the stated goals in the Design Statement must be modified to achieve a feasible and successful design.  It is important for the designer to strive for an optimal design, rather than just a feasible solution.  Principal dimensions, general arrangements, major weights items, and powering options are chosen, and concept drawings are produced and included in a concept statement or design proposal which is then submitted to the client or prospective client.  This step is often done on speculation in the hopes that a client will select the design for construction.
+
+
+
+All designers have their own ways to approach this design phase depending on their experience and the type of boat being designed.  I will discuss one effective approach which is geared toward the use of the computer.
+
+
+
+
+Concept Design Steps
+
+1.  Classify the cost for the new design compared to other boats of the same type
+2.  Identify all major design trade-offs
+3.  Select an iterative process which will create a feasible design
+4.  Create a measure of merit (analytic or subjective) for the design
+5.  Optimize the principal dimensions of boat
+6.  Optimize the details of the boat
+
+
+
+
+Each of these steps is discussed in detail below:
+
+
+Step 1.  Classify the cost for the new design compared to other boats of the same type
+
+Before you jump in and start picking the principal dimensions, arrangements, and performance goals for the boat, look at comparable boats on the market to see the price-range they have.  Then classify the boat as being in a low cost, an average cost, or a high cost range for this type of boat.  Keep this estimate in mind as you're developing the concept design to help maintain a handle on the costs.
+
+
+One way to estimate the cost of the boat is to plot cost versus weight and cost versus length for a large group of boats and use these graphs as general guidelines.  Many designers believe, however, that boat prices vary more with type of boat and weight than with the length of the boat.  Another technique for cost estimation is to assign prices to the different parts of the boat at the same time as you determine each weight item.  For example, when you estimate the weight and center of gravity for the hull, you can assign it a cost estimate at the same time.  You can even assign price ranges (low to high) for each item to determine a range of prices for the boat.  As the design nears completion, this range of prices should narrow.
+
+
+Step 2.  Identify all major design trade-offs
+
+To achieve a feasible design, you need to make sure that everything fits, the boat floats, and it performs as expected.  The interaction of the many interrelated variables must be identified before a design approach can be determined.  Some of the common design trade-offs are listed below:
+
+
+	1.  Weight, Longitudinal Center of Gravity(LCG)  versus  Draft, Trim
+	2.  Weight, Hull Shape, Vertical Center of Gravity(VCG)  versus  Stability
+	3.  Weight  versus  Structure, Arrangements
+	4.  Volume  versus  Arrangements
+	5.  Weight, Hull Shape  versus  Power, Speed
+	6.  Weight  versus  Cost
+
+
+
+Notice that the weights (and volumes) of the boat are involved with all of the trade-offs: cost, size, flotation, and performance of the vessel.  Any significant change to the weight values sets off a chain reaction throughout the design.  Some feel that weight analysis plays the key role in boat design.  As the weight of the boat goes up, so do the costs and the power required to push the boat at a desired speed.  But as the power requirements go up, so do the weight and volume of the engines and the weight and volume of the fuel tanks to achieve a desired cruising range.  This in turn affects the weight estimate and the arrangement drawings, which affects the resistance, which affect the power requirements, and so on.  Of course, this circle doesn't go on forever, but the goal is to do as few iterations as possible.  Defining and tracking accurate weight estimates for the boat early in the design cycle is your best tool toward minimizing the design iteration time.
+
+
+
+
+
+
+
+Step 3.  Select an iterative process which will create a feasible design
+
+
+This phase involves selecting a step-by-step procedure for creating a feasible design using the trade-offs of the last section as a guideline.  Every boat has different needs and requires different approaches to solving for their feasibility.  Start by examining the major purpose of the boat.  Is it fishing, cruising, carrying passengers, racing, or something else?  That major design use determines where to start the process.  For a fishing boat, the fishing gear is the most important and should be selected first, and then you design the boat around the gear.  For a pleasure boat, the design could be centered around live-aboard comfort and ease of operation.  For a racing sailboat, the major goal is to have a fast boat, so hull shape and light weight are emphasized and accommodations are secondary.  Define the feasibility iteration process so that it starts with the most important design attribute.
+
+
+
+
+For a racing sailboat, an iterative approach might be as follows:
+
+	1.  Create what you think is a fast hull shape and estimate the location of its waterline
+	2.  Calculate its displacement and trim
+	3.  Select the rig dimensions
+	4.  Check to see if the boat meets the rating rule
+	     If no, then go back to 1. and vary the shape of the hull or rig
+	5.  Do a structural analysis evaluation
+	6.  Do an arrangement sketch
+	7.  Do a weight estimate (displacement and center of gravity (LCG))
+	8.  If the displacement/LCG do not match the Draft/Trim, alter weights or go to 1.
+	9.  Feasible, so calculate the boat's speed potential using its measure of merit
+
+
+
+Actually, the only real qualification for a feasible racing sailboat is that it meets the racing rule criteria and that it floats.  The next few sections will discuss varying the major and minor design parameters in search of a feasible and optimal design.  You can't search for an optimal design, however, if you can't create a feasible design in the first place!  Note that while searching for an optimal design, it isn't always necessary to go through every feasibility step.  For the racing sailboat, you may wish to optimize the hull shape (and flotation trim) and its rig shape, and skip iteration steps 5, 6, 7, and 8.  This can work if you know beforehand that the displacement and structural requirements can be met for just about any hull that you are investigating and can be determined after an optimum hull shape is found.  A problem might arise, however, if your optimum hull shape weighs so little that a proper structure cannot be supported.
+
+
+
+The purpose of this step is to think though the process of creating a feasible design, as opposed to an optimal one.  Creating a feasible design is just one step in the process of determining a better or optimum design.  The following sections talk about measures of merit and optimizing your design.
+
+
+
+
+
+
+Step 4.  Create a measure of merit (analytic or subjective)
+
+
+Measures of merit (see the discussion in the Design Statement section), are functions or equations used to evaluate the "goodness" of a design.  Some are subjective ratings and some are analytic, based on extensive scientific modeling.  In either case, some form of measure of merit is required if you plan on optimizing your design.
+
+
+In some cases the measure of merit is obvious, such as for the passenger ferry, where the goal is to maximize profit or minimize the required cost per passenger.  In other cases, such as the pleasure boat, the measure of merit is vague and subjective.  In most cases, determining the exact formula for the measure of merit is quite complicated.  You should try to create a measure, however, because the only alternative is to use your intuition, gut feelings, or vague generalities to determine how two boat alternatives compare.
+Step 5.  Optimize the principal dimensions of boat (Global Optimization)
+
+
+The most common approach to design optimization is to create several different "concept boats" which have widely varying principal dimensions, such as length, beam, draft, weight, and powering.  These concept boats are created after an examination of the purpose of the boat and after performing short feasibility studies on a series of designs.
+
+
+Where do these concept boats come from?  They come from design experience, creative inspiration, and a lot of hard work studying the problems and goals associated with the design.  The designer gets an idea for a solution to the design problem, checks its feasibility, and then adds it to the list of concept boats if its measure of merit looks promising.  A final determination of the ranking of these concept boats may be put off until further design evaluation and optimization (local optimization) can be done (see the next section).  This is often the case when more than one concept design rates about the same on the measure of merit scale.
+
+
+A less common approach to global optimization is to use a computer program to automatically vary the principal dimensions, check for design feasibility, and evaluate the resultant measure of merit.  The program tries to select the correct combination of design variables which are both feasible and optimal.  This optimization program requires three parts:  one part to check for (and perhaps enforce) a feasible design, one part to calculate the measure of merit, and one part to vary the principal dimensions in such a way as to head toward an optimal design.
+
+
+For example, a set of interacting computer programs were written to optimize the major design dimensions of America's Cup boats.  The design values that were to be optimized included:  length, beam, draft, displacement, prismatic coefficient, longitudinal center of buoyancy (LCB), and the rig dimensions.  The detailed shape of the hull was not varied because the measure of merit equations (Velocity Prediction Program) could not evaluate such subtle changes as the difference between U-sections and V-sections.  The optimization started out with a hull shape which is close to the shape of a legal America's Cup boat.
+
+
+The optimization sequence proceeds as follows:
+
+
+1.	Start with a parent hull close to the shape of a legal America's Cup boat
+2.	Vary the draft or sail area to create/maintain a legal America's Cup boat
+3	Evaluate the speed potential using a Velocity Prediction Program (VPP)
+4.	Race the boat around the America's Cup course to determine an elapsed time
+5.	Vary any or all of the independent variables in a search for the shortest elapsed time
+6.	Automatic hull shape variation
+7	Go to step 2
+
+
+Step 2 is the maintenance of a feasible design (the hull and rig satisfy the America's Cup rule)
+Step 3 and 4 calculate the measure of merit for the design problem (elapsed time)
+Step 5 and 6 vary the principal dimensions in such a way as to head toward an optimum value
+
+
+In theory, you should be able to let a program like this run and run and run until it finds the optimum solution.  Unfortunately, it's not quite that simple.  As the number of independent (free to change) design variables goes up, the more difficult it is for the optimization procedure to search all combinations of all variables for an optimum set of design values.  There is a greater likelihood of the search stopping after finding a false or local optimum value.  What seems to work best is using an interactive process where the designer is involved with the direction of the search, but the optimization program does the rest of the work, including the display of graphs and contours.  The added benefit of designer involvement in the search is that the designer gets to control the search process and see exactly what happens to the elapsed time measure of merit and why.  The drawbacks of the designer-involved process are that it is slow and the best or "global" optimum solution may not be found.
+
+
+Programs like this that perform nonlinear optimization of a measure of merit require a mathematical equation which is continuous.  This means that the independent design variables all vary smoothly over a range of values.  For example, length, beam, and depth variables can have any value between some minimum and maximum amount, but a design variable like the type of engine, can only have very specific or discrete values, such as gas, diesel, or turbine.  Other design options like single vs twin screw, the choice between different reduction gear ratios, and the type of building material are also examples of discrete variables.
+
+
+There are some computer optimization techniques which try to search for an optimum measure of merit given both continuous and discrete variables, but they aren't commonly used due to their complexity and limited effectiveness.  Most applications of computer optimization involve the search of carefully designed problems and measures of merit using a limited number of independent variables.  The next section on detailed optimization gives some examples.
+
+
+Some designers approach the overall design process by always selecting a number of feasible concept boats (often having different discrete design variables, like one boat having a single screw and another having a twin screw) and trying to examine each one to determine which has the greatest potential.  Other designers tend to create a few good concept boat types, styles, or shapes and spend the rest of their careers varying, improving, and optimizing the designs.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Step 6.  Optimize the details of the boat (Detailed Optimization)
+
+Once you've selected the initial concept boat with the best potential, you still may wish to optimize it further.  This is the most common approach to design development or evolution.  Many designers create new boats simply by varying, customizing, or optimizing their previous designs for a specific purpose or customer.  This adaptation and optimization process is done using educated guesses, parametric analysis, or automatic optimization.
+
+
+
+Educated Guesses
+
+After you've designed boats for a number of years, you begin to develop a very good sense of what will and will not work on a boat.  Designers always have some ideas on how to improve or optimize an existing design, especially if the previous boat has been built and the designer  has had a chance to evaluate the result.  For racing boats (both power and sail), however, the design improvements and changes are smaller and there is a greater need for an objective analysis of the changes.  This is where parametric analysis and design optimization can be used most effectively.
+
+
+
+Parametric Analysis
+
+Parametric analysis is a technique whereby all design variables, except one, are held constant.  As the independent or "free" variable is systematically altered, the designer evaluates the changes to the design using some kind of measure of merit.
+
+
+For example, the graph on the left below shows how an 80 foot fast patrol craft's hull resistance varies as the position of its longitudinal center of gravity (LCG) changes, for a fixed speed of 40 knots.
+
+
+
+
+EMBED MSDraw   \* mergeformatEMBED MSDraw   \* mergeformat
+
+
+Notice that for this speed (the graph on the left), the optimum position for LCG (for minimum resistance) is pretty far aft (located at 28 feet forward of the keel-transom point, for an 80 foot boat).  This raises a few questions.  One: is it even possible to put the weights in the boat so that the LCG is that far aft?  Two: what happens to the trim and resistance for other speeds?  Three, and perhaps most difficult: how exact or accurate is the calculation of the trim and resistance?
+
+
+The graph on the right shows the actual trim of the boat (+ marks) and the predicted critical porpoising trim angle (circles) of the boat using the optimum (at 40 Kts) LCG position of 28 feet.  It shows that the actual trim angles are always lower than the critical porpoising trim angles.  Note: The critical porpoising trim angle calculation may not be very accurate or conservative, so the boat might begin porpoising before the actual trim angle crosses the critical trim angle curve.
+
+
+
+The following graphs show the minimum resistance positions for a variety of speeds and the associated trim curve for their optimum position of LCG.
+
+ EMBED Word.Picture.6  EMBED MSDraw   \* mergeformat
+
+
+
+
+
+
+
+
+
+The most obvious point to note from the above graphs is that the optimum position of LCG moves aft as the speed of the boat increases.  For 50 knots, the optimum position is located at 14.5 feet forward of the transom, which is virtually impossible to achieve.  This is not a drawback since the actual trim angles (+ marks) are all above the critical porpoising trim angles (circles), indicating that the boat will have severe motion problems.  
+
+
+Although the optimum LCG position at some of the slower speeds is achievable (meaning that it is possible to locate the weights on the boat to place the LCG in that position), is it a worthwhile step to take?  To answer this question, you first have to answer two other questions.  One, how difficult is it to move the weights on the boat to achieve this optimum LCG position, and two, what benefits to you get in return?  The answer to the first question is that it is usually very difficult to move weights on a boat to shift the position of LCG, unless it is very early in the design process or you don't have to move the LCG position very far.
+
+
+The answer to the second question is more interesting.  Looking at the graphs, it is easy to see the optimum position of LCG, but one has a tendency to ignore the size of the gain by moving the LCG.  For example, the design LCG position for this boat is 34 feet forward of the transom.  Let's say that you want to move it to the optimum position of 28 feet (for the 40 knot speed).  If you examine the graph for 40 knots, you will see that by shifting the LCG position from 34 feet to 28 feet, the total resistance for the boat decreases by only about 400 lbs, which is only a 1.5% reduction in resistance. (According to the computer program, this translates into a speed increase of less than one knot).  Therefore, shifting the LCG position six feet, from 34 to 28 feet forward of the transom, is probably not worth the gain (if it is even possible in the first place).
+
+
+This raises another question.  Which design variables have the greatest impact on the speed of the boat?  Although this answer will change depending on the speed of the boat, let's look at the effect on resistance of the following four variables:  displacement, vertical center of gravity (VCG), chine beam, and deadrise angle at amidships.  To do this, we will plot how resistance changes for small changes in each of these four design variables.  This is shown in the following four graphs.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+All of the graphs were plotted with the same Y-axis scaling so that it would be easier to determine which variable has the greatest impact.  Looking at the four graphs, it is clear that VCG has a negligible effect on resistance. (It has more effect on stability and roll period.)  The other design variables have roughly the same impact on resistance for the specified range of evaluation.  We still need, however, to answer the same question as we did for the LCG analysis.  What are the advantages to a design change and how difficult is it to achieve?
+
+
+
+
+
+
+After a little study, you should be able to see that lowering the deadrise angle from 15 degrees to 12 degrees not only lowers the resistance the most (by almost 1000 lbs), it is also the easiest to achieve.  Since lowering the deadrise angle adds more volume to the hull, it is easier to deal with than trying to squeeze the accommodations, tanks, etc., into less volume.  Changing either the displacement or chine beam would have a much greater impact on the design.
+
+
+What advantage does 1000 lbs less resistance represent?  For this design, the program indicates that this will increase the speed by 2 knots.  (If you really want to go faster, put in bigger engines!)  This seems to be a good trade-off, but what about the resistance at other speeds?  The program shows that for all other speeds, the lower deadrise angle has less resistance.
+
+
+What about critical porpoising trim angle, since the hull will be "flatter" forward?  The program indicates that for all speeds the actual trim angle for the boat is lower, but the difference between the actual and critical trim angles is less, meaning that the hull might be more prone to porpoising.  This is where you have to rely on your own design experience and the evaluation of other designs, rather than on the hard, cold numbers from the program.
+
+
+The other area that is affected by flatter sections is the accelerations felt by the passengers and crew.  For a 3 foot wave height, the program predicts that the "g-force" accelerations on the boat will increase by (at most) 5% for all boat speeds.
+
+
+
+Although all indications point toward the benefits and limited drawbacks of lowering the deadrise angle from 15 degrees to 12 degrees, you still have to provide the final trade-off analysis.  What is the purpose of the boat?  How will it be used?  Are there other examples of boats using deadrise angles that low, and if so, how do they perform in rough seas?  Does the fact that the boat weighs 186,000 lbs make a difference?  Remember that computer prediction programs are only as good as the theories that they use.  You must always relate the computer results back to your real-life experiences.
+
+
+
+
+
+
+Automatic Optimization
+
+
+It is possible to write a computer program to automate the parametric variation process of searching for an optimum solution.  Due to the complexity when used with many design variables, most attempts at this optimization process involve carefully designed problems using the fewest number of free or independent design variables.  The designer and programmer limit the number of search variables to a few key design values, thereby fixing the rest of the design variables and assuming that they don't affect the problem.  A well-designed optimization problem can lead you very quickly to the optimum solution of a design trade-off.
+
+Hands-on parametric analysis, however, is a good alternative because the designer is involved with the optimization and sees exactly what happens when a design variable is changed.  Using an automatic optimizer, the program determines the final result without the designer having developed any sense of how the variables affect the design.  If you do use an automatic optimization program, you should do a parametric or sensitivity study of the design parameters near the optimum solution, since you need to know how much you can change the independent design variables before the measure of merit drops off by more than small amount.
+
+
+Another way to look at the optimization problem is that you want to know more than just that one set of variable values which produce the best measure of merit.  You want to know the range of variable values which produce a measure of merit which is within 5 or 10 percent of the optimum.  With this information, you can select the combination of design variables which are close to optimum, but take into account some factors or constraints which were not included in the automatic optimization process.
+
+
+Contour plots are a good way to show ranges of design values that are within a certain percent of a maximum measure of merit.  A simple example is shown below for the America's Cup rating rule.  It shows contours of equal Sail-Area/Displacement Ratios (SDR) (one type of measure of merit) as influenced by varying the rated weight and measured length of the boat.  The goal is to keep the values of weight and length inside the contours which are closest to the optimum point.
+
+
+
+Although the Sail Area / Displacement Ratio should not be used as the ultimate measure of merit for the boat, it does give you some insight into the trade-offs imposed by the America's Cup rule.  In this example, the optimum values are weight at about 45000 lbs and measured length at about 66.5 feet.  For a fixed weight, the SDR ratio decreases as measured length increases because increased length (and rated length) is traded for sail area. (Since length and sail area both increase the speed potential of the boat, the rule requires that as one goes up, the other one must go down.)  As the measured length decreases, however, the rule increases the rated length (as the 8th power of the difference between the measured length and 69.554 ft!).  This means that even though the measured length decreases, the rated length increases(!) and the allowable sail area (and SDR) decreases.  All of this can be determined by studying the equations, but it is so much easier to see by looking at the contour plot.
+
+
+Automatic optimization programs can help you find optimum solutions fast and they can find unique solutions to design problems that may never have occurred to you.  The drawbacks are that they are difficult to program and will be more expensive than other types of programs, and they are only as good or accurate as your measure of merit.  Often, when problems are simplified for ease of optimization, the optimum solution must be carefully evaluated against those variables and constraints which were left out of the optimization model.  Optimum results are often located at extreme combinations of variable values, places where other, minor design variables and constraints can take on major importance.  Although computer design optimization can apply constraints or limits to the measure of merit search, it can also make the problem even more difficult to solve.
+
+
+
+
+Concept Design Stage Summary
+
+
+The Concept Design stage is used to define the principal dimensions and layout for a design which are both feasible and "best", using some form of measure of merit.  The results of this stage consist of a concept design report to be given to the current client or a design proposal to be sent to a prospective client.  The amount of information contained in this report often depends on whether anyone is paying you to do the work.
+
+
+A concept design report is useful to make sure that your clients agree with your design progress.  It can be used as an interim deliverable report to the customer to make sure everyone is in agreement before further work is performed.
+
+
+A design proposal developed on speculation and sent to a prospective client is a more difficult product to produce.  If the clients were somewhat vague about the boat's specifications, then a simple, "high-concept" design proposal may be in order.  If you get too specific, then the clients might not like the results and may not feel that you understand their needs or may select someone else's proposal which happens to be closer to their needs.  If prospective clients are not clear about the design details they want, then you have to focus on the main purpose or function of the boat.
+
+Concept Design Process Example
+
+
+This section will describe the Concept Design process from a more concrete perspective using commonly available computer programs.
+
+
+
+Step 1.  Select several "concept boats" to analyze
+
+Analyze the needs of the client and the purpose of the boat to select the principal characteristics of the boat.  For example, if you are designing a sportfisherman, you might want to list the overall attributes it must have.  One way of doing this  is to write a description of the boat as it would appear in its advertising literature:  what does it cost?, how big is it?, how fast does it go?, what is its range?, what are its electronics?, what fishing gear does it have?,  and sketch what it looks like.  Once you've decided on the boat's design attributes, you need to translate them into several concept boats to evaluate.  For example, you might have one concept boat with a single screw and another with twin screws, or you might have a boat which is heavier, but has more powerful engines.  You may wish to build a matrix of concept boats which include all of the combinations of design features.
+
+
+For each concept boat, you should select the following values:
+	Length
+	Beam
+	Depth
+	Draft
+	Style of boat
+		Power: displacement vs. planing
+		Sail: racer vs. cruiser, full vs. fin keel
+	Target displacement
+	Target cost
+	Target performance
+		Maximum continuous cruising speed
+		Sailboat performance in terms of SDR, DLR, rating rule, or VPP numbers
+			(SDR = Sail Area/Displacement Ratio)
+			(DLR = Displacement/Length Ratio)
+			(VPP = Velocity Prediction Program)
+	Rig dimensions for sailboats
+	Range
+	Electronic/navigation equipment
+	Special equipment (fishing, racing, etc.)
+	Major comfort features / interior arrangement
+
+
+(Note: this list is just an example and can be varied for each type of boat, but should consist of major design parameters)
+
+
+Since displacement is a major design variable, it is best if you specify its value, rather that let it float and be the result of everything else that goes into the boat.  You are better off specifying this as a "target" value and showing that it can be achieved by controlling the hull shape and by controlling the weights on the boat.
+
+
+
+
+For each concept boat:
+
+
+2.  Create a starting shape for the hull and define its waterline.
+
+Use an appropriate computer program to create a complete, starting hull shape.  This can be done in several ways.
+
+	A.  Create a boat from the principal dimensions (length, beam, draft, depth)
+		There are computer programs which automatically generate a full, complete,
+		hull shape, given just the principal dimensions for a boat.  These programs
+		create a starting shape for a boat which must be refined and faired.
+	B.  Create a new boat by varying an existing boat.
+		There are computer programs which take existing boats and alter their shape by
+		varying their length, beam, draft, prismatic coefficient, or position of their
+		longitudinal center of buoyancy (LCB).  If the original boat was fair, then the
+		derived boat should also be fair.
+	C.  Create a boat by typing-in its offsets table or by digitizing its body plan.
+		This technique allows you to match an existing design which is not yet in the
+		computer.  Once it has been matched, it can be varied using the techniques
+		described in option B.
+
+
+
+
+3.  Match the hull to the target displacement and waterline.
+
+
+Once you've created a starting shape for the boat, you need to alter its shape to make sure that it has the correct displacement at the desired waterline.  Follow these steps:
+
+
+	Calculate the hydrostatics for the boat.
+		This is fast and simple, since you already have a computer model of the boat.
+		Compare the calculated displacement with the target displacement.
+
+		If the calculated displacement is too low, then do one or more of the following:
+			1. Raise the waterline until the target displacement is achieved
+			2. Modify the underwater hull shape to make it more full
+			3. Increase the length, beam, or depth of the boat
+			4. Increase the boat's prismatic coefficient
+				(this can be done automatically)
+			5. Lower the target weight
+
+		If the calculated displacement is too high, then do one or more of the following:
+			1. Lower the waterline until the target displacement is achieved
+			2. Modify the underwater hull shape to make it less full
+			3. Decrease the length, beam, or depth of the boat
+			4. Decrease the boat's prismatic coefficient
+				(this can be done automatically)
+			5. Raise the target weight
+
+If the initial hull shape has a displacement which is far different from the target displacement, then you may have to consider whether the hull shape needs to be changed drastically, or if the target displacement needs to be changed drastically.  Which is more important to the overall purpose of the design:  hull size and shape or hull weight?
+
+
+If you create a new hull from an existing one (which has already been faired), then you can use a program to change its length, beam, depth, prismatic coefficient, or longitudinal center of buoyancy automatically, without affecting the boat's fairness.  Many times you can create a new hull from an old one without having to perform any fairing on the hull.  Note that if you stretch or modify a hull  too much using this technique, then the resultant hull may have to be reshaped slightly and refaired.
+
+
+
+
+
+4.  Break the target displacement into its component weight groups.
+
+
+Given a target weight, you need to develop a feel for whether or not your design can achieve that goal.  One approach is to do a top-down analysis of the weights.  The first step is to decide what portion of the overall target weight should be allocated to each individual weight group.  The following is a sample list of weight groups.
+
+
+	Hull and deck, plus structure
+	Ballast
+	Interior / joiner work
+	Interior equipment
+	Rig and deck hardware
+	Special Purpose Equipment (e.g. fishing nets/gear)
+	Engine/mechanical
+	Plumbing
+	Electrical
+	Tanks and fluids
+	Stores
+	Contingency weight factor
+
+
+For example, you might decide that the hull and deck group will be 25% of the target weight, the ballast will be 40%, and the contingency group will be 5% (remember that the percentages should all add up to 100%).  These percentages can be obtained from your other designs, or by studying other boats of the same type.
+
+
+Working backwards from the target weight and percentages, you can allocate each group a certain amount of weight.  Before you complete the Concept Design stage, you should study each group and make sure that the targets for each weight group can be achieved.  If you aren't certain of this, you run the risk of major design rework during the Preliminary Design phase.  This weight group division can form the basis for a complete weights breakdown, which is required by the Preliminary Design stage.  The sooner you start collecting exact weights, however, the better you will be able to determine whether the target weight is feasible.  Weights programs are available which allow you to input weights throughout the design process.  They can automatically calculate both the total weight and the position of the Longitudinal Center of Gravity (LCG).
+
+
+As you proceed with the Concept Design process, you should be constantly adding weight details to the list.  For example, as soon as you select an engine, reduction gear, and propeller, you should add the individual weight items and locations to your weight list and calculate the remaining weight allocated for that group.  If the engine weights 1150 lbs and the Engine/Mechanical weight group has 1500 lbs left for allocation, then after adding the engine, there will be only 350 lbs left for the Engine/Mechanical weight group.  Each time you add a weight item, you have to determine if the remaining weight for that group is enough to account for the rest of the weight items to be added to that group.  If not, perhaps you could adjust the weight group percentages and "steal" some weight from another weight group.  The point to remember is that as soon as you select a weight item to go on the boat, you must add it to the weight list and evaluate the remaining weight allocated to that weight group.  If there is a problem, the sooner you deal with it the better.
+
+
+
+In addition to matching the total weight to the target displacement, you need to check the position of the LCG of the weights and compare it to the position of the Longitudinal Center of Buoyancy (LCB) found when you calculated the hydrostatics in the previous step.  To achieve an even trim for the boat, the center position of all of the weights (LCG) must match the position of the LCB (the center of the underwater volume).  If not, the boat will trim down by the bow if the LCG is forward of the LCB, or it will trim down by the stern, if the LCG is aft of the LCB.  The boat will trim such that the position of the trimmed LCB matches the position of the LCG of the weights.  To maintain a hull with an even trim, do one of the following:
+
+
+	1. Calculate the LCB for the design waterline.
+	2. If the LCG is forward of the LCB, do one or more of the following
+		1. Use a computer program to shift the LCB of the hull forward to match LCG
+		2. Add more volume to the hull forward of the current LCB
+		3. Shift some of the weights in the hull aft until the LCG matches the LCB
+	3. If the LCG is aft of the LCB, do one or more of the following
+		1. Use a computer program to shift the LCB of the hull aft to match the LCG
+		2. Add more volume to the hull aft of the current LCB
+		3. Shift some of the weights in the hull forward until the LCG matches the LCB
+
+
+This final alteration needs to be done only as you close in on the final target weight.  If you compare the LCG with the LCB as you are adding weights, you can often correct for any trim problem by proper placement of each new weight.  If you wait to check for trim problems until after all weights have been defined, then you might have a problem which can only be corrected by a major design rework.
+
+
+While you are collecting weights, you should also collect costs for each weight item.  This information can be tracked, along with the weights, to keep a running total of weights and costs for the boat.
+
+
+
+5.  Predict the performance.
+
+
+Now that you have a hull which matches a desired waterline and target displacement, you can predict the performance of the boat.  The performance might include the boat's resistance, stability, power requirements, or speed potential.  There are a number of programs available for performance prediction.
+
+
+For powerboats, resistance calculation is usually broken into several groups, depending on the type of the vessel:  planing boat, displacement boat, fishing boat, etc.  The programs will tell you the resistance and the effective horsepower (EHP) that is required to push the boat at a certain speed.  You can then use another program to select an engine, a propeller and a reduction gear ratio which produces that EHP most efficiently.  The following is an example of a plot produced by a program which predicts the horsepower required to push a power boat at planing speeds
+
+
+
+
+
+
+
+Once an engine, gearbox, shafting, and propeller are selected, you should add them to your weight list and update the weight group target values.
+
+
+
+For sailboats, you can use a program which predicts the velocity of the boat for any wind speed or direction, given the hull and rig shapes.  Within minutes of creating a concept hull shape, you can calculate and plot an accurate polar speed diagram for the boat, as shown below.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+For all boats, the stability can be checked by computer program and the boat's righting moment can be plotted for any heel angle.  This information can be used to predict the static and dynamic stability of the boat and see whether it meets various regulatory rules.  The only missing piece of data required for stability analysis is the vertical center of gravity (VCG), which is determined from a balancing calculation of all weight items (this is calculated in the weights program).  Although the VCG won't be known until all of the weights (and their vertical locations) are known, you can still use the stability calculation program by using an estimate for the VCG.  This estimate is best determined by evaluating another design of the same type.  If this information is not available, you can estimate the VCG by locating it at the waterline of the design.  This is a common practice, but if there is some doubt, you should always set it on the high side, to be conservative.  If you aren't conservative, and you find out after the weights are done that the stability is inadequate, then you have to deal with major design changes.
+
+
+
+
+
+
+
+6. Evaluate the structural requirements for the boat.
+
+
+Although it is early in the design process, you should evaluate the design to see whether it has any special structural requirements.  For some racing boats, the goal is to have the lightest boat possible.  If this is the case, then the structures will greatly affect the feasibility of the design in terms of meeting the target weight while maintaining the proper structural support.  Another reason to do a preliminary evaluation of the structures is to see if some of the interior arrangements can double as stiffeners for the boat.  This can often be done if it is investigated early enough in the design process.
+
+
+If the boat has to meet certain regulatory standards (such as one of the ABS or Lloyds rules), then you may wish to perform a quick rule analysis on the design, especially if the boat is very light weight.  Although there are a number of programs that implement the structural rules, it will still require extra time to perform the structural analysis.
+
+
+Detailed structural analysis of the hull using a finite element analysis method is only necessary for the most uncommon designs, such as if the hull is very light weight, or if the hull is a new or unusual type of design, not covered by the regulatory rules.  Even so, a finite element analysis is usually done only for special projects by engineers experienced in the program’s use.
+
+
+
+
+
+
+
+7.  Sketch the interior arrangements.
+
+
+Another major problem is to fit everything necessary into the boat.  This is a volume problem rather than a weight problem.  There are a couple of approaches to this problem.  Since this is the Concept Design phase, you may decide to check for fit and clearances by sketching the interior by hand on a small piece of paper.  You could get a little bit more formal and use the computer.  This can be done by transferring plan, profile, and section views of the hull to a general purpose (2-dimensional) CAD program to block out the major sections of the interior.  Remember that the goal of the Concept Design stage is to verify feasibility and to perhaps produce a nice arrangements drawing for the design proposal.  You want to minimize any wasted effort if the design ends up changing (which will probably happen, since this is the Concept Design stage).  The best advice is to determine the feasibility of the interior arrangements by sketching the layout by hand on the plan, profile, and sections of the hull. (Note: these views can be automatically plotted, since the hull shape has already been created in the computer.)  The CAD program can be used to create the pretty pictures, when the best concept design is selected and the design proposal has to be produced.
+
+
+While determining the interior arrangements, it's also a good idea to update the weights list concurrently.  Each portion of the interior can be broken into individual components, their weights and positions estimated, and then added to the detailed weight list.  This weight list can then be compared to the target weights for the different weight sections to see if there is a weight versus waterline problem.
+
+
+
+
+
+
+
+
+
+
+
+8.  Check the weights and costs for the boat.
+
+
+This is end of one Concept Design iteration.  With a little bit of luck, you have a feasible design which achieves your desired goals.  Two of the variables to check at this time are the weight and cost for the boat.  Since there are many components to these variables and they have the most unknowns, they are areas where the most problems arise.  It cannot be over-stated how important it is to start collecting and maintaining a list of weight and cost items that are on the boat.  If you put off this work until the Preliminary or Detailed Design stage, then you may be in trouble when you find that the detailed weights add up to be 20 percent over the target weight.  The further along the design spiral you are, the more difficult it is to go back and correct a problem.
+
+
+
+Now that you have a feasible design, you may wish to apply some parametric analysis or optimization techniques to the design.  This may require you to step through the Concept Design iteration a few more times, but, by using the computer, you may be able to improve the design with very little extra work.  Once complete, you can repeat this Concept Design process for the rest of the concept boats and then select the one boat that has the most potential for continued development in the Preliminary Design stage.
+
+
+
+Finally, notice that the computer greatly helps the design process by providing an easy way to start with a complete hull shape.  So many accurate calculations can be performed in the Concept Design stage because of this fact.  The increased accuracy so early in the design process eliminates much of the iterative guess work of the design process.  The two areas where the computer helps the least are in the determination of the detailed weight information and in the layout of the arrangements and the determination of whether everything fits.  That is why you should constantly update the detailed weight list as the design evolves.  The sooner you determine that there is a weight or arrangement problem, the less effort it will take to correct it.
+
+
+
+
+THE PRELIMINARY DESIGN PHASE
+
+
+After the Concept Design stage is complete, many designers jump right into the detailed design of the boat and start producing the specifications and plans for the boat.  The normal, large-ship design process, however, breaks this sequence into the preliminary, contract, and detailed design phases.  I will skip the contract design phase (see [KISS80]) and discuss the separate Preliminary and Detailed design phases.  This separation is somewhat arbitrary, but it helps to divide the rest of the design process into two parts, the analytic part and the deliverable part, and it helps to minimize design rework.
+
+
+I will define Preliminary Design as that portion of the design involved with producing all of the required calculations to verify and support the concept design.  These calculations include hydrostatics, stability, floodability, performance analysis, weights determination, and structural analysis.  Although many of these calculations have been done during the Concept Design stage, they all need to be recalculated now that the exact dimensions of the hull, interior, propulsion, and rig are known.  You could think of this as the next iteration through the design spiral after the Concept Design stage.
+
+
+I will define Detailed Design as that portion of the design involved with producing all of the "deliverables": the drawings and the specifications.  The idea is to complete the design of the boat before any of the drawings are produced.  This reduces or eliminates the need to redo drawings if any part of the design changes due to the results of the calculations.  This is not a big problem when you use the computer to produce the drawings, since making changes by computer is reasonably quick and simple.  In addition, much of the geometry of the boat is already in the computer and can be used to automatically produce some of the drawings.  In general, however, it is best to wait until all of the calculations are complete before producing the drawings to minimize the time lost in making changes.
+
+
+
+Preliminary Design
+
+Once the Concept Design is complete, you are ready to go to the next level of design specification and detail:  hull shape is finalized, interior arrangements are finalized, all weights are calculated or estimated, the structural analysis is performed, and the performance prediction is recalculated and verified.  If the results of the Concept Design stage are accurate and there aren't any last-minute design changes, you should not run into any large trade-off problems which require you to re-evaluate your whole design concept.
+
+
+	1.  Complete the hull shape definition
+	2.  Perform a detailed structural analysis for the boat
+	3.  Finalize the interior arrangements
+	4.  Determine hydrostatic and stability requirements
+	5.  Re-evaluate resistance, powering, and performance of the boat
+	7.  Calculate detailed costs for the boat
+
+
+
+
+1. Complete the hull shape definition.
+The Concept Design process created and refined the initial hull shape, but didn't necessarily perform any detailed fairing (unless the hull was derived from another boat that was already fair).  During this Preliminary Design phase, the hull shape is further refined and faired for the purpose of calculating more accurate analysis and arrangement results.
+
+
+Using a computer and boat design software, it is easy to create and fair hulls.  You no longer need to go through the tedious process of manual lines drawing and fairing the three different views at once.  With a computer hull model, you create a hull form that is unique and accurate from start to finish.  When you move a point in one view, it is automatically updated in the other views (see the paper  "From the Drafting Board to the Computer" [HOLL91]).  With a computer, anyone can create and fair a hull.  No traditional drafting or lofting skills are required, although the programs will not tell you what is a good, versus bad, design.  In addition, you can automatically plot a complete set of lines, print a table of offsets (reduced by the skin thickness), and perform any of the analysis calculations at any point in the design process.
+
+
+
+
+Computer-aided boat design software allows you to create and collect accurate design information quickly and easily.  If the boat needs to change based on the analysis of various design trade-offs, you can easily use the programs to change the shape of the hull and recalculate the results.  This doesn't work for everything, however, since there is no magic way for a program to automatically calculate many of the detailed weights for the boat and there is no way for a program to automatically determine if there is enough room to fit everything into the boat.  In spite of any rework problems, it is better to get down to details as soon as possible.  This does not mean that you should be producing detailed arrangement drawings in the Concept Design stage!  You can do all of the detail volume fitting and weights collection without wasting time producing the final deliverable drawings.  You want to determine the details as early as possible in the design process, but you want to wait until the Detailed Design stage to produce the final drawings.  If the Concept Design phase was completed well, then all major trade-offs have been analyzed and solved and you can determine all of the details in the Preliminary Design phase with little risk of major design rework.
+
+
+
+
+
+
+
+
+
+
+
+Now that the hull shape is finished (almost), you should determine the required structure for the boat.  This information includes the type of building material, the thickness of the material, the location and sizing of all frames, and the location and sizing of all longitudinal stringers.  There are a number of ways to determine this information.  The most common method is by using a structural rule defined by the American Bureau of Shipping or Lloyds.  They have structural rulebooks for boats such as sailboats, powerboats (high and low speed), and fishing vessels.
+
+For example, the ABS Guide for Building and Classing Offshore Racing Yachts has sections which cover keel bolt sizes, plating thicknesses, internal structure sizes, and rudder structural calculations.  The guide provides all of the equations you need to do the calculations for a variety of materials and construction techniques.  Computer programs which implement these rulebook equations can also be obtained.
+
+
+If you don't want to be confined to the generic equations supplied in these rulebooks, you will have to develop your own methods for determining the forces acting on the hull and the equations to be used to evaluate a variety of plating and internal structural arrangements.  The hull structure must provide both overall longitudinal strength and local impact damage resistance.  This is done with a combination of plating material, plating thickness, number and size of frames, and number and size of stringers.
+
+One of the most difficult aspects of structural design is to predict the various types of loads that the hull must withstand:  static hydrodynamic pressure, rig forces, dynamic wave impact loads, and dynamic debris impact forces.  Another goal may be to create a deck strong enough to support a human without flexing.  The deck might be perfectly strong, but it might also flex when walked upon.
+
+
+If you want further analysis of a hull, you may wish to model its 3D shape as a mesh of tiny rectangles and apply it to a finite element analysis program.  This type of program will place a user-defined load on the boat and calculate the final stress intensity pattern on the hull.  This analysis is not often done due to the complexity of generating the mesh model, determining the forces to be applied to the hull, and analyzing the differences between different plate thicknesses, frame spacings, and stringer spacings.  It usually requires the use of someone who has a lot of experience "meshing" hull shapes and using finite element analysis programs.
+
+
+
+
+
+
+
+
+
+3.  Finalize the interior arrangements.
+
+
+Now that the hull shape has been finalized (as close as possible), you can determine the details of how the interior pieces fit together.  Remember, the goal of this design phase is analysis and fit, rather than the production of drawings.  You want to determine if everything will fit as expected, or if there is something that was overlooked.  With computers, however, the best way to do this analysis is to jump right in and start defining accurate dimensions.  This brings up a interesting point on modeling versus drawing.
+
+Some designers are using computer programs to create full 3-dimensional (3D) interior arrangements.  This is different than producing the final 2-dimensional (2D) drawings to be given to the boatyard for construction purposes.  Computer-aided design can be separated into two steps:  a) creating the computer model, usually 3D, and  b) producing a plotted view of the model to be used for sales or construction.  (With 2D computer modeling, the 2D model is usually very close to the final 2D drawing to be produced).  With a proper computer model of a boat, you can produce many views of the boat automatically, such as lines drawings, tables of offsets, 3D perspective views, and cross sections.  By creating a full 3D model (both interior and exterior) of the boat on the computer, you can then produce any derived information automatically (in theory), such as a hull interior cross-section or an exploded part view of the hull interior.  At this time, it is still expensive, time-consuming, and difficult to create a full 3D interior arrangements for a boat on the computer, and may not be worth the effort, unless you have a customer who will pay for it.
+
+
+Creating a 3D exterior hull model by computer, however, is currently very cheap and easy to do.  Most designers use boat design software to create a full 3D, fair hull surface model for the boat so that lines drawings, construction templates, and lofted offsets can be produced automatically.  For the interior arrangements, different views of the hull (cross sections) are transferred to a general purpose CAD program (like AutoCAD) for completing the traditional 2D drawings to be delivered to the yard for construction.
+
+Even with 2D CAD drawings, you can split the process into modeling (Preliminary Design) and results (Detailed Design) steps.  The Preliminary Design modeling phase should be concerned with the definition and fairing of the exterior hull model and the layout and dimensioning of the interior arrangements.  For the interior arrangements, the designer should begin by transferring several views of the 3D hull model to their general purpose CAD program.  These views can be used to begin producing the final arrangements drawings to be delivered.  With a 3D interior arrangements computer model, there is no concern at this stage with the form of the final deliverable drawings, but with 2D computer interior drawings, you might as well start producing the final drawings to be delivered.  You should, however, be concerned with layout, fit, and dimensions at this stage, rather than the final look of the drawing.  Remember that the arrangement plan may have to change again, so you don't want to work on things which can be put off until the Detailed Design phase.
+
+
+The boat design software allows you to create and fair the hull, and calculate results for the 3D hull shape model of the boat.  To create 2D or 3D arrangement models, you need to transfer the 3D hull shape (or 2D views of the 3D hull model) into a general purpose CAD program to create the 3D or 2D interior arrangement model of the boat.  If the interior arrangements are to be done in 2D, then the computer model will end up being equivalent to the final 2D drawings that are finished in the Detailed Design phase.
+
+
+
+
+These standard part shapes can be obtained in a number of ways.  Some manufacturers have parts libraries for their equipment which they will give or sell to you (it helps them sell their equipment), or you can digitize or scan each part shape into the computer from sales literature.  It is a tedious process to create and maintain good parts libraries, but the effort is rewarded in terms of the speed and accuracy of producing your 2D or 3D interior arrangements model.
+
+
+Another advantage to CAD parts libraries is that you can "tag" each part with other information, like the part's make, model number, source, cost, and weight.  This means that you can ask the CAD program to list all of the parts in the model along with their tagged information.  This data can be automatically taken from the parts libraries and printed out for inclusion into the boat's specification.  It can also be used to track many of the weights which are included in the boat.  Developing and maintaining good parts libraries is one of the most important steps you can take in computerizing your design process.
+
+
+
+The goal of the Preliminary Design phase is to create an accurate computer model of the boat and the goal of the Detailed Design phase is to produce a variety of "views" of the model for delivery to the yard.  Some yards may wish to get the 2D and 3D computer models of the boat, along with any deliverable drawings, so that they can calculate and draw whatever they need, without constantly requesting the information from the designer.  For example, say that the builder needs the interior hull shape along the two foot buttock line, to cut out interior pieces that will be bonded to the curved inside shape of the hull.  This information may not be explicitly included in the set of plans given to the yard, but with the full 3D computer model of the boat, the yard can determine, plot, or numerically-control (NC) cut the exact shape it needs.
+
+
+
+
+
+4. Determine hydrostatic and stability requirements
+
+
+The hydrostatic and stability calculations for the boat are required to determine how the hull shape and boat weights affect the performance and safety of the boat.  The hydrostatic (volume) calculation provides information about the hull shape in its upright condition and the stability calculation determines additional righting moment information when the boat is heeled over.  For certain types of commercial vessels, the design has to meet specific federal regulations related to freeboards, stability, and floodability.
+
+Hydrostatic Calculations
+
+These calculations determine properties of the hull shape for any upright flotation plane.  These properties include volume, displacement, center of buoyancy, wetted surface, metacentric heights, and hull shape coefficients.  From a design standpoint, there are two ways to approach these calculations:
+
+
+Method A.  Given a waterline (draft at amidships and trim), calculate the hull properties, including displacement and longitudinal center of buoyancy (LCB), which will equal the boat's weight and the longitudinal center of gravity (LCG).  If you start the design process by drawing a waterline on your profile view of the hull, you can use the draft and trim (usually a boat is designed to have zero or even trim) values to calculate the associated values of displacement and LCB.  The displacement value calculated must equal the sum of all of the boat's weights, and the LCB position must match the longitudinal position of all of the boat's weights (LCG).  If it doesn't, then either the waterline must change or the weights must change.
+
+
+
+Method B.  Given the displacement and LCG, calculate the hull properties, including the waterline (draft and trim).  This is the reverse calculation from the draft and trim example.  The program must search for the waterline (draft and trim) which matches both the target displacement and LCG (LCG must match the LCB position).  If the resultant waterline is not appropriate (too high/low or it has too much trim) then some of the weights and/or their positions must change or the hull shape must change (See the discussion in the Concept Design section for details).
+
+
+
+Most designers start by selecting a target displacement for the boat.  This target displacement is determined by experience and by evaluating similar designs.  From this target, the designer modifies the shape of the hull to match the target displacement and modifies the weights to achieve the target displacement.  To match the trim the weights are adjusted or the hull shape is modified by shifting volumes.  The target displacement usually includes an over-weight contingency factor of between 5 to 10 percent.  This means that there is a normal tendency for the boat to be built heavier than expected (it usually never is the other way around).
+
+
+
+
+Changing the trim of the boat
+
+As you are designing the boat, you may find that the longitudinal center for the weights (LCG) does not match the longitudinal center of buoyancy (LCB) for the no-trim, even-keeled waterline that you drew for the boat.  This means that the boat will trim down by the bow or stern until the center of buoyancy (LCB) shifts to match the position of LCG.  If you want to correct this problem, you must either shift weights or change the shape of the hull as follows:
+
+	A.  Moving weights
+		If the boat is down by the bow, shift weights aft
+		If the boat is down by the stern, shift weights forward
+	B.  Changing the hull shape
+		If the boat is down by the bow, shift the LCB forward (add volume forward)
+		If the boat is down by the stern, shift the LCB aft (add volume aft)
+
+	A computer program can be used to shift the LCB position of the hull automatically, 
+	as long as the shift is not too great.  If the boat has too much trim (one way or the 
+	other), you need to rethink your whole weight distribution or go back to the Concept 
+	Design stage.
+
+
+
+
+
+
+
+Stability Calculations
+
+
+
+The stability calculations determine information related to the safety and comfort of the boat.  Given an upright draft and trim, the stability calculations determine the righting moment for any heel angle.  This process is done by heeling the boat to the desired angle and then letting it sink and trim until the heeled displacement and LCB matches the upright displacement and LCB.  The righting moment (or righting arm, since righting moment is equal to the product of righting arm and displacement) is then plotted for all heel angles from 0 to 180 degrees.  The initial stability of the boat is related to the slope of the curve at a heel angle of zero, and the area under the curve is related to the dynamic stability of the boat.  Two other important points are the heel angle of maximum righting moment and the heel angle at which the righting moment goes to zero.  Sometimes it is desirable to plot a heeling moment curve on top of the righting moment curve.  Examples of heeling moment are wind heel and passengers or cargo located off-center.
+
+
+
+
+
+
+
+Rules created by various regulatory bodies (such as the Coast Guard) use a combination of these values to determine if a design has sufficient stability.  Another graph that is commonly used for stability analysis is the plot of cross curves, as shown below.
+
+
+
+
+
+
+This graph tells you everything you need to know about the intact stability of a design for various displacements and heel angles (each curve is a different heel angle).
+
+
+
+
+
+For certain commercial vessels, regulatory bodies also require that additional criteria for damaged or flooded conditions be met.  One criterion is called a "floodable length" condition, which requires the boat to remain afloat (in an upright condition) after one compartment is flooded side-to-side.  Another criterion is called one- or two-compartment floodability, where the boat must remain afloat and stable after any combination of one or two compartments are flooded.  There are special computer programs which can be used to define and flood arbitrarily-shaped interior compartments.  These programs are only needed for those boats required to meet the stringent regulatory conditions.
+
+
+
+
+
+
+5.  Re-evaluate resistance, powering, and performance of the boat.
+
+Now that the hull shape is completed (or close enough to perform this analysis accurately), you can re-evaluate the performance of the boat.  The techniques and programs used to evaluate powerboats and sailboats are quite different and will be discussed separately.
+
+
+
+Powerboat Resistance and Propulsion
+
+Powerboats are classified as either displacement-type or planing-type vessels with their performance specified in terms of cruising speed and range.  Although there are different methods (using the computer or otherwise) for calculating the resistance of each type of vessel, the powertrain components are still the same.  All powerboats consist of the engine, reduction gears, shafting, auxiliary devices, such as generators, and a propulsor, such as a propeller or waterjet.  The design objective is to select the components that produce the required thrust to push the boat at the desired speed with the greatest efficiency.  The problem can be complicated by the need to maximize the efficiency even when the boat is operated at a range of speeds.
+
+
+Many designers focus on maximizing the efficiency of the boat at the top-end cruising speed, while checking to make sure that the efficiencies at the slower speeds are not prohibitive.  Some boats, however, may require additional work to obtain an efficient compromise.  For example, a fishing boat must be able to cruise empty out to the fishing grounds, troll efficiently, and return home quickly with a full load.  For this type of trade-off, a designer wants to select the propulsion components which maximize the cruising speeds, but minimize fuel consumption.  To answer this question, however, a good measure of merit is critical.  A faster cruising speed means that the boat spends less time commuting and can make more trips per year, but at the expense of a higher fuel bills and larger fuel tanks.  If the engines and tanks are larger, that will leave less room for the fish.  As you can see, the solution to the compromise is not obvious.  The best measure of merit would be one which includes the whole design, rather than just the propulsion system.
+
+
+The design process begins by evaluating the resistance of the boat over all operating speeds.  This can be done by computer using different methods for displacement mode versus planing mode resistance.  This resistance can be equated to the thrust or Effective HorsePower (EHP) required by the propulsor to push the boat at the desired speed.  The EHP can then be translated back through the propeller, shafting, and gearing to estimate the horsepower (called the Shaft HorsePower -SHP) required by the engines.  (For quick estimates, some designers multiply EHP by a factor of 2 to determine the required SHP.)
+
+
+For this stage of design, you need to be as accurate as possible.  This can be done using a program to select an optimum propeller and reduction gear ratio and match it to your engines (no programs are known for other types of propulsors).  Programs that select the optimum propeller help you select an efficient combination of values for gear ratio, propeller diameter, expanded area ratio (EAR), pitch/diameter ratio, and rpm.  You can select between several propeller charts which are designed for different types of propellers, including those designed to operate in a semi-cavitating region.  The controlling factors are the limited selection of engines and reduction gear ratios available, a maximum diameter for the prop, and the limited selection of prop dimensions.
+
+
+Sailboat Performance
+
+When designers talk about sailboat performance, it isn't necessarily racing sailboats they are discussing.  All sailboats must be seaworthy, stable, have a good balance and perform well for their intended purpose.  The key, of course, is that all sailboats have different purposes and goals.  A cruising sailboat may not be optimized for speed, but it should move well through the water and be easily controlled.
+
+
+The best tool a designer has for this purpose is a Velocity Prediction Program (VPP).  This type of program takes into account the shape of the hull and the rig of the boat to determine the speed potential for any wind speed and angle.  It will also tell you at what heel angle you will have to reef (this will tell you how "tender" the boat is).  Whether a sailboat will be raced or not, it is always a good idea to evaluate the performance of the boat to learn which design variables affect its speed.  A fast and easily-driven boat will have less stresses placed on its structure and its occupants.
+
+
+The best part of the VPP sailboat performance model is that it is continually being updated for accuracy (by US Sailing) and can be used to optimize a sailboat for racing.  It cannot evaluate subtle differences between hull or keel shapes, but for overall hull and rig dimensions, it is the most accurate tool available.  Many designers use its results as their main tool for optimizing a design.
+
+
+Since the VPP does not account for the planform shape or the airfoil shape of the keel and rudder, a few programs have been written specifically for that purpose.  Some programs use a simple 2D analysis and some apply a more accurate 3D lifting surface theory.  For those interested in the most advanced computer keel lift and drag programs, you need to find one that applies a potential flow analysis of the underwater portion of the hull.  A separate problem from lift and drag is the resistance of the hull in waves, which can be calculated using other programs.  Although it is very common for a designer to use a VPP program, these advanced "flow code" programs are not commonly available and usually require a large design budget to justify their use.
+
+
+
+
+
+
+
+
+
+6. Calculate detailed weights to determine an accurate draft and trim for the boat
+
+
+It is now time to determine the detailed weights for the boat, given that the hull is complete, the structure is done, and the hydrostatic calculations are done.  (Actually, they might have to change if the total weight from this step doesn't match the displacement and trim found in the hydrostatics calculations!)  Although many initial weight estimates were done in the Concept Design phase, you now have to get as detailed as possible.  You will even have to specify weights and positions for things like wiring and plumbing.  If you don't know the weight, make an educated guess.  Get some samples of wire and plumbing hose and weigh them.  Multiply their weight per foot times the estimated length of wiring and plumbing.  If the boat uses more than one type of wire or hose, weigh each one individually.  Many of the weight estimates may be obtained by pure guess work, but hopefully there will be an equal number of overestimates and underestimates.  It is not uncommon for designers to have up to 1000 weight entries in their weight estimate.
+
+
+The importance of generating an accurate weight estimate cannot be overstated.  It is the key element in making sure that the design is a success.  If a boat is launched and floats below its lines, there is no easy solution.  The boat won't make its designed speed and the waterline will have to be repainted.  You could take weight out of the boat, but you have to be careful that you maintain an even trim for the boat.  Needless to say, it is not good for one's reputation to paint a waterline on a boat before launching and find that the actual waterline is not even close.
+
+
+One way to minimize weight problems is to design a boat using a target displacement.  In the Concept Design stage, you can decide on the displacement (total weight) you want the boat to have by studying other designs and performing parametric analyses and optimizations.  With a target weight, you don't have to constantly cycle from the hull shape, to the waterline calculation, to the weight estimate, to the interior arrangements, and back again, in search of a final displacement and trim for the boat.  With the target weight, you have two separate tasks:  define the shape of the hull so that it has the target weight at the desired waterline, and adjust the hull weights to match the selected target weight.  Although the interior arrangements affect both the weights and the hull shape, it usually is not as much of a problem.  With a target weight technique, you control the weights, rather than the other way around.
+
+
+This process can be summarized as follows:
+
+	1.  Pick a target displacement, based on the Concept Design analysis
+	2.  Create and refine the hull shape to obtain the target displacement and waterline
+	3.  Define the interior arrangements and weights to match the target displacement
+	(See the example process in the Concept Design section)
+
+
+This process minimizes the iterative inter-relationships related to weights and flotation and it also guarantees that the boat will float on its lines and the boat will perform as expected.  This target weight technique does not, however, make weight estimation and control simple.  You still have to make accurate and complete weight estimates.  Most designers include an overrun or contingency weight allowance of between 5 and 10 percent (boats usually never come out under-weight!).  This means that if your boat is targeted to weigh 10,000 lbs, then you allow between 500 and 1000 lbs for unexpected or last-minute weights.  If the boat does end up 5 percent under weight, you can always add ballast to bring the boat down to its lines and increase stability.  If it is overweight, there is very little you can do.
+
+
+The concept Design stage divided the overall weights into a short list of groups, such as hull/deck weights, interior weights, rig weight, and propulsion/mechanical weights.  The Preliminary Design stage further divides these categories into individual weight entries.  Actually, detailed weights should be collected as soon as possible, even during the Concept Design stage.  Weight collection and evaluation should be an on-going process right from the start.
+
+
+If the sum of all of the weights (plus overrun contingency) is greater than the target weight, what you do next depends on how close you are.  Hopefully, after the Concept Design stage, you've established the feasibility of the design and of meeting the target displacement.  Therefore, if you are close, you should be able to make some minor changes, along with using the contingency allowance, to meet the target weight.  If your total weight is way off the target weight, then perhaps there is a problem with the Concept Design results.  Rather than try to correct the design at this stage and continue on, you really should drop everything and re-evaluate the complete Concept Design results, and not continue until the weight problem is resolved.
+
+
+
+
+
+7.  Calculate detailed costs for the boat.
+
+After the Concept Design stage, you should have enough information to submit a bid request to various builders to obtain an estimate for construction (call the builders to ask for the type of information they require).  Some builders will quote you a lower price if you give them full-size lofted frame templates, or if you give them a copy of the 3D hull model so that they can plot anything they want.  The price should be noticeably lower, since the 3D computer hull form model will eliminate all traditional lofting by hand.
+
+
+You may wish to wait to submit the bid requests until the end of the Preliminary Design process when you have more details on the design, but that might delay the Detailed Design process.  Once a builder is selected, you can then discuss the exact type of information (drawings, specifications, full-size drawings) needed from you.  Knowing this information before you start to prepare the deliverables in the Detailed Design stage will save you a lot of unnecessary work.
+
+THE DETAILED DESIGN PHASE
+
+
+
+The Detailed Design phase is that portion of the design involved with producing the design "deliverables": the drawings, the templates, and the specifications.  What you include in this design package depends on the needs of the builder.  This raises a couple of interesting design process considerations which must be dealt with well before you get to this point in the design.
+
+
+
+Point 1.  The sooner you know who the builder is, the better you are able to adapt the design of the boat to meet their knowledge and building strengths.  Certain builders might be able to give you a better construction price if you can design the boat using materials and techniques they understand.  For example, many builders have a favorite type of construction material and building technique, especially when it comes to the hull and structural details.  If you know about these preferences early enough in the design spiral, they might be quite simple to implement.  If the design is going out for competitive bidding, then it may be difficult to obtain the lowest construction quotes, unless you allow the builder to specify design changes to suit their needs.  If this is the case, then you have to get the construction quotes early enough so that you can incorporate their changes in to the design.  Otherwise, you may have to redo a portion of the design and lose some of the construction savings.
+
+
+
+Point 2.  A construction price quote will also depend on what design information is delivered to the builder.  If you give them a 2D or 3D computer model, or if you give them a full-size set of construction templates, then they should be able to quote you a lower price, especially if they can avoid lofting the boat by hand.  When you send out a bid package to prospective builders, you should always include a list of deliverables that can be provided.  It is then up to the builder to say what type of design results they want when they submit their bid.
+
+
+
+You now have to evaluate the builders' quotes on the basis of their prices, their requested modifications, and the types of deliverables they want.  Selection of a builder should be done as early as possible in the design spiral.  The longer you wait, the more you increase your chances of having to modify your design and revise your drawings.
+
+
+
+At the end of the Conceptual Design stage, you need to send out a bid request package to a variety of builders consisting of the following information:
+	A.  An outboard profile drawing
+	B.  A sail and rig plan
+	C.  A general arrangements drawing
+	D.  A preliminary construction drawing showing all frames, longitudinals, etc.
+	E.  A list of equipment
+	F.  A list of specifications for the boat
+	G.  A list of the types of plans, specifications, CAD/CAM output that can be provided
+	H.  A request to submit a bid giving the cost for construction, any requested changes
+		to the design, and a detailed list of required deliverables.
+
+The difficulty is that some of this information may be far from complete and may change substantially in the Preliminary Design stage.  If that happens, then you need to discuss the changes with the selected builder or you may wish to delay the final selection of the builder and go through another round of bid requests later in the design process.  In spite of these problems, it is still better to start the builder selection process as early as possible.  If you wait until the Detailed Design stage to look for a builder, it will delay the completion of the design and the construction of the boat.  In addition, you will not be able to adapt the design to the strengths of the builder without some design rework.
+
+
+The following is a discussion of a variety of design deliverables and how they can be produced by computer.  Much of this information is developed before you reach the Detailed Design stage, so it is best if you keep in mind that the Conceptual and Preliminary Design stages perform the 2D or 3D modeling of the boat and the Detailed Design stage performs the production of the specific deliverables to the builder.  Modeling is concerned with the definition of the boat shape, interior arrangements, equipment lists, and design specifications.  Detailed Design is concerned with producing the information and drawings that are actually shipped to the builder (plotting 2D views of the 3D model).  The differences between 3D modeling and the production of 2D drawings is very important.  Modeling defines a geometrical shape (usually 3D) without regard to the type of plans or drawings to be produced.  Once you get to the Detailed Design stage, you can then automatically create a variety of 2D views of the 3D model to form the basis of a deliverable plan.
+
+
+For example, you begin the process of defining and fairing a hull in the Conceptual Design stage (modeling), but the production of full-size frame and plate developments will wait until the Detailed Design stage (selecting views or formatting of the model).  Another way to understand this distinction is to look at computerized word processing.  You start by typing-in the text of an article or book without regard to how that document is to be formatted.  Is it going to be sent off to a publisher as a computer file?  Are you going to print out a quick copy to give to a colleague?  Is the document going to be inserted and formatted into a newsletter?  The creation of the text is equivalent to the modeling of the 3D shape of the hull and its interior.  The process of printing or formatting the text into a printable document is equivalent to what you need to do in the Detailed Design stage.
+
+
+Inserting a word-processed text document into a desk-top publishing system for creation of a newsletter is the same as the process of taking a cross-section view of a 3D hull model and inserting it into a general purpose CAD program to create a structural drawing.  Creation of the 3D hull shape is called modeling and the production of a drawing or view of that model is called formatting.
+
+
+
+
+
+Below is a list of deliverables from which the builder can select.  You may add to this list as you become more adept with the computer, but keep in mind that this information is only useful if it shortens the construction time, reduces the price, or improves the quality of the construction.  Builders will take anything you give them, but some results may not be worth the effort unless there is some benefit.  You could create a 3D model of a boat and its interior and provide a program which allows the builder to "fly" through the hull, viewing all detailed aspects of the design.  This "deliverable" could add $10,000 or more to the design cost, without any substantial benefit to the construction of the boat.  Keep in mind that the goal is to produce a boat which is accurate, well built, and low in cost.  Just because you can do something flashy by computer doesn't mean that it is worth the time and expense.  Don't become too fascinated by computers because they can become a "black hole" for all of your time and money.  Keep in mind that the goal is to design and build good boats.
+
+
+
+One technique to evaluate the appropriateness of the use of the computer is to work backwards from the construction process. Ask yourself these questions:
+
+1.  What information can the builder use to build the boat faster, cheaper, or better?
+2.  What is the exact format for that information?
+3.  How can it be produced by computer?
+4.  Do you already have some or all of that information from a previous design?
+5.  How much will that information cost to produce?
+6.  How long will it take to produce 
+7.  Is it information which will be difficult to produce for the first boat, but easier to create for 
+	all follow-on boats?  Sometimes, the benefits of computer design are only obtainable 
+	after a long learning curve.  For example, an experienced draftsman can produce a 
+	drawing by hand faster than a novice CAD user, but an experienced CAD user can
+	produce results faster and more accurately than a hand draftsman.  Once CAD parts 
+	libraries are created, the advantage becomes even greater.
+
+
+
+
+
+
+The deliverables can be grouped into these categories:
+
+	1.  Drawn or plotted graphics
+		Use a combination of a hull design program and a general-purpose CAD 
+		program.  For example, a lines drawing of a hull may be created from the
+		computer model and transferred to a general purpose CAD program where you
+		add a title block, dimensions, and any other labeling that would be helpful to
+		the builder.  Another big advantage of using the computer is that many results
+		from previous designs can be easily altered and reused.
+	2.  Written specifications
+		Use a good word processor to collect all of the written specifications into one
+		document.  Many of the specifications can be easily modified and reused from
+		previous designs.
+	3.  Computer models
+		Some builders may have the same type of hull design software and/or
+		general purpose CAD program and can benefit from receiving the full
+		computer model from the designer.  If they use a program from a different
+		vendor, then there is a good chance they won't be able to use your computer
+		hull model and data files.  Don't assume that design information can be easily
+		transferred between different computer programs.  Always check before-hand.
+
+
+
+
+
+
+Detail Design Deliverables
+
+
+
+Hull Lines Drawing  -  A computer-plotted lines drawing can be produced in minutes directly from the 3D hull computer model and delivered to the builder.  In addition, any derived drawing can also be plotted in minutes from the computer hull model with perfect accuracy.  Rather than giving a lines drawing to the builder, however, you might consider giving a copy of the full 3D hull model to the builder so that they can produce any derived shape from the exact model, rather than having to derive the shape from the lines drawing.  For example, it is very simple to plot an expanded view drawing of an arbitrary cant frame from a computer model, compared to having to create the drawing by hand from the lines drawing.  This will usually only work, however, if the designer and the builder both have the exact same computer software program for hull design.  Different hull design programs typically use different mathematics for defining hulls and there may be no exact mathematical conversion between the two definitions.  If you have any questions about this transfer of computer information, contact the developers of both programs.  The alternative is to have the builders tell you exactly what views of the hull they want and you create and send the plotted outputs.
+
+
+
+Offsets Table  -  As more designers are delivering full-size templates (of frames and plates) to the builder, there is less need for the traditional table of offsets.  One of the major goals of computer-aided boat design is to eliminate the lofting process.  It is a duplication of effort since the designer already has an accurate, complete, and fair definition of the hull on the computer and any shape can be accurately plotted full-size.  If the offsets are wanted anyway, the computer program can calculate and print them for any frame, waterline, buttock, and diagonal for the molded shape or reduced by the skin thickness of the hull.
+
+
+
+Plate Developments  -  Many hull design computer programs allow you to create a hull where the plates are "developable", which means the they can be rolled out flat and cut out of sheet material like plywood and aluminum.  With a hull design computer program, you can deliver both full-size frame shapes and full-size developed plate shapes to the builder.  In addition, each of these plates can be marked with the locations of all frames and waterlines.
+
+
+
+Three Dimensional Views  -  Any 3D orthogonal or perspective view of the hull can be plotted automatically from the computer model of the hull.  There are programs that also allow you to create photo-realistic 3D views of your hull.  This usually requires you to transfer the hull model to a program that specializes in creating these realistic 3D views.  This type of output may not be extremely useful to the builder, unless they want to include it with their advertising literature.  One of the best uses of the 3D views is to include them in the design proposal.  This is possible since you can create a 3D computer hull model very early in the Conceptual Design phase, before the design proposal is created.  A side benefit of computer-aided boat design is that it is possible to put together a complete and impressive design proposal with very little effort.
+
+
+
+
+
+General Arrangements  -  Most computer-aided boat design programs handle the exterior hull surface design and fairing, and the calculations associated with that shape.  For detailed interior arrangements, you will have to transfer that model to a general purpose CAD program, such as AutoCAD, for completion of the interior views.  There are two approaches to this problem:  creating 2D drawings of the interior and structure, or creating a full 3D representation of the interior of the hull.
+
+
+The first technique simply automates the current process, whereby you take different 2D views of the hull to form the basis of the various interior views.  For example, you may transfer a plan or deck view of the hull from the hull design program to the general purpose CAD program and use that as the framework for creating a deck equipment view of the hull.  This can be speeded up by first creating standard parts libraries for all deck hardware and then simply scaling and inserting the appropriate parts into the deck view of the hull.  Another example is to take several transverse frame cuts of the hull from the hull design program and transfer them to the general purpose CAD program.  These sections can then be used as a framework to define the interior of the hull.  The key ingredient to this process is that 2D views of the 3D hull model are transferred from the hull design program into the CAD program to create the traditional interior arrangements and structural drawings, thereby automating the current design and drafting process.
+
+
+Some more ambitious designers have begun to transfer the complete 3D model of the hull to the general purpose CAD program to form the basis of a full 3D interior arrangements definition.  This is quite different than the first process, since in this case you are creating a full 3D model of the hull, rather than creating the traditional plans to be delivered to the builder.  After the full 3D interior arrangements model is created, you still have to create the drawings or plans that have to be delivered to the builder.  This means that you need to create various 2D views of the 3D model and add details, dimensions, and annotations to produce the deliverable plans.  The benefit of the full 3D model is that you can easily check for space, clearance tolerances, and create any 2D cut view of the hull and interior to form the basis of a deliverable plan.
+
+
+Creating a full 3D model of the interior of the hull is an ideal goal, but it takes a good general purpose 3D CAD program, a lot of preliminary parts creation set-up work, and a person experienced in using the 3D capability of the general purpose CAD program.  To create a 2D parts library, you simple scan in or digitize a picture from an equipment catalog (such as an engine) and store its shape in a parts library.  For 3D parts creation, there is no easy way to define 3D parts like engines.  The best you might do is to simulate the shape with a collection of 3D boxes.  The best long-term solution is to lobby the equipment manufacturers to supply either 2D or 3D representations of their parts. The manufacturers can create accurate 3D models of their equipment and tag their parts with the model number, pricing, weight, and supplier.  This gives the manufacturer a better chance of having their equipment selected for a design and it prevents you from having to create the part and maintain its shape whenever the piece of equipment changes.
+
+
+
+
+
+
+
+
+Note:  Why not design both the interior and exterior of a boat using a general purpose CAD program?
+
+The computer-aided boat design market has evolved to the point where there are programs for the design and fairing of the exterior of the hull and there are general purpose CAD programs.  The reason for this is that the general purpose CAD programs try to be everything to everybody and have had difficulties in defining and fairing 3D curved surfaces.  Although many of the more expensive general purpose CAD programs now contain the basic geometry to model 3D surfaces, they still need to be customized to meet the specific needs of boat and ship designers.  In addition, you must add some ability to calculate the hydrostatics and stability of the boat while it's being designed.  Although it is possible to customize a general purpose CAD program, such as AutoCAD, to adapt it to boat design, most of the companies supplying boat design software have been unwilling to tie all of their software to one product.  This would mean that their customers would have to buy that one general purpose CAD program, in addition to buying their boat design customizations of that CAD program.
+
+
+The separation of the hull design software and the general purpose CAD program is not really a problem, since it is easy to transfer hull design information from the hull design software to the general purpose CAD software.  In the future, there will be additional changes which will make it easier to invisibly transfer interior and exterior hull data between the hull design and general purpose CAD programs.  These changes will allow you to apply the best parts of a variety of programs to your 3D exterior and interior hull model.  The central focus of computer-aided design will be on the 3D model, rather than on the individual programs.
+
+
+A benefit of the separation of the exterior hull design software and the general purpose CAD programs is that it allows you to start using the computer for boat design very quickly and easily.  With just the boat design software, you can get started defining, fairing, and calculating results for hulls with little or no computer experience.  Afterwards, you can begin the long process of computerizing the production of all of your drawings:  creating parts libraries and learning about the general purpose CAD program you've selected.  Remember that the process of completely converting from manual boat design to computer-aided boat design is not an easy one.  For quite some time you may continue to draw plans by hand, or draw parts of them by computer and parts of them by hand.  Some things are easier to do by hand until you become an expert in using the general purpose CAD program.
+
+
+
+Structural Drawings  -  Most of these drawings will be created using the same techniques  described in the general arrangements section.  You will take various views and cross-sections from the hull design program and transfer them to the general purpose CAD program to form the basis of the structural drawings.  Although these views form a framework, there is still a lot of CAD drawing to be done, such as adding the frame structures, longitudinal stringer locations and cutouts, and a variety of interior structural components.  Some of these drawings can be standardized into parts libraries and some of these drawings may be copied and altered from previous designs.  Either way, creating 2D structural drawings using a general purpose CAD program still takes time and a good knowledge of the CAD program.  With some preparation and a bit of CAD program knowledge, you can produce the structural drawings faster by computer than by hand.  The biggest advantage with the computer comes when you want to create a new drawing as a variation of an old one.  You simply make a copy of the old drawing on the computer, make the changes, and plot the results.  Since there is no need for tracing or erasing, making a slight variation of an older design by computer is extremely fast and easy.
+Deck Plan  -  This 2D drawing is created by taking a plan view of the hull from the hull design software and transferring it to the general purpose CAD program to form the framework of the drawing.  You then add your title block and start adding, scaling, and positioning the required equipment.  If everything is organized properly, you should be able to find 2D plan views of all equipment in your parts libraries and finish the drawing with very little effort.  In addition, each part should be "tagged" with information about its manufacturer, part number, weight, and price.  When the drawing is done, the general purpose CAD program should be able to print out a list of equipment used in the drawing.  This information can then be included in the boat specifications using a word processing program, and the weight information can be used as input into a weights calculation program.  This weight information should consist of the name of the part, its weight, and its final longitudinal and vertical position in the boat.  This information can then be used by the weights calculation program to determine the boat's overall weight and position of its center of gravity.
+
+
+
+Machinery Equipment and Arrangements  -  Like the others, these drawings include a view of the hull taken from the boat design software, parts from the parts libraries, and the finishing of the drawing by a general purpose CAD program.  You may wish to take one of the general arrangement drawings and vary it to show the details of the powerplant installation.  Anything you can do to eliminate the need to create the drawing using the basic general purpose CAD commands is helpful.  Tests have shown that an experienced CAD draftsman is not appreciably faster than a good manual drafter.  The CAD draftsman has parts libraries and the manual draftsman has standard traceable templates.  The CAD draftsman has commands to erase and redraw portions of a drawing and the manual draftsman has an eraser and can draw complicated shapes quickly by hand.  The point is that if the CAD draftsman is using basic commands such as INSERT LINE, INSERT ARC, ADD FILLET, and ADD TEXT, then there is only a small advantage over the experienced manual draftsman.  The big advantage of CAD drafting is when you can obtain parts of the drawing automatically.  For example, it is a great advantage to be able to "cut" the hull at any location (using the hull design software) and transfer its shape to the general purpose CAD program to form the basis of an arrangements drawing.  It is also noticeably faster to insert a part into a CAD drawing using a parts library than it is for a manual draftsman to trace a part onto a drawing using a template.  In addition, if the CAD part is tagged with additional part information which is transferred to the design specification word processor document and information which is transferred to a weight calculation program, then the advantages of CAD really begin to pay off in terms of speed and accuracy.
+
+
+
+Systems Diagrams  -  These plans include all of the systems on the boat, such as wiring and piping diagrams.  Once again, you can start with a view of the hull transferred from the hull design program to the general purpose CAD program.  You can then use your own wiring and plumbing parts libraries, or you can use a variety of "third-party" CAD program add-ons to help you create these drawings.  For many general purpose CAD programs, especially AutoCAD, there are independent computer companies which provide add-on programs or libraries for special purpose drawings, such as wiring and piping diagrams.  These add-ons include already built libraries containing standard parts associated with that design area.  For example, a plumbing add-on library might have standard parts for a variety of plumbing fixtures, such as elbows, tees, vees, valves, and pumps.  This is different than obtaining CAD part information from equipment vendors, since these part shapes are generic and do not necessarily exactly match the shape of the component that will go into the boat.  It's best if you can build your parts libraries using the exact information provided by the equipment manufacturers, but, if this is not possible, then using the third-party add-ons can be a fast way to build standard parts libraries and allow you to create the final deliverable drawing quickly.  In addition, some CAD add-on packages include part shape information for creating full 3D models in addition to the standard 2D part views.
+
+
+
+Written Specifications  -  This written information is included with the plans to list the equipment that goes on the boat and to provide construction directions from the designer to the builder.  In addition to a good hull design program and a good general purpose CAD program, the next best program to have is a good general purpose word processing package that allows you to include both text and graphics into one document.  Most current top level word processors allow you to import text and graphics from a variety of sources.  This allows you to create an illustrated specification that can be given to the builder.  Again, you have to be careful about wasting time and effort.  Even though a computer program allows you to do some fancy things, it may not be worth your time and effort.  For example, there are stories where people spend hours on the computer trying to create the perfect memo, spending too much time adding graphics and selecting just the right font style for the characters.  Keep in mind that the goal is to provide the builder with what is needed to construct the boat accurately, quickly, and under budget (and not waste your time and money).
+
+
+Just as with the standard parts libraries, you can create a standard document for a boat's specification.  It should include standard information which is common for all boats you design, such as directions to and requirements of the builder.  You can then easily customize it for your current boat, adding the specific list of equipment, their sources, their weights, and their prices.  In addition, you can use the word processor's ability to automatically create a table of contents and an index to create a complete and polished design specification in a short amount of time.  In fact, anything that you can do to reuse information from a previous design is helpful.
+
+
+
+
+
+Summary of the Detail Design Process
+
+The Detail Design stage involves the creation of templates, plans, and specifications which are delivered to the builder to help build the boat accurately, quickly, and under budget.  To avoid unnecessary work, start by selecting the builder and determining what plans and specifications are required and then work backwards to determine how they can be created.  With some preparation, many of these results can be created very quickly using the computer.
+
+
+Designers that are heavily involved with the computer use both a hull design program and a general purpose CAD program.  The hull design program is used to create, fair, and perform calculations on a 3D mathematical model of the hull.  The general purpose CAD program is used to receive either the 3D model of the hull to create a full 3D interior, or to receive several 2D views of the 3D hull model to form the basis of the required plans.  The main benefits of using a general purpose CAD program depends on your ability to create parts libraries to cover as many of the components of the design as possible.  In addition, the ability to transfer 2D and 3D views of the hull model to the general purpose CAD program to form the basis of a drawing is invaluable.
+
+
+
+REFERENCES
+
+
+[BENF70]  Benford, Harry    "Fundamentals of Ship Design Economics"
+University of Michigan Department of Naval Architecture and Marine Engineering
+Report No. 086,  May, 1970
+
+
+[BENF91]  Benford, Harry,  Naval Architecture for Non-Naval Architects
+Society of Naval Architects and Marine Engineers, 1991
+
+
+[BERM79]  Berman, Deborah W.,  "Rational Approach to Power Boat Lines"
+Volume 1,  August 20-25, 1979,
+University of Michigan Department of Naval Architecture and Marine Engineering
+Report No. 214
+
+
+[BRUC76]  Bruce, Edmond, and Morss, Harry,  Design for Fast Sailing,  AYRS, 1976
+
+[BUXT72]  Buxton, I.L., "Engineering Economics Applied to Ship Design"
+RINA,  Paper No. 2,  Spring Meetings,  1972
+
+
+[CHAP64]  Chapelle, Howard,  Yacht Designing and Planning, Norton, 1964
+
+[GEOR83]  George, William,   Stability and Trim for the Ship's Officer
+
+
+[GERR89]  Gerr, Dave,   Propeller Handbook
+International Marine Publishing Company,  1989
+
+
+
+
+[GILL87]  Gillmer, Thomas, and Johnson, Bruce,  Introduction to Naval Architecture
+United States Naval Institute,  1987
+
+
+[HAML89]  Hamlin, Cyrus,   Preliminary Design of Boats and Ships
+
+
+[HAMM75]  Hammitt, Andrew,  Technical Yacht Design,  Van Nostrand Reinhold, 1975
+
+
+[HARV83]  Harvald, Sv. Aa., Resistance and Propulsion of Ships,  John Wiley,  1983
+
+
+[HENR65]  Henry, Robert, and Miller, Richards,  Sailing Yacht Design
+Cornell Maritime Press,  1965
+
+
+[HOLL90]  Hollister, Stephen M.,  “Computer-Aided Design and Construction for Designers and Builders”,  Westlawn Symposium papers, New York Boat Show, Jan. 13, 1990
+
+
+[HOLL91]  Hollister, Stephen M.,  “Hull Design:  From the Drawing Board to the Computer”,  Computers in Small Craft Design, SBYD, Nov., 1991, Seattle
+
+
+[KINN73]  Kinney, Francis,  Skene's Elements of Yacht Design,  Dodd, Mead & Co., 1973
+
+
+[KISS80]  Kiss, Ronald K., "Mission Analysis and Basic Design"
+Chapter 1, Ship Design and Construction,  Taggart, ed., 1980, SNAME
+
+
+[LEWI88]  Lewis, Edward, (Ed.)  Principles of Naval Architecture I, II, and III
+SNAME, 1988
+
+
+[MILL90]  Miller, Richards, and Kirkman, Karl,   Sailing Yacht Design - A New Appreciation of a Fine Art,  SNAME Transactions, Vol 98, 1990, pp 187 - 237
+
+
+International Marine Publishing Co.,  1971
+
+
+[TAGG80]  Taggart, Robert, (Ed.)  Ship Design and Construction
+SNAME,  1980
+
+
+[TEAL92]  Teale, John,  How to Design a Boat, Adlard Coles Nautical, 1992
+
+
+[TROW92]  Trower, Gordon,  Yacht and Small Craft Design,  Helmsman Books, 1992
+
+
+
+
+Where:
+
+SNAME = Society of Naval Architects and Marine Engineers
+RINA = Royal Institute of Naval Architects
+AYRS = Amateur Yacht Racing Society
+
+
+All graphs presented in this paper were created by programs in The Nautilus Systemtm, produced by New Wave Systems, Inc.
+
+PAGE3
+
+
+

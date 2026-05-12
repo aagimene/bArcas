@@ -1,0 +1,225 @@
+Reverse Engineering
+
+
+Stephen M. Hollister, N.A., P.E.
+New Wave Systems, Inc.
+
+
+
+Introduction
+
+To many, the term “reverse engineering” conjures up visions of engineers huddled in back rooms painstakingly disassembling products in order to steal their trade secrets.  Although this may happen, the term is now commonly applied to the general process of recreating existing 3D geometry in the computer.  This 3D geometry could be the shape of a real, manufactured object, like a car, or it could be some type of organic shape, like a plant or a human body.
+
+When software was originally created for 3D modeling in the late 1960’s and early 1970’s (computer-aided design (CAD) software), more thought was given to defining geometry from scratch on the computer.   For manufactured products, the consensus was that eventually all products would be done on the computer and there would be no real need to “go backwards”.  Thirty years later, this philosophy still seems to be in charge, but the need to go backwards is as great or bigger than ever.  To meet this need, numerous companies have developed input digitizing devices and software aimed directly at the reverse engineering market.
+
+ Although many manufactured objects are now defined on the computer using some type of 3D modeling software, those outside of the company that manufactured the part may not be able to obtain the existing geometry on the computer.  The geometry might be needed for product repair or it might be needed for all sorts of odd purposes.   For example, someone wanted to put the shape of an old VW Beetle into the computer so that they could construct an over-sized sculpture of the car.  It could also be someone who wants to capture the shape of an airplane to put into a flight simulator program.  For non-manufactured objects like rocks, trees, and human beings (sometimes referred to as “organic” objects), there are no existing computer models and you have no choice but to re-create the 3D shape on the computer.
+
+There are up to three steps in the process of reverse engineering.  The first step is to use some input device or technique to collect the raw geometry of the object.  This data is usually in the form of (x,y,z) points on the object relative to some local coordinate system.  These points may or may not be in any particular order.  The second step is to use a computer program to read this raw point data and to convert it into a usable form.  This step is not as easy as it might seem.  The third step is to transfer the results from the reverse engineering software into some 3D modeling or application software so that you can perform the desired action on the geometry.   Sometimes, steps 2 and 3 can be done inside one program. 
+
+
+
+Defining Questions
+
+
+What is the size of the object you wish to digitize?   This, of course, affects the type of digitizing device you can use.  Some input devices can be repositioned to be able to handle larger objects, but you have to be concerned about the potential loss of accuracy.  Related questions are how much space around the object do you have to work with and what are the environmental conditions? 
+
+What level of accuracy do you need?  Don’t expect too much accuracy.  Although the digitizing device you use might be very accurate, you are only collecting data at discrete points.  These disjoint points must then be curve-fit or surface-fit to create a useable 3D model.  This fitting process is where most of the accuracy errors are introduced.  Even if you collect thousands of data points on the object, you still will lose some accuracy when the points are converted into a usable form.  The accuracy of the input device may not be the accuracy you achieve for the usable 3D computer model.
+
+For the input devices, you also have to be careful about the accuracy figures given.  What is the best accuracy?  What is the worst-case accuracy?  What is the repeatable accuracy?  What is the digital accuracy (number of bits)?  For example, 2D scanners usually define both the optical resolution and the digital resolution.  The optical resolution is lower than the digital resolution, but the devices can sometimes interpolate the raw, optical data to increase it to the full digital resolution.  The interpolated results, however, do not have the same accuracy as a scanner that has a higher optical resolution.  There can also be other errors from other sources.  If accuracy is that important to you, then you must put the whole 3-step process to a test.  Remember, however, that most of the errors will be introduced during the conversion process from the raw data into the usable 3D model.
+
+What do you want to do with the data?  This is perhaps the most important question because it affects what hardware and software you need.  If you just want to recreate just the basic shape of an object for use in a fast-moving, dynamic simulation, then accuracy is not critical and you want the data size of the final 3D model to be small.  Since you won’t be using the 3D model for construction or repair purposes, then you might only need a 3D polyhedron (polygon) form.  This will affect the type of software you need to convert the raw data into a useable 3D model form.  If, however, you need a very accurate recreation of the object to perform a repair or alteration, then you will need to convert the raw data to a different 3D modeling form, such as NURB surfaces.  If you also need to verify or prove that the final 3D computer model is within a certain tolerance of the raw data, then you need to look for tools in the software that make this task easier.
+
+Generally speaking, for less accurate objects or “organic objects”, the goal is to recreate the object in a 3D polygon-type form.  If the object to be input is a manufactured object with precise dimensions, then the goal is to recreate the object using 3D NURB surfaces.  NURB surfaces may also be used for less accurate or organic objects, if the goal is to be able to perform large-scale modifications to the object.  These are not hard and fast rules, since there is a good overlap of capability between organic, polygon or subdivision modelers and NURB surface modelers. 
+
+
+
+
+
+Input Devices
+
+The devices that input geometry into a computer can be divided into two groups: 2D devices and 3D devices.  The 2D input devices consist of the following:
+
+
+2D Digitizer Tablets – These devices consist of a flat, tablet-like part that hooks up to your computer, usually through your serial port.  They range from about 12 X 12 inch tabletop size up to very large 6 foot+ models that include their own support frames.  Once you tape your drawing or picture on the flat tablet, you use one of many types of connected input pointing devices (pen, puck, or stylus) to trace the geometry you want into the computer.  You may use a program that comes with the tablet or you may use a general-purpose 2D or 3D graphics design program.  To input the geometry, most programs will have you position the pointing device at closely spaced positions along each line or curve in the drawing and input the 2D (x,y) point by clicking a button on the pointing device.  A pen input device is often used if accuracy is not critical or if you have a lot of points to enter.  A “puck” type of pointing device with very fine crosshairs is used for very accurate work.  A tablet is good for inputting lines and curves into the computer.  All tablets also allow a stream mode where (x,y) points are continually sent to the computer as you move the stylus.  This stream input mode may or may not be desirable.
+
+
+2D Scanners - These common devices work like digital photocopiers and are good for small drawings or pictures.  They are fast, but they only get the drawing or picture into the computer as a matrix of color dots (a raster or bitmap image), just like on the computer screen.  The resolution might be very high, but the raster format of the geometry may not be in a useful format.  If a drawing consists of a number of lines and curves that you want to work on or use in some kind of 2D or 3D geometry modeling program, then you are out of luck, unless you convert the raster image into some kind of line or “vector” format.  There are two ways to do this.  One way is to use a raster to vector conversion program.  These programs look at the raster image and try to connect the dots to form lines or curves that can be transferred to your design program.  As you can imagine, these raster to vector conversion programs can get easily confused if many lines or curves cross each other on the drawing.  After this conversion, you might have to spend a lot of time in your design program cleaning up the mess.  It might be faster to use a 2D digitizer tablet to input the data.  Another way to convert the raster data to vector data is to use a design program that can read the raster data and display the picture as a background image.  Then you can use your design program to recreate the vector geometry by “tracing” over the raster image.  This is kind of like doing the digitizing right on the computer screen.
+
+
+
+As you can probably see, there is no “free lunch” when it comes to getting geometry into the computer in a usable form.  If all you need to do is to scan a drawing or photograph that you want to put on the web or into a report using a word processor, then there is no need to convert the raster image into a vector format.  This is really not considered to be reverse engineering, however, since you do not have to convert the raster image into a different, more usable form.
+
+
+
+
+The 3D input devices are generally broken into contact and non-contact types and consist of the following:
+
+
+Electro-Mechanical Measuring Arms – These devices consist of a multi-jointed mechanical arm with a measuring point (touch probe) where the fingers would be.  It is kind of like a 3D digitizing stylus or pen.  You pull the arm and position the measuring point tip on the object and click a button to input the (x,y,z) point position of the measurement tip.  Then you reposition the arm and tip on another spot and enter the next 3D geometry point.  Some of these devices allow a stream input mode which automatically collects points as you move the measuring point tip over the object.  Like the 2D tablets, this stream mode may or may not be desirable.  Although these devices are very accurate, input can be tedious and the size of the object is limited by the range of the mechanical arms.  These devices are usually divided into two parts: the part that you position (the touch probe), and the coordinate measuring machine (CMM).
+
+
+Point Triangulation Devices – These are relatively low cost or home-made devices that use two separately located measuring tapes or calibrated wires that are connected to a pointing “wand”.  The pointing wand is extended, pulling the tapes or wires, and placed on the object.  For non-electronic measuring tapes, the lengths of the two tapes are written down.  Using triangulation, the (x,y,z) location of the measurement point can be determined.  This calculation may be done using a computer program.  For electronic versions, the extended lengths of the tapes or wires are determined electronically and the triangulation is done automatically, without having to write down numbers.  These devices are often used on objects that are too large for other 3D input devices.
+
+
+
+Scanning Devices - These non-contact devices, sometimes called 3D scanners, transmit various types of signals (laser, white light, radiation, sound waves, etc.) to determine distances.  These devices collect an enormous amount of point data in a semi-random fashion.  The point data could be organized in consecutive cross-sectional cuts or the point data could be in a fairly random form, called a point cloud of data.  The equipment operator has little or no direct control over the sequence of the data.
+
+
+Photogrammetry – These techniques, sometimes called 3D photography, use cameras to photograph an object from several directions.  The photographs are read into the computer (scanned in or copied, if the camera was digital) in bit map or raster form.  Then you use special software that aligns the different raster photographs and allows you to calculate points on the object.  This sounds like the easiest solution, but the process of reconstructing the 3D shape on the computer can be tedious and less accurate than other methods, especially for smooth, curved surfaces.  Some of these techniques use just the ambient light in the area of the object (passive techniques) and some techniques add light using lasers, white light, or other devices (active techniques).  The active techniques could be classified as 3D scanners.  Photogrammetry generally refers to the passive techniques that use ambient light.
+
+
+
+
+
+All of these input devices collect “raw” (x,y,z) point data on the object and store them in a computer file in the order that they were entered.  Some devices allow you to define start and stop codes while you digitize so that you can identify connected points on the object, like a knuckle or hard edge.  You might think of this connected string of points as a polyline on the object.  Other input devices generate semi-random sequences of points, sometimes called point-clouds of data.  As discussed later, this point input order may make an enormous difference in what reverse engineering software you can use and how easy it is to convert the raw point data into useable and accurate 3D geometry.  All of the input devices are more concerned with the accurate input of 3D point positions on the object than they are with the order or sequence of the points in the data file.  It is the job of the reverse engineering software or the 3D modeling software to construct usable geometries based on these points.  This step can be quite tedious.
+
+
+
+
+
+Reverse Engineering Software
+
+Special purpose reverse engineering programs may have many tools for performing general 3D shape manipulation, but their main focus is on the process of converting raw point data from the input devices into a more usable polygon or NURB surface representation with the least loss of accuracy.  You would like to think that after this process is done, the final 3D computer model passes exactly through all of the raw input data points.  This may happen for a polygon model, but the raw data rarely ever matches the exact needs of a NURB surface model and the accuracy is less.  The following two sequences of steps show you what you might have to go through during the reverse engineering process.  The first sequence of steps is for point clouds of raw input data and the second sequence of steps is for raw point data that is organized sequentially along key paths on the object.
+
+
+
+
+
+
+
+For Point Clouds of Data
+
+
+1.  Read the raw point data into the program from standard DXF or IGES files.
+
+2.  Clean up the raw data.  Throw away extraneous or obviously wrong points.  It would be nice to visually see the raw data on the computer before you are done digitizing the model.  That way, you can correct any problems that might crop up.  If you do not have complete raw point data coverage of the object, you might have to digitize or scan the part again.  You also might want to eliminate excess points in flat areas of the object.
+
+
+3.   For point clouds of data, you need to use a program that has the capability to “wrap” the cloud of points with 3D, connected polygons.  If the point cloud covers several objects, the user of the software may have to split the point cloud into smaller sections before using the polygon wrapping capability.   You may also need tools to align point cloud data taken from different views of the object.
+
+For a wrapped polygon model, you may now be finished, if all you need is a 3D polygon model of the object for very simple rendering or display purposes.  However, most users need to modify the object or need to define colors, textures, and a variety of other attributes for the polygon model.  If the wrapping process creates too many polygons for use by your modeling or rendering software, then the reverse engineering software should provide some way to reduce the number of polygons used while still maintaining control over the accuracy of the model.  At this point, you may be done with the reverse engineering software and need to transfer the polygon model to your 3D polygon modeler for further work or analysis.
+
+
+4.  If you need a more accurate definition of the object using NURB surfaces, then you have more work to do.  The object, now covered in polygons, must be skinned or fitted with NURB surfaces.  NURB surfaces have many nice properties, but their major drawback is that they are rectangular in nature.  This doesn’t mean that you can’t stretch them into almost any shape.  It just means that to achieve a good NURB surface fit to an object, you need to break the digitized object into a collection of rectangular-like areas.  The more non-rectangular the areas, the less accurate the fit will be.   Some reverse engineering programs try to convert the polygon model to a NURB model automatically and some require user guidance.  This is a trade-off; the automatic methods will generate more NURB surfaces, but the manual methods can be quite tedious.  The ideal solution would be to combine the best of both methods.  Keep in mind that this is the process where most of the accuracy errors are created.  Generally, the more NURB surfaces you fit to the polygon mesh, the more accurate the result will be, but more surfaces mean less controllability, which is a problem if you want to modify the model.
+
+
+5.  The final step is to output the NURB surfaces in an IGES file format using either type 128 NURB surfaces or type 143 or type 144 trimmed NURB surfaces.  These are the most common formats for transferring NURB surfaces to other programs.  If you plan to transfer these NURB surfaces to another program, make sure that it can handle the format output from your reverse engineering software.
+
+
+
+
+
+For Digitized Sequence of Points
+
+For input digitizing devices that do not generate point clouds of data automatically, the user has much more control over the number and sequence of input points.  This allows you to reduce the number of raw data points that you have to deal with by entering a number of specially selected sequences of points on the object.  For example, the operator might control the 3D digitizer to first enter all of the borders or hard boundary edges of the object.  If the object consists of all flat sides, then the task would be done.  If the object consisted of curved surfaces, the operator would additionally digitize several evenly spaces cross-sections of the object.  This means that the reverse engineering software will have to deal with this data rather than an arbitrary point cloud of data.  If this is the technique that you will be using, then you need to know what software you will be using for the reverse engineering process and what its requirements are.
+
+Even though you do not generate a massive point cloud of data of the object, you can still use those programs that process your raw point data as a point cloud and turns it into a 3D polygon mesh.  The problem is that the polygon wrapping process does not take into account the information associated with the sequencing of the input points.  Without a massive number of points, the polygon wrapping technique might do a poor job.  If your goal is to generate just a 3D polygon representation of the object, then you will probably have to use a polygon wrapping technique.  This section, however, will describe the general steps required to convert these sequenced points into NURB surfaces.
+
+First, here are a few instructions for the input digitizing process.  Since you are not generating a point cloud of data and since you want to minimize the number of points that you have to digitize, you first need to know what data works best when converting the raw data into NURB surfaces.  As discussed above, NURB surfaces are rectangular-like surfaces defined by a grid of points, organized as rows and columns.  Before digitizing, you need to identify how that object will be covered with the NURB surfaces.  The following steps show this process and start before you begin digitizing your sequence of points.
+
+
+
+1. Before digitizing, evaluate your object to see how it can be broken into one or more rectangular-like NURB surfaces.  Identify all paths that will become the edges of the NURB surfaces.
+
+
+2. During the input process, digitize each NURB surface edge as a connected series of points.  You can think of each sequence of points as a polyline.  Once you have digitized the surface edges, you need to digitize a series of cross-sections through what will be each NURB surface, going from surface edge to surface edge.  Digitize the cross-sections perpendicular to what will be the two long edges of the surface.  Spread the cross-sections evenly across the surface.  The more sections that you digitize, the more accurate will be the surface fit, but there is a point of diminishing returns.  For surfaces without much curvature, use 3 to 5 cross-sections.  For more complicated surfaces, increase the number of cross-sections.  These digitized boundary edges and cross-sections will be used by the reverse engineering software or 3D modeling software to create NURB surfaces.  If you spend some time determining how the NURB surfaces will be fitted to your object, you will save a lot of time in the reverse engineering process and the resultant surface fit will be very accurate.
+
+
+3. Read the raw data point files into your reverse engineering or 3D modeling software.  If the surface edge and cross-section points are not pre-connected as polyline entities, then you need to use the software to connect the points that define the edges and cross-sections into separate polylines.  You should define the edges of each surface as a separate polyline.
+
+
+4. Fit each polyline with a curve.  This step may or may not be necessary.  It depends on what the software needs to create a NURB surface.  Some programs can work with polylines and some require curves.
+
+
+5. Use the proper command to skin or loft a NURB surface through all of the surface cross-sections.  As part of this skinning process, you need to include the two surface edge curves that are parallel to the cross-sections.  The accuracy of this surface skinning or fitting process depends on how you define and orient the surface on your object and how evenly spaced are your cross-sections.
+
+
+6. Once the NURB surface has been created, you will have to compare the resultant surface with the raw input data points.  Some programs give you tools to show locations and magnitudes of the errors.  If there aren’t any, then you will have to use the program to look at the created surface from all views and zoom in to locate any errors.
+
+
+7. Repeat steps 4-6 for each surface to be constructed.  As you can see, the digitizing and reverse engineering process depends a lot on a good understanding of NURB surfaces.
+
+
+
+8.  The final step is to output the NURB surfaces in an IGES file format using either type 128 NURB surfaces or type 143 or type 144 trimmed NURB surfaces.  These are the most common formats for transferring NURB surfaces to other programs.  If you plan to transfer these NURB surfaces to another program, make sure that it can handle the format output from your reverse engineering software.
+
+
+Note:  If the area to be digitized is definitely not rectangular, then you will have to either decide how the rectangular NURB surface will be distorted to fit, or you can digitize past the edges to create a rectangular shape.  If you digitize past the desired edges, then you should still digitize the edge that you went past.  This edge will be used to trim the oversized NURB surface.
+
+
+
+
+
+3D Modeling or Application Software
+
+The purpose of reverse engineering a 3D model of an object is to do something with the result.  If the ultimate task is simply to display or render the model, then you would probably only need a polygon model and the ultimate application would be a rendering program.  If you need to do other tasks, like shape alteration or construction of templates for repairs, then you would probably need a NURB surface definition and a general-purpose 3D modeling program.  Other possible tasks are things like finite element analysis (FEA) or computational fluid dynamics (CFD) analysis.  These analyses might require only a 3D polygon model, but the polygons might have to be radically adjusted to meet the needs of the analysis program.
+
+
+
+
+
+
+
+Summary
+
+The first thing you need to do is to define the accuracy you need and determine what you want to do with the 3D model once you get it in the computer.   The next step is to select the software that will perform those tasks and determine whether they require only a polygon model or whether they require a NURB surface definition.  Once this has been defined, you can then tackle the selection of the input device and the reverse engineering software.  
+
+
+
+Reverse Engineering Using Pilot3D
+
+
+
+This discussion covers manual contact input digitizing devices that generate points in sequence under user control.  These manual digitizers (not 3D scanners that generate point clouds of data) allow you to reduce the number of raw data points that you have to deal with by entering a number of specially selected sequences of points on the object.  However, you cannot input just any points.  You have to know what points are required by the software.  For example, the operator might control the 3D digitizer to first enter all of the borders or hard boundary edges of the object.  If the object consists of all flat sides, then the task would be done.  If the object consists of curved surfaces, the operator would additionally digitize several evenly spaces cross-sections of the object.  The amount of points that need to be digitized, the spacing of the points and the orientation of these points greatly affect the ease and accuracy of generating the final 3D computer model.
+
+Pilot3D uses Non-Uniform Rational B-splines (NURBs) to define 3D objects.  NURBs are the dominant mathematical technique used by most all 3D modeling and CAD programs.  If you create NURB surfaces from your raw point data, you will be assured that the 3D model you create can be used by almost any design and analysis program.
+
+The problem is that NURBs are rather fussy mathematical tools.  They are rectangular in nature and behave badly if they are stretched into very odd shapes.  This means that you must look at the object you want to digitize and determine how you can break it into one or more rectangular-like shapes.  The surfaces do not have to be perfectly rectangular.  They can even be triangular in shape by making one side of the rectangular surface zero.  However, if your surface has 5 or more sides with sharp, knuckle points along the edge, then you will have to break the surface into multiple NURB surfaces.  Either that, or you will have to define an over-sized rectangular surface and use the actual surface edges as trimming curves on the surface.
+
+Another thing to keep in mind is that Pilot3D creates a NURB surface by lofting or skinning a surface through a collection of polylines or curves.  These curves should be fairly evenly spaced and should cover the entire NURB surface region.  After you decide how the rectangular-like NURBs will fit on your object, you need to digitize what will become the boundaries of the NURB surfaces and then digitize a number of cross-sections over the surface, perpendicular to the long edges of the surface.
+
+
+
+With these thoughts in mind, here is a general step-by-step process for digitizing and reconstructing a 3D NURB surface model.
+
+
+
+1. Before digitizing, evaluate your object to see how it can be broken into one or more rectangular-like NURB surfaces.  Identify all paths that will become the edges of the NURB surfaces.  Then determine a number of cross-sections over each surface perpendicular to the long edges of each surface.  If desired, you can mark the paths and cross-sections on the object before digitizing.
+
+
+2. During the input process, digitize each NURB surface edge as a connected series of points.  You can think of each sequence of points as a polyline.  If your digitizer can link points together and mark them as a polyline, you should do so.  Otherwise, you will have to use Pilot3D to create polylines from the raw point data to create the 4 surface edges and all of the cross-sections.  Once you have digitized the surface edges, you need to digitize a series of cross-sections through what will be each NURB surface, going from surface edge to surface edge.  Digitize the cross-sections perpendicular to what will become the two long edges of the surface.  Spread the cross-sections evenly across the surface.  The more sections that you digitize, the more accurate will be the surface fit, but there is a point of diminishing returns.  For surfaces without much curvature, use about 5 cross-sections.  For more complicated surfaces or for more accuracy, increase the number of cross-sections.  These digitized boundary edges and cross-sections will be used by Pilot3D to create NURB surfaces.  If you spend some time determining how the NURB surfaces will be fitted to your object, you will save a lot of time in the NURB surface fitting process and the resultant surface fit will be very accurate.
+
+If you have to create an over-sized NURB surface because the shape that you are digitizing is not rectangular at all, then you must digitize both the actual surface edges and digitize the edges that will become the edges of the over-sized NURB surface.  Then you must digitize the cross-sections over the entire over-sized NURB surface area, not just the actual surface area.  The actual surface edges will be used to trim the over-sized NURB surface to the actual shape of the surface.
+
+Don’t be overly concerned about trying to get perfect input points because Pilot3D can do a lot of manipulation to the raw data to get it to meet the skinning needs of the NURB surfaces.
+
+
+3. Save the digitized points in a DXF or IGES type file for reading into Pilot3D.
+
+
+4. Read the raw data point files into Pilot3D using one of the File-Data File Input commands.  If the surface edge and cross-section points are not pre-connected as polyline entities, then you need to use the software to connect the points that define the edges and cross-sections into separate polylines.  You should define the 4 edges of each surface as separate polylines.  To create a polyline or curve from point data in Pilot3D, use the Curve-Add Polyline or Curve-Add Curve command.  Instead of using the left mouse button to define each point, move the cursor near each digitized point and hit the ‘p’ key on the keyboard.  This tells the program to snap the input polyline or curve point to the point nearest to the cursor.  This process can be continued until a curve or polyline is created using all of the raw data points.  This is rather tedious if you have a lot of data points.  That is why it is recommended that the creation of polylines in the digitizing software is helpful, if it can be done.   When you are creating each of these polylines or curves, create one for each of the 4 surface edges and one for each of the cross-sections of the surface.  These boundary edges and cross-sections are what Pilot3D uses to skin and create NURB surfaces.
+
+
+5. Fit each polyline with a curve using the Curve-Curvefit command.  This step is not required in Pilot3D for the surface skinning step, but it is a good idea.  The curves will give you an idea of how the program will fit the rows or columns to the cross-sections.  If the curvefit is bad, then you can adjust the shape using the point editing tools to create a better fit.  You can use the original raw data points as guides to make sure that your corrections do not stray too far from the actual shape.  Now you are ready to create the NURB surface from the cross-sections.  
+
+
+6. Use the Create 3D-Skin/Loft Surf command to skin or loft a NURB surface through all of the surface cross-sections.  When you select this command, the program will prompt you to pick each cross-section, in sequence, across the surface.  Note that you should include the two surface edges that are parallel to the cross-sections!  When picking each cross-section, you need to pick each curve near the same end.  The reason for this is that the program is rather dumb and needs you to tell it which ends of the curves should be connected together.  This may seem obvious to a human, but there are some cases that could be quite confusing for the program to figure out automatically.  After you select all of the cross-sections (and the 2 parallel edge curves), the program will show you a dialog box with a number of options.  The important one is to define how many rows you wish to fit through the cross-sections.  The more rows you enter, the more accurate the fit will be, but more rows will make it more difficult to edit or smooth the surface.  Smoother or simpler surfaces require fewer rows (perhaps 5), but surfaces with more curvature require a higher number.  The accuracy of this surface skinning or fitting process depends on how you define and orient the surface on your object and how evenly spaced are your cross-sections.
+
+
+7. Once the NURB surface has been created, you will have to compare the resultant surface with the raw input data points.  This can be done by zooming in on the rows and columns of the surface and checking on how far the raw data points are from the surface.  If any corrections need to be made, you can use any of the surface editing commands to create a better fit of the surface to the data points.  If you do not like how the NURB surface was created, then you can use the Undo command and try again.  Keep in mind, however, that fitting a NURB surface to a collection of points is a difficult task, especially if accuracy is a concern.  In most cases, you will have to adjust the NURB surface using the edit commands to get the best fit.  Carefully zoom in on each portion of each row and column and look at how closely the surface matches the raw data points.  At this point you really need to know what kind of accuracy is needed for your task.  Otherwise, you could be spending hours trying to fix things that don’t matter.
+
+
+8. To develop or layout the surface, all you have to do is to select the Develop-Develop Plate command to view its 2D laid out shape.  To output this shape to a DXF file for transfer to CNC cutting software, you need to select the File-Data File Output-DXF Output command.
+
+
+Summary
+
+There is a lot to this process, but the key ingredients are:
+
+Pilot3D uses NURB surfaces that work best when they are rectangular in shape
+You need to divide your part into rectangular-like sections
+You need to digitize the 4 edges of the surface and a number of cross-sections
+Pilot3D creates a NURB surface by fitting a surface through the cross-sections and 2 parallel surface edges
+You will have to edit the fitted NURB surface until you match the raw data within the desired tolerance
+
+

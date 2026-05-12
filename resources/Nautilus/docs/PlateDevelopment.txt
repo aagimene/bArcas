@@ -1,0 +1,95 @@
+Plate Development and Expansion
+
+
+Stephen M. Hollister
+New Wave Systems, Inc.
+
+
+A surface is developable if it is a combination of flat, cylindrical, and conical sections.  A developable surface is one where you can lay a straight edge anywhere on the surface and find a direction where it completely touches the surface at all parts of the straight edge.  This straight section of the surface is called a ruling line.  Note that for flat, cylindrical, and conical sections, this test would always be true.  A mathematical description of this condition is when the Gaussian curvature of the surface is zero at all points.  This is just a fancy way of saying that for all points on the surface there is always one direction that is straight (has a curvature of zero).
+
+
+The purpose of creating developable surfaces is to allow you to unwrap or flatten out the surface so that you can cut it out of flat material, like plywood, aluminum, steel, and even cloth.  If you cut the pattern out using CNC (Computer Numerical Control), you can save a lot of time building the 3D structure.  In reality, however, people have found that the surface to be constructed out of flat material does not have to be perfectly developable to be buildable.  For many materials, it is relatively easy to introduce stretch, twist or compound curvature in the 2D pattern as you wrap it into its 3D shape.  This allowance for twist opens up a huge range of additional 3D shapes that can be built from 2D patterns.  The problem is that there is no exact answer to how much twist you can have before the stretching or twisting can’t be done or before the material fails.  As soon as you introduce stretching or twisting, there is no one solution to the process of unwrapping and flattening out the 3D surface into its 2D pattern shape.  As you can imagine, the 3D shape that is created from the 2D pattern depends on how you stretch and twist the pattern.  We have found, however, that if the 3D model shape is nearly developable, then you should have no problems with the unwrapped 2D pattern.  Unfortunately, it may take some trial-and-error practice to determine what nearly means.
+
+
+As the 3D shape becomes more twisted or contains more compound curvature, there is no magic way for a program to tell you when the full 3D surface can’t be built from one 2D pattern.  The amount of twist that is allowed (i.e. to be buildable) depends on the type of material, its size, its thickness, the machine you use to introduce the added curvature, and the skill of the machine operator.  Remember that a 2D pattern can be stretched or twisted into an infinite number of 3D shapes.  You have to develop your own criteria for determining how much twist you can introduce.  One test is to plot out small 2D patterns and try constructing the 3D shape from cardboard or some material that simulates the properties of material that you use for construction.  If there is any doubt, then you should go back to the 3D model and change its shape to be more developable.  If you have a perfectly developable surface, then you should have no problems with the 2D patterns.  The problems arise when twist is introduced into the shape.  Another trick you could use for twisted shapes is to cut out the 2D patterns with a little bit of extra material along two of the edges.  Then fit the material and scribe and cut the two edges for a perfect fit.  This works, but this refit process is really what you’re trying to eliminate.
+
+
+When a 3D surface has so much twist or compound curvature that it cannot be built out of one piece of flat material by simple stretching or twisting techniques, then the surface is said to be expandable.  Rather than plate development, this process is called plate expansion.  There is no well-defined point at which the process changes from plate development to plate expansion.  Generally speaking, the term expansion is used when there is a lot of stretching or twisting distortion required to get the 2D pattern to fit the 3D shape, or if you have to subdivide the full 3D surface into smaller pieces before unwrapping them into 2D patterns.  Keep in mind that even a sphere (which has a lot of double curvature) can be built out of simple 2D pieces without a lot of distortion if the 2D pieces are small enough.
+
+
+Pilot3D uses the same technique to unwrap or flatten out the 3D model shape into the 2D pattern for both developable (or nearly so) and expandable (doubly curved) surfaces.  If the surface is perfectly developable, the program will give you the exact, no twist 2D pattern.  Your job is to create the desired surface using the twist or curvature information provided by the program.  We suggest that you calibrate this twist or curvature information in you own mind by testing the program out on an object that you have already built.
+
+
+If the object that you are designing needs to be developable, or nearly so, then we recommend that you use the ruling line techniques discussed below.  These ruling lines are automatically calculated and drawn between two curve entities and show you the amount of twist by using different colors for the ruling lines.  The twist is defined by the angle that the material must be rotated along the entire ruling line.  By moving the edit points on the two boundary curves, you can dynamically shape the surface and view the change in the ruling line twist colors.  Once the desired shape and level of twist has been achieved, the program can fit the ruling lines with a NURB surface.  The ruling lines become the columns of the NURB surface.  If you have some understanding of the proper orientation of ruling lines for your surface, you can create the surface first and orient the surface columns as ruling lines yourself.  After you have had some experience with developable surfaces and ruling lines, you might find this direct approach faster.
+
+
+If the surface has too much twist or compound curvature (expandable), or if you want to skip the ruling line approach, you can create and edit the shape of the surface directly.  To check for the amount of twist or compound curvature in the surface, you need to display its Gaussian curvature (Surf-Kpat commands).  Since the Gaussian curvature calculation is difficult and slow, the program gives you control over the location and color density of the curvature display.  This is good for curvature feedback while you are performing detailed shape editing of the surface.  This program encodes the Gaussian curvature of zero (perfectly developable) as a dark blue.  As the surface contains more compound curvature, the colors change to light blue, to green, and then to yellow and red, for the highest double curvature.  This makes the colored Gaussian curvature display of the surface look like a finite element analysis stress map.  Just like the ruling line technique, we recommend that you test this process with an object that you have already constructed to develop a feel for the colors displayed for the Gaussian curvature.  You can also use the Surf-Develop Patch command to force part of a surface to be perfectly developable. 
+
+
+Once you have a surface (however it was created), Pilot3D will apply a finite element type of calculation to flatten out the plate and determine all of the internal strains created during the process. (Note that the flattened 2D plate shape can also be marked with cross-section trace lines.)  For perfectly developable surfaces, the 2D layout will be exact and the internal strains will be zero because there is no stretching or twisting.  For plates with twist or compound curvature, the program calculates and sums these strains to give you an idea of how much stretching or twisting is required.  Since there is no unique solution to this compound curvature problem, the program requires the user to enter the amount that the perimeter of the 3D surface edges stretches (or shrinks) when it is flattened out.  This is enough information for the program to uniquely solve the problem.  But how much edge stretching does occur?  You have to study your construction process.  If the edges of the 2D pattern are constrained while the shape is forced into the material, then you would want to keep the perimeter length of the 2D pattern equal to the perimeter length of the 3D model shape and specify no stretching or shrinking of the edges.  Some sources, however, say that the best expansion is one where the total of all strains is minimized.  To do this in the program, you would have to repeat the calculation with several +/- edge stretch percentages to see which one minimized the sum of all internal strains.
+
+
+
+
+
+Ruling Lines For Plate Development
+
+
+Pilot3D lets you to tell the program to draw ruling lines between any two curves.  As you shape and fair the two curves, the program dynamically recalculates and draws the ruling lines with colors that indicate the amount of twist in the ruling lines.  When you achieve the desired shape and level of twist, the program allows you to fit a NURB surface through all of the ruling lines.  Then you can unwrap or flatten out the surface into its 2D pattern.
+
+
+For this ruling line calculation, the goal is to calculate the best ruling lines that can be nicely fit by a NURB surface.  Nice ruling lines are ones that are fairly evenly spaced over the lengths of the curves and have no gaps or missing ruling lines.  This is not as easy as it might seem, since the ruling line with the smallest twist angle may not be the best ruling line.  In addition, there may be areas where there is a good amount of twist in the surface and you do not want to search for the ruling line with the smallest twist.
+
+
+First, you need to know what an exact ruling line is.  It is a straight line crossing the surface from edge to edge that has zero twist.  Imagine laying a sheet of plywood between two curves in space.  If you construct a line on the plywood connecting the places on the two curves where the plywood touches the curves, then that line would be an exact ruling line.  Next, imagine gluing two pencils, one at each end of the ruling line, normal or perpendicular to the plywood.  Then, if two people (at each end of the ruling line) twist the plywood in opposite directions (introducing twist in the plywood), the two perpendicular pencils will rotate in opposite directions.  Looking down the ruling line, the twist angle is the angle between the two pencils.  When there is no twist in the plate, this angle is zero.  As you twist the plate in opposite directions, the twist angle increases.  Pilot3D lets you set a “Desired Twist Angle” value that you want to achieve.  You have to imagine yourself putting that amount of twist angle in the material you are using all along the plate.
+
+
+The problem is that you cannot have the program search anywhere for ruling lines where the twist angle is very near zero.  Ruling line twist angles are very sensitive to the shapes of the two curves.  If you always look for the lowest twist angle, the final set of ruling lines between the two curves will be uneven, they may cross each other, or they might be missing altogether (no solution), even though the twist might be well within building tolerances.  As you fair or smooth the two boundary curves, the ruling lines might change shape dramatically with a very small change in curve shape.  In addition, for flat portions of surfaces, any line crossing the surface will have a twist angle of zero.  In those areas, the program must try to spread the ruling lines nicely over the surface.
+
+
+Pilot3D tries to avoid these problems by starting with nice ruling lines and then changing their positions as little as possible to minimize the twist angle. The nice starting ruling lines are found by dividing each curve arc-length-wise into the “Number of Ruling Lines” input value (the default value is 50 ruling lines), and then connecting each associated point on each curve with an initial guess ruling line.
+
+
+For each ruling line of the initial set of nice ruling lines, the following is done:
+
+1. Fix the curve 1 end of the ruling line.
+
+2. Vary the curve 2 end of the ruling line back and forth from its initial position by the incremental search step size (curve length divided by the number of Search Steps on Curves) to find the nearest curve 2 end of the ruling line that meets the Desired Twist Angle input value.  If, after searching the Maximum Search steps either side of the initial guess location, the Desired Twist Angle condition is not found, the program uses the one ruling line with the smallest twist angle.  If this twist angle is still greater than the Maximum Twist Angle input value, then the program will not display the ruling line.
+
+
+This algorithm will always try to find the nicest spread of ruling lines between the curves, since the ultimate goal is to fit a NURB surface to the ruling lines and to generate the 2D pattern.  Since the calculation and display of the ruling lines and twist angles are automatically done as you move either curve, you get immediate feedback on the developability of the surface.  The calculated ruling lines behave very well for either large or small changes to the model, and for large or small ruling line twist angles.  This makes it much easier to create and develop surfaces that have a good amount of twist.
+
+
+Once you have the curve and ruling line shapes you desire, Pilot3D allows you to fit the ruling lines with one NURB surface that can be unwrapped or flattened out into a 2D pattern.
+
+
+
+
+
+
+Notes on Plate Development and Expansion
+
+
+Note 1:  When you cut all of the developed plates and support frames exactly from the computer-generated patterns, you have to be extremely careful about the set-up of the frames and the wrapping of the plates onto the frames.  One little error or mis-position of a frame can cause a progressive error to creep in.  These little errors grow until a plate can be off by more than an inch at the ends of the structure.  If the plate has already been cut, then many people are not going to be happy.  If you cut out frames and plates exactly, then you must be very careful and accurate during setup.  The old fix-up techniques of cut-and-fit do not work anymore.
+
+
+Note 2:  Make sure the plate to be developed is buildable, but there are no neat mathematical formulas that the program can use to tell you if you are not close enough.  If the Gaussian curvature display shows that the surface is almost exactly developable, then there is no problem, but as you add more twist to the surface or ruling lines, you may wish to add additional scrap material to two of the sides of the plate so that you can scribe and fit the plate exactly.  Another check is shown in the Layout Numbers view when the PlaneCut trace lines are turned on.  The program calculates and compares the 2D developed PlaneCut trace girths with the full-size, actual 3D girths along the plate.  The two numbers should be the same if the plate is developable.  However, if there is any doubt about developability, cut and fit.
+
+
+Note 3:  Make sure you use “enough” supports to construct the object, even if you have to use temporary supports.  If you do not use enough supports, the plate will have a hard time assuming the shape it had in the computer.
+
+
+Note 4:  Make sure that you have the supports spaced very accurately and that the supports are aligned perfectly.  If you cut out both the supports and the developed plates by NC control, then the construction process must be done very carefully.  This is not the time to use the old cut and fit tricks.
+
+
+Note 5: The goal of all of this work is to accurately build objects that form the foundation for cutting out the rest of the parts in the object.  The more accurate the initial fit of supports and plates, the more accurate and quickly the rest of the object will go together.  In addition, you will gain experience in building accurately and be able to pre-cut more pieces ahead of time with less recut and fit problems.  This has a significant domino effect throughout the rest of the construction process.
+
+
+
+
+Developability Check
+
+
+As an aid to determine the developability of the plate, the developed YZ trace lines include a calculation at the end which compares the developed (2D) girth length of the YZ PlaneCut on the developed plate with the (3D) curved girth length of the YZ PlaneCut along the plate.  Since the frame trace line is supposed to be wrapped onto the curved 3D shape of the cut-out YZ PlaneCut, then their two lengths should be the same.  What the program calculates are both the 2D developed YZ PlaneCut girth length and the actual 3D shape of the cut on the surface.  These two numbers should be equal if the plate is perfectly developable.  If it isn’t, you can evaluate the difference in girth length to estimate whether you can stretch or twist the plate into shape or to determine about how much scrap material to leave along one edge.  Note that this is just one estimate of how close a plate is to being perfectly developable.  It still can be difficult to judge whether you can cut the plate out of 2D material and twist it into shape.  We recommend that you take some examples that you have already built (both developable and non-developable) and put their shapes into the program and evaluate what the program thinks about their developability, both in terms of the Gaussian curvature and in terms of these 2D and 3D girth differences.  Another common technique is to construct a model out of cardboard (plot scale versions of the frames and plates) and see if it can be built.  Obviously, this is tedious, but not as bad as making a mistake on the full-size structure and wasting a lot of time and perhaps a big sheet of aluminum or steel.
+
+
