@@ -1687,7 +1687,7 @@ function renderSideView() {
     ...perimPts.map(pt2str),
     ...[...bowKeelPts].reverse().map(pt2str),
     ...[...rockerPts].reverse().map(pt2str),
-    ...sternKeelPts.map(pt2str),
+    ...[...sternKeelPts].reverse().map(pt2str),
   ];
   sideSvg.appendChild(el('polygon', { points: silPts.join(' '), class: 'silhouette' }));
 
