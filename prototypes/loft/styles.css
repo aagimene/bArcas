@@ -320,7 +320,7 @@ main {
 
 #side-view .water { stroke: #94a3b8; stroke-dasharray: 4 4; stroke-width: 0.7; }
 #side-view .axis  { stroke: #cbd5e1; stroke-width: 0.5; }
-#side-view .label { font: 9px -apple-system, sans-serif; fill: #64748b; }
+#side-view .label { font-family: -apple-system, sans-serif; fill: #64748b; }
 #side-view .silhouette {
   fill: rgba(245, 158, 11, 0.10);
   stroke: rgba(245, 158, 11, 0.6);
@@ -337,7 +337,7 @@ main {
 #side-view .spine-handle:active { cursor: grabbing; }
 #side-view .spine-hit     { fill: transparent; cursor: grab; }
 #side-view .handle-hit    { fill: transparent; cursor: grab; }
-#side-view .paddler-label { fill: #b45309; font: 9px -apple-system, sans-serif; }
+#side-view .paddler-label { fill: #b45309; font-family: -apple-system, sans-serif; }
 
 /* ── Four hull-profile curves in the side view ───────────────────────
    keel   = blue  (#2563eb) — already set via .spine-line / .keel
@@ -372,7 +372,8 @@ main {
 #top-view .station-keel           { fill: #2563eb; stroke: white; stroke-width: 1.4; pointer-events: none; }
 #top-view .station-keel.selected  { fill: #1d4ed8; stroke-width: 1.8; }
 #top-view .station-hit            { stroke: transparent; stroke-width: 16; cursor: ns-resize; fill: none; }
-#top-view .station-label          { font: 9px -apple-system, sans-serif; fill: #be185d; pointer-events: none; }
+#top-view .station-label          { font-family: -apple-system, sans-serif; fill: #be185d; pointer-events: none; }
+#top-view .label                  { font-family: -apple-system, sans-serif; fill: #64748b; }
 #top-view .handle-line       { stroke: #64748b; stroke-width: 0.8; pointer-events: none; }
 #top-view .spine-anchor      { fill: #0891b2; stroke: white; stroke-width: 1.5; cursor: grab; }
 #top-view .spine-handle      { fill: #64748b; stroke: white; stroke-width: 1;   cursor: grab; }
@@ -393,7 +394,7 @@ main {
 #side-view .station-tick.selected { fill: #b45309; }
 #side-view .station-hit      { fill: transparent; cursor: ew-resize; }
 #side-view .station-deck-hit { fill: transparent; cursor: grab; }
-#side-view .station-label    { font: 9px -apple-system, sans-serif; fill: #b45309; text-anchor: middle; pointer-events: none; }
+#side-view .station-label    { font-family: -apple-system, sans-serif; fill: #b45309; text-anchor: middle; pointer-events: none; }
 
 /* Station chord = overlay line between a station's keel and deck control
    points. Pink for interior stations; orange for bow sheer; purple for
@@ -457,17 +458,18 @@ main {
 #section-view .ctrl-hit               { fill: transparent; cursor: grab; }
 
 /* ── Coordinate-system badge (used in side, top, section panes) ────── */
-#side-view  .axis-arrow,
-#top-view   .axis-arrow,
-#section-view .axis-arrow { stroke: #0f172a; stroke-width: 1.6; pointer-events: none; }
-#side-view  .axis-label,
-#top-view   .axis-label,
-#section-view .axis-label {
-  font: 600 11px -apple-system, sans-serif;
-  fill: #0f172a; pointer-events: none;
+/* Side/top badges are HTML-overlaid fixed SVGs — not in the main SVG. */
+.axis-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  pointer-events: none;
+  z-index: 2;
 }
-#section-view .axis-label { font-size: 13px; }
-#section-view .axis-arrow { stroke-width: 2; }
+.axis-badge line { stroke: #0f172a; stroke-width: 1.6; }
+.axis-badge text { font: 600 11px -apple-system, sans-serif; fill: #0f172a; }
+#section-view .axis-arrow { stroke: #0f172a; stroke-width: 2; pointer-events: none; }
+#section-view .axis-label { font: 600 13px -apple-system, sans-serif; fill: #0f172a; pointer-events: none; }
 #section-view .ctrl-hit.centerline    { cursor: ns-resize; }
 #section-view .ctrl-hit.keel,
 #section-view .ctrl-hit.centerline.keel { cursor: not-allowed; pointer-events: none; }

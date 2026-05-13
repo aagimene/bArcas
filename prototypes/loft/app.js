@@ -1589,23 +1589,16 @@ function renderTopView() {
       class: 'station-keel' + (isSel ? ' selected' : ''),
     }));
     topSvg.appendChild(el('text', {
-      x: xOfT(halfB) + 8/tf, y: yOfT(kx) + 4/tf, class: 'station-label',
+      x: xOfT(halfB) + 8/tf, y: yOfT(kx) + 4/tf, class: 'station-label', 'font-size': 9/tf,
     }, entry.label));
   });
 
   // Labels.
-  topSvg.appendChild(el('text', { x: 0, y: yOfT(state.bowSheer.tip.x)  - 8/tf, class: 'label', 'text-anchor': 'middle' }, 'bow'));
-  topSvg.appendChild(el('text', { x: 0, y: yOfT(state.sternSheer.tip.x) + 16/tf, class: 'label', 'text-anchor': 'middle' }, 'stern'));
+  topSvg.appendChild(el('text', { x: 0, y: yOfT(state.bowSheer.tip.x)  - 8/tf, class: 'label', 'text-anchor': 'middle', 'font-size': 9/tf }, 'bow'));
+  topSvg.appendChild(el('text', { x: 0, y: yOfT(state.sternSheer.tip.x) + 16/tf, class: 'label', 'text-anchor': 'middle', 'font-size': 9/tf }, 'stern'));
 
   // ── Coordinate-system badge (X-Y plane, top-down) ──────────────────────
   // Bottom-left corner of the viewBox.
-  const vb = topSvg.viewBox.baseVal;
-  const ax = vb.x + 14/tf, ay = vb.y + vb.height - 14/tf;
-  const L = 28/tf;
-  topSvg.appendChild(el('line', { x1: ax, y1: ay, x2: ax + L, y2: ay,     class: 'axis-arrow' }));
-  topSvg.appendChild(el('line', { x1: ax, y1: ay, x2: ax,     y2: ay - L, class: 'axis-arrow' }));
-  topSvg.appendChild(el('text', { x: ax + L + 4/tf, y: ay + 4/tf,    class: 'axis-label' }, '+Y (port)'));
-  topSvg.appendChild(el('text', { x: ax - 4/tf,     y: ay - L - 2/tf, class: 'axis-label', 'text-anchor': 'start' }, '+X (bow)'));
 }
 
 // ── Side view ─────────────────────────────────────────────────────────────
@@ -1642,17 +1635,8 @@ function renderSideView() {
     x1: -340, y1: yOf(0), x2: 340, y2: yOf(0), class: 'water',
   }));
   sideSvg.appendChild(el('text', {
-    x: 320, y: yOf(0) - 3, class: 'label', 'text-anchor': 'end',
+    x: 320, y: yOf(0) - 3, class: 'label', 'text-anchor': 'end', 'font-size': 9/sf,
   }, 'WL (Z = 0)'));
-
-  // Coordinate-system badge (X-Z plane).
-  {
-    const ax = -332, ay = 110, L = 28;
-    sideSvg.appendChild(el('line', { x1: ax, y1: ay, x2: ax + L, y2: ay,     class: 'axis-arrow' }));
-    sideSvg.appendChild(el('line', { x1: ax, y1: ay, x2: ax,     y2: ay - L, class: 'axis-arrow' }));
-    sideSvg.appendChild(el('text', { x: ax + L + 4, y: ay + 4,     class: 'axis-label' }, '+X (bow)'));
-    sideSvg.appendChild(el('text', { x: ax - 4,     y: ay - L - 2, class: 'axis-label', 'text-anchor': 'start' }, '+Z (up)'));
-  }
 
   // ── Four explicit hull-profile curves ───────────────────────────────
   // keel (rocker, blue), deck line (green), bow sheer (orange), stern
@@ -1803,21 +1787,21 @@ function renderSideView() {
 
     // Label above the keel.
     sideSvg.appendChild(el('text', {
-      x: xOf(sp.p.x), y: yOf(sp.p.z) + 16/sf, class: 'station-label',
+      x: xOf(sp.p.x), y: yOf(sp.p.z) + 16/sf, class: 'station-label', 'font-size': 9/sf,
     }, entry.label));
   });
 
   // Endpoint labels follow the actual spine endpoints (which are the same
   // draggable spine control points as any other).
   sideSvg.appendChild(el('text', {
-    x: xOf(state.spine.stern.x), y: yOf(0) + 22/sf, class: 'label', 'text-anchor': 'middle',
+    x: xOf(state.spine.stern.x), y: yOf(0) + 22/sf, class: 'label', 'text-anchor': 'middle', 'font-size': 9/sf,
   }, 'stern'));
   sideSvg.appendChild(el('text', {
-    x: xOf(state.spine.bow.x), y: yOf(0) + 22/sf, class: 'label', 'text-anchor': 'middle',
+    x: xOf(state.spine.bow.x), y: yOf(0) + 22/sf, class: 'label', 'text-anchor': 'middle', 'font-size': 9/sf,
   }, 'bow'));
   sideSvg.appendChild(el('text', {
     x: xOf(state.spine.paddler.x), y: yOf(state.spine.paddler.z) - 12/sf,
-    class: 'label paddler-label', 'text-anchor': 'middle',
+    class: 'label paddler-label', 'text-anchor': 'middle', 'font-size': 9/sf,
   }, 'paddler'));
 
   // ── Sheer ends (bow + stern) ─────────────────────────────────────────
