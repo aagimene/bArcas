@@ -843,9 +843,10 @@ function buildLoft(state) {
       const botPt = st.bottomPt;
       const topPt = st.topPt;
       const dx = topPt.x - botPt.x, dz = topPt.z - botPt.z;
+      const maxB = Math.max(...st.samples.map(s => s.b), 1e-9);
       return st.samples.map(({ b, n }) => {
         const cx = botPt.x + n * dx;
-        return { x: cx, y: b * beamEvalAt(beamPts, cx), z: botPt.z + n * dz };
+        return { x: cx, y: (b / maxB) * beamEvalAt(beamPts, cx), z: botPt.z + n * dz };
       });
     }
     if (st.kind === 'tip') {
@@ -856,10 +857,11 @@ function buildLoft(state) {
     const { p } = compositeAt(state, lengths, st.S);
     const dPt = st.deckPt || { x: p.x, z: p.z + 0.3 };
     const dx  = dPt.x - p.x, dz = dPt.z - p.z;
+    const maxB = Math.max(...st.samples.map(s => s.b), 1e-9);
     return st.samples.map(({ b, n }) => {
       const cx    = p.x + n * dx;
       const halfB = beamEvalAt(beamPts, cx);
-      return { x: cx, y: b * halfB, z: p.z + n * dz };
+      return { x: cx, y: (b / maxB) * halfB, z: p.z + n * dz };
     });
   });
 
