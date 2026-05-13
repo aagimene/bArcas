@@ -1426,6 +1426,9 @@ let TOP_SCALE_Y = 320;
 
 function renderTopView() {
   topSvg.innerHTML = '';
+  // Scale factor: divide SVG-unit sizes by this so control points stay
+  // constant pixel size regardless of zoom level.
+  const tf = topVP.zoom;
   // Reference image (behind everything else).
   if (state.topRef?.url) {
     const r = state.topRef;
@@ -1543,11 +1546,11 @@ function renderTopView() {
       if (!nd[key]) continue;
       const hx = xOfT(nd[key].y), hy = yOfT(nd[key].x);
       topSvg.appendChild(el('line',   { x1: cx, y1: cy, x2: hx, y2: hy, class: 'handle-line' }));
-      topSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 10,  class: 'handle-hit',   'data-drag': drag, 'data-idx': nd.id }));
-      topSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 3.5, class: 'spine-handle', 'data-drag': drag, 'data-idx': nd.id }));
+      topSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 10/tf,  class: 'handle-hit',   'data-drag': drag, 'data-idx': nd.id }));
+      topSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 3.5/tf, class: 'spine-handle', 'data-drag': drag, 'data-idx': nd.id }));
     }
-    topSvg.appendChild(el('circle', { cx, cy, r: 14, class: 'spine-hit',    'data-drag': dragAnchor, 'data-idx': nd.id }));
-    topSvg.appendChild(el('circle', { cx, cy, r: 5,  class: 'spine-anchor', 'data-drag': dragAnchor, 'data-idx': nd.id }));
+    topSvg.appendChild(el('circle', { cx, cy, r: 14/tf, class: 'spine-hit',    'data-drag': dragAnchor, 'data-idx': nd.id }));
+    topSvg.appendChild(el('circle', { cx, cy, r: 5/tf,  class: 'spine-anchor', 'data-drag': dragAnchor, 'data-idx': nd.id }));
   });
 
   // ── Station marks (matching side-view chord style: magenta) ─────────
@@ -1582,27 +1585,27 @@ function renderTopView() {
     }));
     // Centerline marker dot.
     topSvg.appendChild(el('circle', {
-      cx: 0, cy: yOfT(kx), r: 3.5,
+      cx: 0, cy: yOfT(kx), r: 3.5/tf,
       class: 'station-keel' + (isSel ? ' selected' : ''),
     }));
     topSvg.appendChild(el('text', {
-      x: xOfT(halfB) + 8, y: yOfT(kx) + 4, class: 'station-label',
+      x: xOfT(halfB) + 8/tf, y: yOfT(kx) + 4/tf, class: 'station-label',
     }, entry.label));
   });
 
   // Labels.
-  topSvg.appendChild(el('text', { x: 0, y: yOfT(state.bowSheer.tip.x)  - 8, class: 'label', 'text-anchor': 'middle' }, 'bow'));
-  topSvg.appendChild(el('text', { x: 0, y: yOfT(state.sternSheer.tip.x) + 16, class: 'label', 'text-anchor': 'middle' }, 'stern'));
+  topSvg.appendChild(el('text', { x: 0, y: yOfT(state.bowSheer.tip.x)  - 8/tf, class: 'label', 'text-anchor': 'middle' }, 'bow'));
+  topSvg.appendChild(el('text', { x: 0, y: yOfT(state.sternSheer.tip.x) + 16/tf, class: 'label', 'text-anchor': 'middle' }, 'stern'));
 
   // ── Coordinate-system badge (X-Y plane, top-down) ──────────────────────
   // Bottom-left corner of the viewBox.
   const vb = topSvg.viewBox.baseVal;
-  const ax = vb.x + 14, ay = vb.y + vb.height - 14;
-  const L = 28;
+  const ax = vb.x + 14/tf, ay = vb.y + vb.height - 14/tf;
+  const L = 28/tf;
   topSvg.appendChild(el('line', { x1: ax, y1: ay, x2: ax + L, y2: ay,     class: 'axis-arrow' }));
   topSvg.appendChild(el('line', { x1: ax, y1: ay, x2: ax,     y2: ay - L, class: 'axis-arrow' }));
-  topSvg.appendChild(el('text', { x: ax + L + 4, y: ay + 4,    class: 'axis-label' }, '+Y (port)'));
-  topSvg.appendChild(el('text', { x: ax - 4,     y: ay - L - 2, class: 'axis-label', 'text-anchor': 'start' }, '+X (bow)'));
+  topSvg.appendChild(el('text', { x: ax + L + 4/tf, y: ay + 4/tf,    class: 'axis-label' }, '+Y (port)'));
+  topSvg.appendChild(el('text', { x: ax - 4/tf,     y: ay - L - 2/tf, class: 'axis-label', 'text-anchor': 'start' }, '+X (bow)'));
 }
 
 // ── Side view ─────────────────────────────────────────────────────────────
@@ -1610,6 +1613,9 @@ function renderTopView() {
 function renderSideView() {
   applySideViewBox();
   sideSvg.innerHTML = '';
+  // Scale factor: divide SVG-unit sizes by this so control points stay
+  // constant pixel size regardless of zoom level.
+  const sf = SIDE_VP_DEFAULT.W / sideVP.W;
   // Reference image (behind everything else).
   if (state.sideRef?.url) {
     const r = state.sideRef;
@@ -1730,8 +1736,8 @@ function renderSideView() {
     ['handle-bow',         h.bCtrl],
   ];
   for (const [id, p] of handleDots) {
-    sideSvg.appendChild(el('circle', { cx: xOf(p.x), cy: yOf(p.z), r: 10, class: 'handle-hit', 'data-drag': id }));
-    sideSvg.appendChild(el('circle', { cx: xOf(p.x), cy: yOf(p.z), r: 3.5, class: 'spine-handle', 'data-drag': id }));
+    sideSvg.appendChild(el('circle', { cx: xOf(p.x), cy: yOf(p.z), r: 10/sf, class: 'handle-hit', 'data-drag': id }));
+    sideSvg.appendChild(el('circle', { cx: xOf(p.x), cy: yOf(p.z), r: 3.5/sf, class: 'spine-handle', 'data-drag': id }));
   }
 
   // Anchor points (large): stern, paddler, bow.
@@ -1742,9 +1748,9 @@ function renderSideView() {
   ];
   for (const [id, p] of anchorDots) {
     const isPaddler = id === 'anchor-paddler';
-    sideSvg.appendChild(el('circle', { cx: xOf(p.x), cy: yOf(p.z), r: 14, class: 'spine-hit', 'data-drag': id }));
+    sideSvg.appendChild(el('circle', { cx: xOf(p.x), cy: yOf(p.z), r: 14/sf, class: 'spine-hit', 'data-drag': id }));
     sideSvg.appendChild(el('circle', {
-      cx: xOf(p.x), cy: yOf(p.z), r: 5,
+      cx: xOf(p.x), cy: yOf(p.z), r: 5/sf,
       class: 'spine-anchor' + (isPaddler ? ' paddler' : ''),
       'data-drag': id,
     }));
@@ -1772,24 +1778,24 @@ function renderSideView() {
 
     // Keel control point — solid teal, slides along rocker.
     sideSvg.appendChild(el('circle', {
-      cx: xOf(sp.p.x), cy: yOf(sp.p.z), r: 14,
+      cx: xOf(sp.p.x), cy: yOf(sp.p.z), r: 14/sf,
       class: 'station-hit',
       'data-drag': 'station', 'data-idx': String(i),
     }));
     sideSvg.appendChild(el('circle', {
-      cx: xOf(sp.p.x), cy: yOf(sp.p.z), r: 5,
+      cx: xOf(sp.p.x), cy: yOf(sp.p.z), r: 5/sf,
       class: 'station-keel' + (isSel ? ' selected' : ''),
       'data-drag': 'station', 'data-idx': String(i),
     }));
 
     // Deck control point — diamond, free X-Z drag.
     sideSvg.appendChild(el('circle', {
-      cx: xOf(dPt.x), cy: yOf(dPt.z), r: 14,
+      cx: xOf(dPt.x), cy: yOf(dPt.z), r: 14/sf,
       class: 'station-deck-hit',
       'data-drag': 'station-deck', 'data-idx': String(i),
     }));
     sideSvg.appendChild(el('rect', {
-      x: xOf(dPt.x) - 5, y: yOf(dPt.z) - 5, width: 10, height: 10,
+      x: xOf(dPt.x) - 5/sf, y: yOf(dPt.z) - 5/sf, width: 10/sf, height: 10/sf,
       transform: `rotate(45 ${xOf(dPt.x)} ${yOf(dPt.z)})`,
       class: 'station-deck' + (isSel ? ' selected' : ''),
       'data-drag': 'station-deck', 'data-idx': String(i),
@@ -1797,20 +1803,20 @@ function renderSideView() {
 
     // Label above the keel.
     sideSvg.appendChild(el('text', {
-      x: xOf(sp.p.x), y: yOf(sp.p.z) + 16, class: 'station-label',
+      x: xOf(sp.p.x), y: yOf(sp.p.z) + 16/sf, class: 'station-label',
     }, entry.label));
   });
 
   // Endpoint labels follow the actual spine endpoints (which are the same
   // draggable spine control points as any other).
   sideSvg.appendChild(el('text', {
-    x: xOf(state.spine.stern.x), y: yOf(0) + 22, class: 'label', 'text-anchor': 'middle',
+    x: xOf(state.spine.stern.x), y: yOf(0) + 22/sf, class: 'label', 'text-anchor': 'middle',
   }, 'stern'));
   sideSvg.appendChild(el('text', {
-    x: xOf(state.spine.bow.x), y: yOf(0) + 22, class: 'label', 'text-anchor': 'middle',
+    x: xOf(state.spine.bow.x), y: yOf(0) + 22/sf, class: 'label', 'text-anchor': 'middle',
   }, 'bow'));
   sideSvg.appendChild(el('text', {
-    x: xOf(state.spine.paddler.x), y: yOf(state.spine.paddler.z) - 12,
+    x: xOf(state.spine.paddler.x), y: yOf(state.spine.paddler.z) - 12/sf,
     class: 'label paddler-label', 'text-anchor': 'middle',
   }, 'paddler'));
 
@@ -1836,24 +1842,24 @@ function renderSideView() {
 
       // Keel (bottom) control point — same blue as hull keel points.
       sideSvg.appendChild(el('circle', {
-        cx: xOf(sst.bottomPt.x), cy: yOf(sst.bottomPt.z), r: 14,
+        cx: xOf(sst.bottomPt.x), cy: yOf(sst.bottomPt.z), r: 14/sf,
         class: 'station-hit',
         'data-drag': `sheer-bot-${end}`, 'data-idx': String(sIdx), 'data-uni': String(uniIdx),
       }));
       sideSvg.appendChild(el('circle', {
-        cx: xOf(sst.bottomPt.x), cy: yOf(sst.bottomPt.z), r: 5,
+        cx: xOf(sst.bottomPt.x), cy: yOf(sst.bottomPt.z), r: 5/sf,
         class: 'station-keel' + (isSel ? ' selected' : ''),
         'data-drag': `sheer-bot-${end}`, 'data-idx': String(sIdx), 'data-uni': String(uniIdx),
       }));
 
       // Deck (top) control point — same pink diamond as hull deck points.
       sideSvg.appendChild(el('circle', {
-        cx: xOf(sst.topPt.x), cy: yOf(sst.topPt.z), r: 14,
+        cx: xOf(sst.topPt.x), cy: yOf(sst.topPt.z), r: 14/sf,
         class: 'station-deck-hit',
         'data-drag': `sheer-top-${end}`, 'data-idx': String(sIdx), 'data-uni': String(uniIdx),
       }));
       sideSvg.appendChild(el('rect', {
-        x: xOf(sst.topPt.x) - 5, y: yOf(sst.topPt.z) - 5, width: 10, height: 10,
+        x: xOf(sst.topPt.x) - 5/sf, y: yOf(sst.topPt.z) - 5/sf, width: 10/sf, height: 10/sf,
         transform: `rotate(45 ${xOf(sst.topPt.x)} ${yOf(sst.topPt.z)})`,
         class: 'station-deck' + (isSel ? ' selected' : ''),
         'data-drag': `sheer-top-${end}`, 'data-idx': String(sIdx), 'data-uni': String(uniIdx),
@@ -1862,11 +1868,11 @@ function renderSideView() {
 
     // Convergence tip — ring, draggable.
     sideSvg.appendChild(el('circle', {
-      cx: xOf(sheer.tip.x), cy: yOf(sheer.tip.z), r: 14,
+      cx: xOf(sheer.tip.x), cy: yOf(sheer.tip.z), r: 14/sf,
       class: 'stem-hit', 'data-drag': `sheer-tip-${end}`,
     }));
     sideSvg.appendChild(el('circle', {
-      cx: xOf(sheer.tip.x), cy: yOf(sheer.tip.z), r: 6,
+      cx: xOf(sheer.tip.x), cy: yOf(sheer.tip.z), r: 6/sf,
       class: `${botClass} tip`, 'data-drag': `sheer-tip-${end}`,
     }));
 

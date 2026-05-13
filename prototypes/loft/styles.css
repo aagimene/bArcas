@@ -315,6 +315,9 @@ main {
   touch-action: none;
 }
 
+/* Control overlays keep constant visual weight regardless of zoom level. */
+#side-view *, #top-view * { vector-effect: non-scaling-stroke; }
+
 #side-view .water { stroke: #94a3b8; stroke-dasharray: 4 4; stroke-width: 0.7; }
 #side-view .axis  { stroke: #cbd5e1; stroke-width: 0.5; }
 #side-view .label { font: 9px -apple-system, sans-serif; fill: #64748b; }
