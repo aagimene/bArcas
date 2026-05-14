@@ -483,6 +483,28 @@ function buildLoft(state) {
       indices.push(Ad, Dd, Bd);
       indices.push(Ad, Cd, Dd);
     }
+    // ── Tip end caps ────────────────────────────────────────────────────
+    // When deck.z ≠ keel.z at the tip, the hull doesn't converge to a single
+    // point — there's a vertical edge between starboard and port tip columns.
+    // Close each tip with a strip of triangles from k=0 to k=N-1.
+    const tipFace = (rowI, outwardForward) => {
+      for (let k = 0; k < N - 1; k++) {
+        const sA = rowI * N + k,   sB = rowI * N + k + 1;
+        const pA = stbdVertCount + rowI * N + k,
+              pB = stbdVertCount + rowI * N + k + 1;
+        if (outwardForward) {
+          // Bow tip: outward normal is +x. CCW when viewed from +x.
+          indices.push(sA, pA, pB);
+          indices.push(sA, pB, sB);
+        } else {
+          // Stern tip: outward normal is -x. CCW when viewed from -x.
+          indices.push(pA, sA, sB);
+          indices.push(pA, sB, pB);
+        }
+      }
+    };
+    tipFace(0, false);             // stern
+    tipFace(Mdense - 1, true);     // bow
   }
 
   // Expose dense rows for SVG wireframe and station row data for selection.
