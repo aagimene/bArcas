@@ -1960,10 +1960,14 @@ sideSvg.addEventListener('pointermove', (e) => {
 
   if (drag.kind === 'knot') {
     // Move on-curve knot; handles move with it.
-    const k = state.spine.knots[drag.idx];
+    const knots = state.spine.knots;
+    const k = knots[drag.idx];
     if (!k) return;
     k.x = wx; k.z = wz;
-    const knots = state.spine.knots;
+    // Pair endpoints: bow/stern tip X is shared with the deck line endpoint.
+    const dkKnots = state.deckLine.knots;
+    if (drag.idx === 0)              dkKnots[0].x = wx;
+    if (drag.idx === knots.length-1) dkKnots[dkKnots.length-1].x = wx;
     state.length = knots[knots.length-1].x - knots[0].x;
     lengthEl.value = state.length.toFixed(2);
     lengthOut.textContent = state.length.toFixed(2) + ' m';
@@ -1985,8 +1989,15 @@ sideSvg.addEventListener('pointermove', (e) => {
     if (len > 0.005) { k.angle = Math.atan2(-dz, -dx); k.aftLen = len; }
     rebuildHull(); renderSideView(); renderTopView();
   } else if (drag.kind === 'deck-knot') {
-    const k = state.deckLine.knots[drag.idx];
-    if (k) { k.x = wx; k.z = wz; }
+    const dkKnots = state.deckLine.knots;
+    const k = dkKnots[drag.idx];
+    if (!k) return;
+    k.x = wx; k.z = wz;
+    // Pair endpoints: bow/stern tip X is shared with the rocker endpoint.
+    const spKnots = state.spine.knots;
+    if (drag.idx === 0)                k.x = spKnots[0].x = wx;
+    if (drag.idx === dkKnots.length-1) k.x = spKnots[spKnots.length-1].x = wx;
+    state.length = spKnots[spKnots.length-1].x - spKnots[0].x;
     rebuildHull(); renderSideView();
   } else if (drag.kind === 'deck-fore') {
     const k = state.deckLine.knots[drag.idx];
