@@ -1783,10 +1783,10 @@ topSvg.addEventListener('pointermove', (e) => {
   topDrag.moved = true;
 
   if (topDrag.kind === 'ref-top') {
-    // wx = world Y (beam), wy = world X (longitudinal) — top view axes
+    // wx = worldX (longitudinal), wy = worldY (beam) — from svgToLocalTop
     if (!topDrag.startWX) { topDrag.startWX = wx; topDrag.startWY = wy; topDrag.origX = state.topRef.worldX; topDrag.origY = state.topRef.worldY; }
-    state.topRef.worldX = topDrag.origX + (wy - topDrag.startWY);
-    state.topRef.worldY = topDrag.origY + (wx - topDrag.startWX);
+    state.topRef.worldX = topDrag.origX + (wx - topDrag.startWX);
+    state.topRef.worldY = topDrag.origY + (wy - topDrag.startWY);
     renderTopView();
     return;
   }
