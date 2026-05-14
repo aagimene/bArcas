@@ -2275,6 +2275,15 @@ function wireRefImage(viewKey, fileId, opacityId, opacityOutId, clearId, renderF
 wireRefImage('sideRef', 'side-ref-file', 'side-ref-opacity', 'side-ref-opacity-out', 'side-ref-clear', renderSideView);
 wireRefImage('topRef',  'top-ref-file',  'top-ref-opacity',  'top-ref-opacity-out',  'top-ref-clear',  renderTopView);
 
+// Controls panel show/hide.
+{
+  const pane = document.querySelector('.pane-controls');
+  const showBtn = document.getElementById('controls-show');
+  const hideBtn = document.getElementById('controls-hide');
+  hideBtn.addEventListener('click', () => { pane.classList.add('hidden'); showBtn.classList.add('visible'); });
+  showBtn.addEventListener('click', () => { pane.classList.remove('hidden'); showBtn.classList.remove('visible'); });
+}
+
 document.getElementById('export-state').addEventListener('click', () => {
   // Serialise the full state object (all hull geometry + UI settings).
   const json = JSON.stringify(state, null, 2);
