@@ -377,16 +377,23 @@ function buildLoft(state) {
   const deckSampled = sampledSpine(state.deckLine.knots, 64);
   const beamPts     = sampledBeamLine(state);
 
-  const degen = Array.from({ length: N }, () => ({ b: 0, n: 0 }));
+  // Tips use a full cross-section shape (not all-zero) so the b/n splines
+  // for the deck column (k=N-1) stay near n=1 everywhere. Convergence to a
+  // single point at bow/stern is handled by halfB→0 and height→0 there.
   const sortedSt = [...state.stations]
     .filter(st => st.s > 1e-6 && st.s < 1 - 1e-6)
     .sort((a, b) => a.s - b.s);
+  // Use the nearest station's section shape at each tip (or default if none).
+  const tipSamples = (nearestSt) =>
+    sampleSection(nearestSt ? nearestSt.points : defaultSection(), N);
+  const tip0 = tipSamples(sortedSt[0]);
+  const tip1 = tipSamples(sortedSt[sortedSt.length - 1]);
 
   // Base rows: tips + interior stations.
   const baseSt = [
-    { s: 0, samples: degen },
+    { s: 0, samples: tip0 },
     ...sortedSt.map(st => ({ s: st.s, samples: sampleSection(st.points, N) })),
-    { s: 1, samples: degen },
+    { s: 1, samples: tip1 },
   ];
   const M = baseSt.length;
   const baseS = baseSt.map(b => b.s);
