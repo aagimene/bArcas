@@ -38,7 +38,7 @@ const DEFAULT_HALF_BEAM = 0.30; // reference half-beam for display scale
 const state = {
   length: 4.8,
   loftRes: '24',
-  xSubdiv: 4,
+  xSubdiv: 16,
   selectedStation: 0,
   spine: {
     knots: [
