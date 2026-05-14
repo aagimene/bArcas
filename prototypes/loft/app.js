@@ -1453,6 +1453,25 @@ function renderSectionView() {
   }
 }
 
+// ── Unit conversion helpers ──────────────────────────────────────────────
+// fmtLength(metres) → "4.80 m  ·  15.75 ft  ·  15' 9″"
+function fmtLength(m) {
+  const ft = m * 3.28083989501;
+  const ftInt = Math.floor(ft);
+  const inches = (ft - ftInt) * 12;
+  const inchRounded = Math.round(inches * 16) / 16; // 1/16" precision
+  let ftInDisp;
+  if (Math.abs(inchRounded - 12) < 1e-6) ftInDisp = `${ftInt + 1}' 0″`;
+  else ftInDisp = `${ftInt}' ${inchRounded.toFixed(2).replace(/\.?0+$/, '')}″`;
+  return `${m.toFixed(2)} m  ·  ${ft.toFixed(2)} ft  ·  ${ftInDisp}`;
+}
+// fmtMM(metres) → "10 mm  ·  0.394″"
+function fmtMM(m) {
+  const mm = m * 1000;
+  const inches = m * 39.3700787;
+  return `${mm.toFixed(0)} mm  ·  ${inches.toFixed(3)}″`;
+}
+
 // ── Controls panel (Phase A: read-only-ish) ──────────────────────────────
 
 const lengthEl   = document.getElementById('length');
@@ -1603,7 +1622,7 @@ lengthEl.addEventListener('input', () => {
     bl.peaks.forEach(pk => { pk.x = sx(pk.x); pk.hdx *= r; });
   }
   state.length = newL;
-  lengthOut.textContent = newL.toFixed(2) + ' m';
+  lengthOut.textContent = fmtLength(newL);
   rebuildHull();
   renderSideView();
   renderTopView();
@@ -1630,7 +1649,7 @@ xSubdivEl.addEventListener('change', () => {
 // Spine radius — translates half-meshes ±r in Y.
 const spineRadiusEl  = document.getElementById('spine-radius');
 const spineRadiusOut = document.getElementById('spine-r-out');
-const fmtR = (v) => (v * 1000).toFixed(0) + ' mm';
+const fmtR = (v) => fmtMM(v);
 spineRadiusOut.textContent = fmtR(state.spineRadius);
 spineRadiusEl.value = String(state.spineRadius);
 spineRadiusEl.addEventListener('input', () => {
@@ -2085,7 +2104,7 @@ sideSvg.addEventListener('pointermove', (e) => {
     if (drag.idx === knots.length-1) dkKnots[dkKnots.length-1].x = wx;
     state.length = knots[knots.length-1].x - knots[0].x;
     lengthEl.value = state.length.toFixed(2);
-    lengthOut.textContent = state.length.toFixed(2) + ' m';
+    lengthOut.textContent = fmtLength(state.length);
     rebuildHull(); renderSideView(); renderTopView();
   } else if (drag.kind === 'knot-fore') {
     // Drag outgoing handle — updates angle and foreLen; aftLen stays.
@@ -2281,7 +2300,7 @@ document.getElementById('import-state').addEventListener('change', (e) => {
       loftResEl.value  = state.loftRes;
       xSubdivEl.value  = String(state.xSubdiv);
       lengthEl.value   = state.length.toFixed(2);
-      lengthOut.textContent = state.length.toFixed(2) + ' m';
+      lengthOut.textContent = fmtLength(state.length);
       rebuildHull();
       renderStationList();
       renderSideView();
@@ -2536,7 +2555,7 @@ function nearestSegmentInsertIdx(points, clickB, clickN) {
 
 // ── Initial render ───────────────────────────────────────────────────────
 
-lengthOut.textContent = state.length.toFixed(2) + ' m';
+lengthOut.textContent = fmtLength(state.length);
 stationLabel.textContent = stationLabelFor(state.selectedStation);
 renderStationList();
 renderSideView();
