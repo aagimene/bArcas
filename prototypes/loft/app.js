@@ -222,30 +222,53 @@ function sampleSpline(points, xKey, yKey, samplesPerSpan = 16) {
   return out;
 }
 
-// Sample a starboard-only section to N transverse points by arc-length
-// equal spacing along the spline through the control points.
+// Sample a starboard-only cross-section to N transverse points by arc-length
+// equal spacing. Uses Catmull-Rom → cubic Bezier conversion so each segment
+// is a true Bezier curve through the control points (local control,
+// C1 smooth, more predictable than natural cubic).
 function sampleSection(section, N) {
-  const dense = sampleSpline(section, 'b', 'n', 24);
+  const pts = section;
+  const np  = pts.length;
+  if (np < 2) return Array.from({length: N}, () => ({b: 0, n: 0}));
+
+  // Build a dense polyline from piecewise cubic Beziers (Catmull-Rom tension=0.5).
+  const dense = [];
+  const tension = 0.5;
+  for (let i = 0; i < np - 1; i++) {
+    const p0 = pts[Math.max(0,    i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(np-1, i + 2)];
+    const c1b = p1.b + (p2.b - p0.b) * tension / 3;
+    const c1n = p1.n + (p2.n - p0.n) * tension / 3;
+    const c2b = p2.b - (p3.b - p1.b) * tension / 3;
+    const c2n = p2.n - (p3.n - p1.n) * tension / 3;
+    const steps = 24;
+    for (let s = 0; s < steps; s++) {
+      const t = s / steps, u = 1 - t;
+      dense.push({
+        b: u*u*u*p1.b + 3*u*u*t*c1b + 3*u*t*t*c2b + t*t*t*p2.b,
+        n: u*u*u*p1.n + 3*u*u*t*c1n + 3*u*t*t*c2n + t*t*t*p2.n,
+      });
+    }
+  }
+  dense.push({ b: pts[np-1].b, n: pts[np-1].n });
+
+  // Arc-length resample to N points.
   const arc = [0];
   for (let i = 1; i < dense.length; i++) {
-    const db = dense[i].x - dense[i - 1].x;
-    const dn = dense[i].y - dense[i - 1].y;
-    arc.push(arc[i - 1] + Math.hypot(db, dn));
+    const db = dense[i].b - dense[i-1].b, dn = dense[i].n - dense[i-1].n;
+    arc.push(arc[i-1] + Math.hypot(db, dn));
   }
-  const total = arc[arc.length - 1] || 1;
+  const total = arc[arc.length-1] || 1;
   const out = new Array(N);
   for (let k = 0; k < N; k++) {
-    const target = (k / (N - 1)) * total;
+    const target = (k / (N-1)) * total;
     let lo = 0, hi = arc.length - 1;
-    while (hi - lo > 1) {
-      const mid = (lo + hi) >> 1;
-      if (arc[mid] <= target) lo = mid; else hi = mid;
-    }
+    while (hi - lo > 1) { const m = (lo+hi)>>1; if (arc[m] <= target) lo = m; else hi = m; }
     const t = arc[hi] === arc[lo] ? 0 : (target - arc[lo]) / (arc[hi] - arc[lo]);
-    out[k] = {
-      b: dense[lo].x + t * (dense[hi].x - dense[lo].x),
-      n: dense[lo].y + t * (dense[hi].y - dense[lo].y),
-    };
+    out[k] = { b: dense[lo].b + t * (dense[hi].b - dense[lo].b),
+               n: dense[lo].n + t * (dense[hi].n - dense[lo].n) };
   }
   return out;
 }
@@ -1412,10 +1435,10 @@ function renderSectionView() {
     x: 193, y: nOf(1) - 6, class: 'label', 'text-anchor': 'end',
   }, 'deck'));
 
-  // Closed-loop section.
-  const dense = sampleSpline(station.points, 'b', 'n', 24);
-  const stbdPath = 'M ' + dense.map(p => `${bOf( p.x).toFixed(2)} ${nOf(p.y).toFixed(2)}`).join(' L ');
-  const portPath = 'M ' + dense.map(p => `${bOf(-p.x).toFixed(2)} ${nOf(p.y).toFixed(2)}`).join(' L ');
+  // Closed-loop section — same Bezier sampler buildLoft uses.
+  const dense = sampleSection(station.points, 256);
+  const stbdPath = 'M ' + dense.map(p => `${bOf( p.b).toFixed(2)} ${nOf(p.n).toFixed(2)}`).join(' L ');
+  const portPath = 'M ' + dense.map(p => `${bOf(-p.b).toFixed(2)} ${nOf(p.n).toFixed(2)}`).join(' L ');
   sectionSvg.appendChild(el('path', { class: 'section-curve',  d: stbdPath }));
   sectionSvg.appendChild(el('path', { class: 'section-mirror', d: portPath }));
 
