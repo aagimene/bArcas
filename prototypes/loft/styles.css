@@ -463,6 +463,10 @@ main {
 /* ── Footer ──────────────────────────────────────────────────── */
 
 .ref-details summary { font-size: 0.82rem; font-weight: 600; cursor: pointer; color: #334155; padding: 0.2rem 0; }
+/* Reference image corner scale handles */
+#side-view .ref-corner, #top-view .ref-corner {
+  fill: white; stroke: #0891b2; stroke-width: 1.6; cursor: nwse-resize;
+}
 .ref-group { display: flex; flex-direction: column; gap: 0.3rem; margin: 0.4rem 0 0.6rem; padding-left: 0.5rem; border-left: 2px solid #e2e8f0; }
 .ref-label { font-size: 0.74rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.1rem; }
 .ref-file-label { display: inline-block; padding: 0.2rem 0.5rem; font-size: 0.78rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 3px; cursor: pointer; }

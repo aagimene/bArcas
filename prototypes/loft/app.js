@@ -956,6 +956,15 @@ function renderTopView() {
     imgEl.setAttribute('opacity', r.opacity);
     imgEl.setAttribute('data-drag', 'ref-top');
     topSvg.appendChild(imgEl);
+    // Corner handles: xi: 0=port(worldY), 1=stbd(worldY+worldH); zi: 0=bow(worldX+worldW), 1=stern(worldX)
+    for (let xi = 0; xi <= 1; xi++) for (let zi = 0; zi <= 1; zi++) {
+      const cx = xOfT(xi === 0 ? r.worldY : r.worldY + r.worldH);
+      const cy = yOfT(zi === 0 ? r.worldX + r.worldW : r.worldX);
+      topSvg.appendChild(el('circle', {
+        cx, cy, r: 6/tf, class: 'ref-corner',
+        'data-drag': 'ref-top-corner', 'data-xi': String(xi), 'data-zi': String(zi),
+      }));
+    }
   }
   const xOfT = (wy) =>  wy * TOP_SCALE_Y;
   const yOfT = (wx) => -wx * TOP_SCALE_X;
@@ -1142,6 +1151,16 @@ function renderSideView() {
     imgEl.setAttribute('opacity', r.opacity);
     imgEl.setAttribute('data-drag', 'ref-side');
     sideSvg.appendChild(imgEl);
+    // Corner handles for scaling (aspect-ratio constrained).
+    // xi: 0=left, 1=right;  zi: 0=top (higher Z), 1=bottom (lower Z)
+    for (let xi = 0; xi <= 1; xi++) for (let zi = 0; zi <= 1; zi++) {
+      const cx = xOf(xi === 0 ? r.worldX : r.worldX + r.worldW);
+      const cy = yOf(zi === 0 ? r.worldZ : r.worldZ - r.worldH);
+      sideSvg.appendChild(el('circle', {
+        cx, cy, r: 6/sf, class: 'ref-corner',
+        'data-drag': 'ref-side-corner', 'data-xi': String(xi), 'data-zi': String(zi),
+      }));
+    }
   }
   const xOf = (x) => x * SIDE_SCALE;
   const yOf = (z) => -z * SIDE_SCALE;
@@ -1772,7 +1791,11 @@ topSvg.addEventListener('pointerdown', (e) => {
   const target = e.target.closest('[data-drag]');
   if (!target) return;
   e.preventDefault();
-  topDrag = { kind: target.dataset.drag, id: target.dataset.idx, moved: false, pointerId: e.pointerId };
+  topDrag = {
+    kind: target.dataset.drag, id: target.dataset.idx, moved: false, pointerId: e.pointerId,
+    xi: target.dataset.xi !== undefined ? +target.dataset.xi : undefined,
+    zi: target.dataset.zi !== undefined ? +target.dataset.zi : undefined,
+  };
   if (topDrag.kind === 'station') selectStation(+topDrag.id);
   topSvg.setPointerCapture(e.pointerId);
 });
@@ -1783,10 +1806,29 @@ topSvg.addEventListener('pointermove', (e) => {
   topDrag.moved = true;
 
   if (topDrag.kind === 'ref-top') {
-    // wx = worldX (longitudinal), wy = worldY (beam) — from svgToLocalTop
+    // wx = worldX (longitudinal), wy = worldY (beam)
     if (!topDrag.startWX) { topDrag.startWX = wx; topDrag.startWY = wy; topDrag.origX = state.topRef.worldX; topDrag.origY = state.topRef.worldY; }
     state.topRef.worldX = topDrag.origX + (wx - topDrag.startWX);
     state.topRef.worldY = topDrag.origY + (wy - topDrag.startWY);
+    renderTopView();
+    return;
+  }
+
+  if (topDrag.kind === 'ref-top-corner') {
+    const r = state.topRef;
+    if (!topDrag.anchorSet) {
+      topDrag.anchorSet = true;
+      // zi=0(bow end)→anchor stern, zi=1(stern end)→anchor bow
+      topDrag.anchorWx = topDrag.zi === 0 ? r.worldX         : r.worldX + r.worldW;
+      // xi=0(port)→anchor stbd, xi=1(stbd)→anchor port
+      topDrag.anchorWy = topDrag.xi === 0 ? r.worldY + r.worldH : r.worldY;
+    }
+    const newW = Math.max(0.05, Math.abs(wx - topDrag.anchorWx)); // length
+    const newH = r.nativeAspect ? newW * r.nativeAspect : newW;   // beam
+    r.worldW = newW;
+    r.worldH = newH;
+    r.worldX = topDrag.zi === 0 ? topDrag.anchorWx         : topDrag.anchorWx - newW;
+    r.worldY = topDrag.xi === 0 ? topDrag.anchorWy - newH   : topDrag.anchorWy;
     renderTopView();
     return;
   }
@@ -1952,8 +1994,9 @@ sideSvg.addEventListener('pointerdown', (e) => {
   const { x, y } = svgToLocal(sideSvg, e);
   drag = {
     kind, idx, moved: false, pointerId: e.pointerId,
-    startWx: x / SIDE_SCALE,
-    startWz: -y / SIDE_SCALE,
+    startWx: x / SIDE_SCALE, startWz: -y / SIDE_SCALE,
+    xi: target.dataset.xi !== undefined ? +target.dataset.xi : undefined,
+    zi: target.dataset.zi !== undefined ? +target.dataset.zi : undefined,
   };
   if (kind === 'station') selectStation(idx);
   sideSvg.setPointerCapture(e.pointerId);
@@ -1970,6 +2013,25 @@ sideSvg.addEventListener('pointermove', (e) => {
     if (!drag.startWX) { drag.startWX = wx; drag.startWZ = wz; drag.origX = state.sideRef.worldX; drag.origZ = state.sideRef.worldZ; }
     state.sideRef.worldX = drag.origX + (wx - drag.startWX);
     state.sideRef.worldZ = drag.origZ + (wz - drag.startWZ);
+    renderSideView();
+    return;
+  }
+
+  if (drag.kind === 'ref-side-corner') {
+    const r = state.sideRef;
+    if (!drag.anchorSet) {
+      drag.anchorSet = true;
+      // Anchor = opposite corner: xi=0(left)→anchor right, xi=1(right)→anchor left
+      drag.anchorWx = drag.xi === 0 ? r.worldX + r.worldW : r.worldX;
+      // zi=0(top)→anchor bottom, zi=1(bottom)→anchor top
+      drag.anchorWz = drag.zi === 0 ? r.worldZ - r.worldH : r.worldZ;
+    }
+    const newW = Math.max(0.05, Math.abs(wx - drag.anchorWx));
+    const newH = r.nativeAspect ? newW / r.nativeAspect : newW;
+    r.worldW = newW;
+    r.worldH = newH;
+    r.worldX = drag.xi === 0 ? drag.anchorWx - newW : drag.anchorWx;
+    r.worldZ = drag.zi === 0 ? drag.anchorWz + newH : drag.anchorWz;
     renderSideView();
     return;
   }
@@ -2098,24 +2160,9 @@ document.getElementById('side-reset').addEventListener('click', () => {
 
 // ── Reference image controls ──────────────────────────────────────────────
 
-function wireRefImage(viewKey, fileId, opacityId, opacityOutId, wId, hId, xId, yId, clearId, renderFn) {
+function wireRefImage(viewKey, fileId, opacityId, opacityOutId, clearId, renderFn) {
   const refState = () => state[viewKey];
   const fmtPct = v => Math.round(v * 100) + '%';
-
-  const hInput = document.getElementById(hId);
-  const wInput = document.getElementById(wId);
-
-  // Derive worldH from worldW using native image aspect ratio.
-  const applyAspect = () => {
-    const r = refState();
-    if (!r.nativeAspect) return;
-    // Side view: image width=worldW, height=worldH → worldH = worldW / nativeAspect.
-    // Top view:  SVG width=worldH*s, height=worldW*s → worldH = worldW * nativeAspect.
-    r.worldH = viewKey === 'sideRef'
-      ? r.worldW / r.nativeAspect
-      : r.worldW * r.nativeAspect;
-    hInput.value = r.worldH.toFixed(3);
-  };
 
   document.getElementById(fileId).addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -2128,7 +2175,23 @@ function wireRefImage(viewKey, fileId, opacityId, opacityOutId, wId, hId, xId, y
         const r = refState();
         r.url = url;
         r.nativeAspect = img.naturalWidth / img.naturalHeight;
-        applyAspect();
+        // Auto-position to cover the hull on first load.
+        const spKnots = state.spine.knots;
+        const sternX = spKnots[0].x, bowX = spKnots[spKnots.length - 1].x;
+        const hullLen = bowX - sternX;
+        if (viewKey === 'sideRef') {
+          r.worldW = hullLen;
+          r.worldH = r.worldW / r.nativeAspect;
+          r.worldX = sternX;
+          // Top edge at highest deck point + small pad.
+          const dkPts = sampledSpine(state.deckLine.knots, 16).pts;
+          r.worldZ = Math.max(...dkPts.map(p => p.y)) + 0.05 + r.worldH;
+        } else {
+          r.worldW = hullLen;
+          r.worldH = r.worldW * r.nativeAspect;
+          r.worldX = sternX;
+          r.worldY = -r.worldH / 2;
+        }
         renderFn();
       };
       img.src = url;
@@ -2146,34 +2209,14 @@ function wireRefImage(viewKey, fileId, opacityId, opacityOutId, wId, hId, xId, y
   });
   opOut.textContent = fmtPct(refState().opacity);
 
-  document.getElementById(wId).addEventListener('input', (e) => {
-    refState().worldW = parseFloat(e.target.value) || 0.1;
-    applyAspect(); // re-derive height from new width
-    renderFn();
-  });
-  hInput.addEventListener('input', (e) => { refState().worldH = parseFloat(e.target.value) || 0.1; renderFn(); });
-  document.getElementById(xId).addEventListener('input', (e) => { refState().worldX = parseFloat(e.target.value) || 0;   renderFn(); });
-  document.getElementById(yId).addEventListener('input', (e) => {
-    const k = viewKey === 'sideRef' ? 'worldZ' : 'worldY';
-    refState()[k] = parseFloat(e.target.value) || 0;
-    renderFn();
-  });
-
   document.getElementById(clearId).addEventListener('click', () => {
     refState().url = null;
     renderFn();
   });
 }
 
-wireRefImage('sideRef',
-  'side-ref-file', 'side-ref-opacity', 'side-ref-opacity-out',
-  'side-ref-w', 'side-ref-h', 'side-ref-x', 'side-ref-z',
-  'side-ref-clear', renderSideView);
-
-wireRefImage('topRef',
-  'top-ref-file', 'top-ref-opacity', 'top-ref-opacity-out',
-  'top-ref-w', 'top-ref-h', 'top-ref-x', 'top-ref-y',
-  'top-ref-clear', renderTopView);
+wireRefImage('sideRef', 'side-ref-file', 'side-ref-opacity', 'side-ref-opacity-out', 'side-ref-clear', renderSideView);
+wireRefImage('topRef',  'top-ref-file',  'top-ref-opacity',  'top-ref-opacity-out',  'top-ref-clear',  renderTopView);
 
 document.getElementById('export-state').addEventListener('click', () => {
   // Serialise the full state object (all hull geometry + UI settings).
