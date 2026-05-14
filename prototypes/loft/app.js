@@ -31,39 +31,38 @@ const DEFAULT_HALF_BEAM = 0.30; // reference half-beam for display scale
 //   Endpoints coincide exactly with spine endpoints (deck=keel at tips).
 // Stations: cross-section shapes at arc-length fractions s ∈ (0,1) along rocker.
 //   No deckPt — deck height driven globally by deckLine.
+// Simple starting hull: one station at midship, no shape knots on rocker.
+// deckLine.handles[] — off-curve control handles for the deck Bezier.
+//   Curve passes through stern/bow endpoints. Handles attract (don't constrain).
+//   Click near deck curve to add a handle; right-click a handle to delete.
 const state = {
-  length: 4.802480116117168,
+  length: 4.8,
   loftRes: '24',
   xSubdiv: 4,
-  selectedStation: 1,
+  selectedStation: 0,
   spine: {
     knots: [
-      { x: -2.4264831068398243, z: 0.06160801887512207,
-        angle: Math.atan2(-0.11421245098114013, 1.230199495224722),
-        aftLen: 0, foreLen: Math.hypot(1.230199495224722, -0.11421245098114013) },
-      { x: 0, z: -0.04,
-        angle: -0.01139060029726415,
-        aftLen: 0.6797328096093938, foreLen: 0.7416010725396657 },
-      { x: 2.3759970092773437, z: 0.09066193580627441,
-        angle: Math.atan2(0.098433198928833, 0.8408212280273437),
-        aftLen: Math.hypot(0.8408212280273437, 0.098433198928833), foreLen: 0 },
+      { x: -2.4, z: 0.04, angle: Math.atan2(-0.08, 1.0), aftLen: 0, foreLen: 1.1 },
+      { x:  2.4, z: 0.04, angle: Math.atan2( 0.08, 1.0), aftLen: 1.1, foreLen: 0 },
     ],
   },
   deckLine: {
-    h1: { x: -0.5, z: 0.38 },
-    h2: { x:  1.0, z: 0.38 },
+    handles: [
+      { x: -0.5, z: 0.38 },
+      { x:  0.5, z: 0.38 },
+    ],
   },
   stations: [
-    { s: 0.22743304081072982, points: [{"b":0,"n":0,"chine":false},{"b":0.55,"n":0.13,"chine":false},{"b":1,"n":0.53,"chine":false},{"b":0.55,"n":0.9,"chine":false},{"b":0,"n":1,"chine":false}] },
-    { s: 0.40072270318561265, points: [{"b":0,"n":0,"chine":false},{"b":0.55,"n":0.13,"chine":false},{"b":1,"n":0.53,"chine":false},{"b":0.55,"n":0.9,"chine":false},{"b":0,"n":1,"chine":false}] },
-    { s: 0.47953775859189696, points: [{"b":0,"n":0,"chine":false},{"b":0.644879150390625,"n":0.14643620385064018,"chine":false},{"b":0.9032260470920139,"n":0.2564714855617947,"chine":false},{"b":1.0353635152180989,"n":0.47361458672417533,"chine":false},{"b":1.0476221720377603,"n":0.662581041124132,"chine":false},{"b":0.6575403425428602,"n":0.900765143500434,"chine":false},{"b":0,"n":1,"chine":false}] },
-    { s: 0.5616359112496526, points: [{"b":0,"n":0,"chine":false},{"b":0.55,"n":0.13,"chine":false},{"b":1,"n":0.53,"chine":false},{"b":0.55,"n":0.9,"chine":false},{"b":0,"n":1,"chine":false}] },
-    { s: 0.5816359112496526, points: [{"b":0,"n":0,"chine":false},{"b":0.55,"n":0.13,"chine":false},{"b":1,"n":0.53,"chine":false},{"b":0.55,"n":0.9,"chine":false},{"b":0,"n":1,"chine":false}] },
-    { s: 0.7092932476204413, points: [{"b":0,"n":0,"chine":false},{"b":0.55,"n":0.13,"chine":false},{"b":1,"n":0.53,"chine":false},{"b":0.55,"n":0.9,"chine":false},{"b":0,"n":1,"chine":false}] },
-    { s: 0.7922205528243991, points: [{"b":0,"n":0,"chine":false},{"b":0.55,"n":0.13,"chine":false},{"b":1,"n":0.53,"chine":false},{"b":0.55,"n":0.9,"chine":false},{"b":0,"n":1,"chine":false}] },
-    { s: 0.8644388497476737, points: [{"b":0,"n":0,"chine":false},{"b":0.55,"n":0.13,"chine":false},{"b":1,"n":0.53,"chine":false},{"b":0.55,"n":0.9,"chine":false},{"b":0,"n":1,"chine":false}] },
+    { s: 0.5, points: [
+      {b:0,n:0,chine:false}, {b:0.55,n:0.13,chine:false},
+      {b:1,n:0.53,chine:false}, {b:0.55,n:0.9,chine:false}, {b:0,n:1,chine:false},
+    ]},
   ],
-  beamLine: {"sternHandle":{"dx":1.1088784354769023,"dy":0.32106409252809665},"bowHandle":{"dx":-0.03616913716369963,"dy":0.03909700350479787},"peaks":[{"x":0.6797328096093938,"y":0.3,"hdx":0.6848874150428853,"hdy":-0.1251194667020078},{"x":1.9858151008068836,"y":0.06734946434359206,"hdx":0.3856003453045136,"hdy":-0.020187888261300385}]},
+  beamLine: {
+    sternHandle: {dx: 1.0, dy: 0.1},
+    bowHandle:   {dx: -1.0, dy: 0.1},
+    peaks: [{x: 0, y: 0.28, hdx: 0.8, hdy: 0}],
+  },
   showLoftMesh: true,
   meshOpacity: 70,
   spineRadius: 0.005,
@@ -137,16 +136,27 @@ function spineAt(sampled, s) {
   return { p, tx: dx/len, tz: dz/len };
 }
 
-// Sample the deck line cubic Bezier (stern→h1→h2→bow) at `steps` points.
-// Returns [{x,y}] where y=z.
+// Sample the deck line Bezier: control polygon = [stern, ...handles, bow].
+// Uses De Casteljau for arbitrary degree. Returns [{x,y}] where y=z.
 function sampledDeckLine(state) {
-  const stern = state.spine.knots[0];
-  const bow   = state.spine.knots[state.spine.knots.length-1];
-  const { h1, h2 } = state.deckLine;
+  const stern   = state.spine.knots[0];
+  const bow     = state.spine.knots[state.spine.knots.length-1];
+  const handles = state.deckLine.handles;
+  const cps = [stern, ...handles, bow]; // all use .x and .z fields
+  const n = cps.length - 1;            // Bezier degree
   const steps = 64;
   const pts = [];
-  for (let i = 0; i <= steps; i++)
-    pts.push(cubicBezierPt(stern, h1, h2, bow, i/steps));
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    let p = cps.map(c => ({ x: c.x, z: c.z }));
+    for (let r = 1; r <= n; r++) {
+      const q = [];
+      for (let j = 0; j <= n - r; j++)
+        q.push({ x: (1-t)*p[j].x + t*p[j+1].x, z: (1-t)*p[j].z + t*p[j+1].z });
+      p = q;
+    }
+    pts.push({ x: p[0].x, y: p[0].z });
+  }
   return pts;
 }
 
@@ -1166,19 +1176,19 @@ function renderSideView() {
   sideSvg.appendChild(el('path', { class: 'keel', d: pathD(keelPts) }));
   sideSvg.appendChild(el('path', { class: 'deck-pts-line', d: pathD(perimPts) }));
 
-  // ── Deck line: cubic Bezier stern→bow with two off-curve handles ────
-  const sternK = state.spine.knots[0];
-  const bowK   = state.spine.knots[state.spine.knots.length-1];
-  const { h1, h2 } = state.deckLine;
+  // ── Deck line: Bezier with off-curve handles ─────────────────────────
+  const sternK  = state.spine.knots[0];
+  const bowK    = state.spine.knots[state.spine.knots.length-1];
+  const dhList  = state.deckLine.handles;
+  // Control cage: faint dashed polyline stern → h0 → … → bow
+  const cageD = 'M ' + [sternK, ...dhList, bowK].map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.z).toFixed(2)}`).join(' L ');
+  sideSvg.appendChild(el('path', { class: 'deck-cage', d: cageD }));
   const deckD = 'M ' + deckPts.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.y).toFixed(2)}`).join(' L ');
   sideSvg.appendChild(el('path', { class: 'deck-bezier', d: deckD }));
-  // Handle lines and dots.
-  sideSvg.appendChild(el('line', { x1: xOf(sternK.x), y1: yOf(sternK.z), x2: xOf(h1.x), y2: yOf(h1.z), class: 'handle-line' }));
-  sideSvg.appendChild(el('line', { x1: xOf(bowK.x),   y1: yOf(bowK.z),   x2: xOf(h2.x), y2: yOf(h2.z), class: 'handle-line' }));
-  sideSvg.appendChild(el('circle', { cx: xOf(h1.x), cy: yOf(h1.z), r: 10/sf, class: 'handle-hit', 'data-drag': 'deck-h1' }));
-  sideSvg.appendChild(el('circle', { cx: xOf(h1.x), cy: yOf(h1.z), r: 3.5/sf, class: 'deck-handle', 'data-drag': 'deck-h1' }));
-  sideSvg.appendChild(el('circle', { cx: xOf(h2.x), cy: yOf(h2.z), r: 10/sf, class: 'handle-hit', 'data-drag': 'deck-h2' }));
-  sideSvg.appendChild(el('circle', { cx: xOf(h2.x), cy: yOf(h2.z), r: 3.5/sf, class: 'deck-handle', 'data-drag': 'deck-h2' }));
+  dhList.forEach((h, hi) => {
+    sideSvg.appendChild(el('circle', { cx: xOf(h.x), cy: yOf(h.z), r: 10/sf, class: 'handle-hit', 'data-drag': 'deck-h', 'data-idx': String(hi) }));
+    sideSvg.appendChild(el('circle', { cx: xOf(h.x), cy: yOf(h.z), r: 3.5/sf, class: 'deck-handle', 'data-drag': 'deck-h', 'data-idx': String(hi) }));
+  });
 
   // ── Rocker spine: N-knot piecewise Bezier ───────────────────────────
   sideSvg.appendChild(el('path', {
@@ -1216,14 +1226,25 @@ function renderSideView() {
       sideSvg.appendChild(el('text', { x: xOf(k.x), y: yOf(0) + 22/sf, class: 'label', 'text-anchor': 'middle', 'font-size': 9/sf }, 'bow'));
   });
 
-  // ── Station keel marks (no deck diamond — deck is globally driven) ──
+  // ── Stations: keel (bottom) + deck (top) + chord line ──────────────
   const sortedStSide = [...state.stations].sort((a, b) => a.s - b.s);
   sortedStSide.forEach((st, i) => {
     const { p: kp } = spineAt(spSampled, st.s);
+    const dz = deckLineAt(deckPts, kp.x);   // deck z from global curve
     const isSel = i === state.selectedStation;
+    const sel = isSel ? ' selected' : '';
+    // Chord line keel→deck.
+    sideSvg.appendChild(el('line', {
+      x1: xOf(kp.x), y1: yOf(kp.z), x2: xOf(kp.x), y2: yOf(dz),
+      class: 'station-line' + sel,
+    }));
+    // Keel (bottom) dot — draggable, slides along rocker.
     sideSvg.appendChild(el('circle', { cx: xOf(kp.x), cy: yOf(kp.z), r: 14/sf, class: 'station-hit', 'data-drag': 'station', 'data-idx': String(i) }));
-    sideSvg.appendChild(el('circle', { cx: xOf(kp.x), cy: yOf(kp.z), r: 5/sf, class: 'station-keel' + (isSel ? ' selected' : ''), 'data-drag': 'station', 'data-idx': String(i) }));
-    sideSvg.appendChild(el('text', { x: xOf(kp.x), y: yOf(kp.z) + 16/sf, class: 'station-label', 'font-size': 9/sf }, String(i + 1)));
+    sideSvg.appendChild(el('circle', { cx: xOf(kp.x), cy: yOf(kp.z), r: 5/sf, class: 'station-keel' + sel, 'data-drag': 'station', 'data-idx': String(i) }));
+    // Deck (top) dot — read-only, shows where deck curve is.
+    sideSvg.appendChild(el('circle', { cx: xOf(kp.x), cy: yOf(dz), r: 4/sf, class: 'station-deck-top' + sel, 'pointer-events': 'none' }));
+    // Label above deck dot.
+    sideSvg.appendChild(el('text', { x: xOf(kp.x), y: yOf(dz) - 8/sf, class: 'station-label', 'font-size': 9/sf, 'text-anchor': 'middle' }, String(i + 1)));
   });
 
   // ── Loft mesh overlay (if enabled) ───────────────────────────────────
@@ -1970,11 +1991,9 @@ sideSvg.addEventListener('pointermove', (e) => {
     const len = Math.hypot(dx, dz);
     if (len > 0.005) { k.angle = Math.atan2(-dz, -dx); k.aftLen = len; }
     rebuildHull(); renderSideView(); renderTopView();
-  } else if (drag.kind === 'deck-h1') {
-    state.deckLine.h1 = { x: wx, z: wz };
-    rebuildHull(); renderSideView();
-  } else if (drag.kind === 'deck-h2') {
-    state.deckLine.h2 = { x: wx, z: wz };
+  } else if (drag.kind === 'deck-h') {
+    const h = state.deckLine.handles[drag.idx];
+    if (h) { h.x = wx; h.z = wz; }
     rebuildHull(); renderSideView();
   } else if (drag.kind === 'station') {
     // Slide station along rocker by matching X position to arc-length.
@@ -2140,34 +2159,76 @@ document.getElementById('import-state').addEventListener('change', (e) => {
   reader.readAsText(file);
 });
 
-// Click near the rocker to insert an on-curve shape knot via De Casteljau.
+// Click near rocker → insert on-curve knot; click near deck curve → insert handle.
 sideSvg.addEventListener('click', (e) => {
   if (e.button !== 0) return;
   if (e.target.closest('[data-drag]')) return;
   if (drag && drag.moved) return;
   const { x, y } = svgToLocal(sideSvg, e);
   const wx = x / SIDE_SCALE_X, wz = -y / SIDE_SCALE_Z;
-  const spSampled = sampledSpine(state.spine.knots, 64);
-  // Find which segment and t-parameter is closest to the click.
-  let bestDist = Infinity, bestSeg = -1, bestT = 0;
+
+  // Check rocker proximity first.
   const knots = state.spine.knots;
+  let rDist = Infinity, rSeg = -1, rT = 0;
   for (let i = 0; i < knots.length - 1; i++) {
     const k0 = knots[i], k1 = knots[i+1];
     const P1 = knotHandles(k0).fore, P2 = knotHandles(k1).aft;
     for (let j = 0; j < 32; j++) {
-      const t0 = j/32, t1 = (j+1)/32;
+      const t0 = j/32;
       const p0 = cubicBezierPt(k0, P1, P2, k1, t0);
-      const p1 = cubicBezierPt(k0, P1, P2, k1, t1);
+      const p1 = cubicBezierPt(k0, P1, P2, k1, (j+1)/32);
       const dx = p1.x-p0.x, dz = p1.y-p0.y;
       const ll = dx*dx+dz*dz;
       const tt = ll>0 ? Math.max(0,Math.min(1,((wx-p0.x)*dx+(wz-p0.y)*dz)/ll)) : 0;
       const d = Math.hypot(wx-(p0.x+tt*dx), wz-(p0.y+tt*dz));
-      if (d < bestDist) { bestDist = d; bestSeg = i; bestT = t0+tt/32; }
+      if (d < rDist) { rDist = d; rSeg = i; rT = t0 + tt/32; }
     }
   }
-  if (bestSeg < 0 || bestDist > 0.12) return;
-  insertRockerKnot(state, bestSeg, bestT);
-  rebuildHull(); renderSideView(); renderTopView();
+
+  // Check deck line proximity.
+  const deckSamp = sampledDeckLine(state);
+  let dDist = Infinity;
+  for (let i = 0; i < deckSamp.length - 1; i++) {
+    const a = deckSamp[i], b = deckSamp[i+1];
+    const dx = b.x-a.x, dz = b.y-a.y;
+    const ll = dx*dx+dz*dz;
+    const tt = ll>0 ? Math.max(0,Math.min(1,((wx-a.x)*dx+(wz-a.y)*dz)/ll)) : 0;
+    dDist = Math.min(dDist, Math.hypot(wx-(a.x+tt*dx), wz-(a.y+tt*dz)));
+  }
+
+  const THRESH = 0.12;
+  if (rDist <= THRESH && rDist <= dDist) {
+    // Insert rocker knot.
+    insertRockerKnot(state, rSeg, rT);
+    rebuildHull(); renderSideView(); renderTopView();
+  } else if (dDist <= THRESH && dDist < rDist) {
+    // Insert deck handle sorted by x.
+    const newH = { x: wx, z: wz };
+    const handles = state.deckLine.handles;
+    const insertAt = handles.findIndex(h => h.x > wx);
+    handles.splice(insertAt < 0 ? handles.length : insertAt, 0, newH);
+    rebuildHull(); renderSideView();
+  }
+});
+
+// Right-click: delete rocker shape knot (not endpoints) or deck handle.
+sideSvg.addEventListener('contextmenu', (e) => {
+  const t = e.target.closest('[data-drag]');
+  if (!t) return;
+  if (t.dataset.drag === 'knot') {
+    const idx = +t.dataset.idx;
+    const knots = state.spine.knots;
+    if (idx === 0 || idx === knots.length - 1) return; // protect endpoints
+    e.preventDefault();
+    knots.splice(idx, 1);
+    rebuildHull(); renderSideView(); renderTopView();
+  } else if (t.dataset.drag === 'deck-h') {
+    const idx = +t.dataset.idx;
+    if (state.deckLine.handles.length <= 1) return; // keep at least one
+    e.preventDefault();
+    state.deckLine.handles.splice(idx, 1);
+    rebuildHull(); renderSideView();
+  }
 });
 
 // ── Cross-section drag / add / delete handlers ───────────────────────────
