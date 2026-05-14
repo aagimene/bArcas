@@ -46,10 +46,14 @@ const state = {
       { x:  2.4, z: 0.04, angle: Math.atan2( 0.08, 1.0), aftLen: 1.1, foreLen: 0 },
     ],
   },
+  // Deck line: same piecewise cubic Bezier with on-curve knots as rocker.
+  // At s=0 and s=1 the deck coincides with the keel (bow/stern converge).
+  // Interior knots arch the deck above the keel.
   deckLine: {
-    handles: [
-      { x: -0.5, z: 0.38 },
-      { x:  0.5, z: 0.38 },
+    knots: [
+      { x: -2.4, z: 0.04, angle: Math.atan2( 0.30, 1.0), aftLen: 0,   foreLen: 1.0 },
+      { x:  0,   z: 0.38, angle: 0,                       aftLen: 1.0, foreLen: 1.0 },
+      { x:  2.4, z: 0.04, angle: Math.atan2(-0.30, 1.0), aftLen: 1.0, foreLen: 0   },
     ],
   },
   stations: [
@@ -136,44 +140,14 @@ function spineAt(sampled, s) {
   return { p, tx: dx/len, tz: dz/len };
 }
 
-// Sample the deck line Bezier: control polygon = [stern, ...handles, bow].
-// Uses De Casteljau for arbitrary degree. Returns [{x,y}] where y=z.
+// Sample the deck line — reuses sampledSpine since the knot format is identical.
 function sampledDeckLine(state) {
-  const stern   = state.spine.knots[0];
-  const bow     = state.spine.knots[state.spine.knots.length-1];
-  const handles = state.deckLine.handles;
-  const cps = [stern, ...handles, bow]; // all use .x and .z fields
-  const n = cps.length - 1;            // Bezier degree
-  const steps = 64;
-  const pts = [];
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    let p = cps.map(c => ({ x: c.x, z: c.z }));
-    for (let r = 1; r <= n; r++) {
-      const q = [];
-      for (let j = 0; j <= n - r; j++)
-        q.push({ x: (1-t)*p[j].x + t*p[j+1].x, z: (1-t)*p[j].z + t*p[j+1].z });
-      p = q;
-    }
-    pts.push({ x: p[0].x, y: p[0].z });
-  }
-  return pts;
+  return sampledSpine(state.deckLine.knots, 64);
 }
 
-// Evaluate deck z at a given world x by linear interpolation in sampled deck pts.
-function deckLineAt(deckPts, x) {
-  if (x <= deckPts[0].x) return deckPts[0].y;
-  if (x >= deckPts[deckPts.length-1].x) return deckPts[deckPts.length-1].y;
-  let lo = 0, hi = deckPts.length-1;
-  while (hi-lo > 1) { const m=(lo+hi)>>1; if (deckPts[m].x <= x) lo=m; else hi=m; }
-  const t = (x - deckPts[lo].x) / (deckPts[hi].x - deckPts[lo].x);
-  return deckPts[lo].y + t*(deckPts[hi].y-deckPts[lo].y);
-}
-
-// Insert an on-curve knot on rocker segment `segIdx` at Bezier parameter `t`
-// via De Casteljau subdivision. Preserves the curve exactly.
-function insertRockerKnot(state, segIdx, t) {
-  const knots = state.spine.knots;
+// Insert an on-curve knot at Bezier parameter `t` on segment `segIdx` of
+// any knots[] array (rocker or deck line) via De Casteljau subdivision.
+function insertKnot(knots, segIdx, t) {
   const k0 = knots[segIdx], k1 = knots[segIdx+1];
   const P0 = k0, P1 = knotHandles(k0).fore, P2 = knotHandles(k1).aft, P3 = k1;
   const lerp = (a,b,t) => ({ x:a.x+t*(b.x-a.x), z:(a.z??a.y)+t*((b.z??b.y)-(a.z??a.y)) });
@@ -399,9 +373,9 @@ function buildLoft(state) {
   const N = parseInt(state.loftRes, 10) || 24;
   const xSubdiv = Math.max(1, parseInt(state.xSubdiv, 10) || 1);
 
-  const spSampled = sampledSpine(state.spine.knots, 64);
-  const deckPts   = sampledDeckLine(state);
-  const beamPts   = sampledBeamLine(state);
+  const spSampled   = sampledSpine(state.spine.knots,   64);
+  const deckSampled = sampledSpine(state.deckLine.knots, 64);
+  const beamPts     = sampledBeamLine(state);
 
   const degen = Array.from({ length: N }, () => ({ b: 0, n: 0 }));
   const sortedSt = [...state.stations]
@@ -429,9 +403,9 @@ function buildLoft(state) {
   const denseRows = [];
   for (let i = 0; i < Mdense; i++) {
     const s = i / (Mdense - 1);
-    const { p: keel } = spineAt(spSampled, s);
-    const deckZ  = deckLineAt(deckPts, keel.x);
-    const height = Math.max(0.001, deckZ - keel.z);
+    const { p: keel } = spineAt(spSampled,   s);
+    const { p: deck } = spineAt(deckSampled, s);
+    const height = Math.max(0.001, deck.z - keel.z);
     const halfB  = beamEvalAt(beamPts, keel.x);
     const samples = Array.from({ length: N }, (_, k) => ({
       b: Math.max(0, bSplines[k](s)),
@@ -506,9 +480,9 @@ function buildLoft(state) {
 
   // Expose dense rows for SVG wireframe and station row data for selection.
   const stationRows = sortedSt.map((st, i) => {
-    const { p: keel } = spineAt(spSampled, st.s);
-    const deckZ  = deckLineAt(deckPts, keel.x);
-    const height = Math.max(0.001, deckZ - keel.z);
+    const { p: keel } = spineAt(spSampled,   st.s);
+    const { p: deck } = spineAt(deckSampled, st.s);
+    const height = Math.max(0.001, deck.z - keel.z);
     const halfB  = beamEvalAt(beamPts, keel.x);
     const samples = sampleSection(st.points, N);
     const maxB = Math.max(...samples.map(s => s.b), 1e-9);
@@ -1150,8 +1124,8 @@ function renderSideView() {
   const xOf = (x) => x * SIDE_SCALE_X;
   const yOf = (z) => -z * SIDE_SCALE_Z;
 
-  const spSampled = sampledSpine(state.spine.knots, 64);
-  const deckPts   = sampledDeckLine(state);
+  const spSampled   = sampledSpine(state.spine.knots,   64);
+  const deckSampled = sampledSpine(state.deckLine.knots, 64);
   const pt2str = p => `${xOf(p.x).toFixed(2)},${yOf(p.z).toFixed(2)}`;
   const pathD  = pts => 'M ' + pts.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.z).toFixed(2)}`).join(' L ');
 
@@ -1176,19 +1150,31 @@ function renderSideView() {
   sideSvg.appendChild(el('path', { class: 'keel', d: pathD(keelPts) }));
   sideSvg.appendChild(el('path', { class: 'deck-pts-line', d: pathD(perimPts) }));
 
-  // ── Deck line: Bezier with off-curve handles ─────────────────────────
-  const sternK  = state.spine.knots[0];
-  const bowK    = state.spine.knots[state.spine.knots.length-1];
-  const dhList  = state.deckLine.handles;
-  // Control cage: faint dashed polyline stern → h0 → … → bow
-  const cageD = 'M ' + [sternK, ...dhList, bowK].map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.z).toFixed(2)}`).join(' L ');
-  sideSvg.appendChild(el('path', { class: 'deck-cage', d: cageD }));
-  const deckD = 'M ' + deckPts.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.y).toFixed(2)}`).join(' L ');
-  sideSvg.appendChild(el('path', { class: 'deck-bezier', d: deckD }));
-  dhList.forEach((h, hi) => {
-    sideSvg.appendChild(el('circle', { cx: xOf(h.x), cy: yOf(h.z), r: 10/sf, class: 'handle-hit', 'data-drag': 'deck-h', 'data-idx': String(hi) }));
-    sideSvg.appendChild(el('circle', { cx: xOf(h.x), cy: yOf(h.z), r: 3.5/sf, class: 'deck-handle', 'data-drag': 'deck-h', 'data-idx': String(hi) }));
+  // ── Deck line: on-curve knots, same structure as rocker ──────────────
+  // Handles drawn before curve so curve renders on top.
+  state.deckLine.knots.forEach((k, ki) => {
+    const { aft, fore } = knotHandles(k);
+    if (k.aftLen > 0)
+      sideSvg.appendChild(el('line', { x1: xOf(k.x), y1: yOf(k.z), x2: xOf(aft.x),  y2: yOf(aft.z),  class: 'deck-handle-line' }));
+    if (k.foreLen > 0)
+      sideSvg.appendChild(el('line', { x1: xOf(k.x), y1: yOf(k.z), x2: xOf(fore.x), y2: yOf(fore.z), class: 'deck-handle-line' }));
+    if (k.aftLen > 0) {
+      sideSvg.appendChild(el('circle', { cx: xOf(aft.x), cy: yOf(aft.z), r: 10/sf, class: 'handle-hit', 'data-drag': 'deck-aft', 'data-idx': String(ki) }));
+      sideSvg.appendChild(el('circle', { cx: xOf(aft.x), cy: yOf(aft.z), r: 3.5/sf, class: 'deck-handle', 'data-drag': 'deck-aft', 'data-idx': String(ki) }));
+    }
+    if (k.foreLen > 0) {
+      sideSvg.appendChild(el('circle', { cx: xOf(fore.x), cy: yOf(fore.z), r: 10/sf, class: 'handle-hit', 'data-drag': 'deck-fore', 'data-idx': String(ki) }));
+      sideSvg.appendChild(el('circle', { cx: xOf(fore.x), cy: yOf(fore.z), r: 3.5/sf, class: 'deck-handle', 'data-drag': 'deck-fore', 'data-idx': String(ki) }));
+    }
+    const isEndpt = ki === 0 || ki === state.deckLine.knots.length - 1;
+    sideSvg.appendChild(el('circle', { cx: xOf(k.x), cy: yOf(k.z), r: 14/sf, class: 'handle-hit', 'data-drag': 'deck-knot', 'data-idx': String(ki) }));
+    sideSvg.appendChild(el('circle', { cx: xOf(k.x), cy: yOf(k.z), r: 5/sf, class: 'deck-knot' + (isEndpt ? '' : ' shape-knot'), 'data-drag': 'deck-knot', 'data-idx': String(ki) }));
   });
+  // Deck line curve.
+  sideSvg.appendChild(el('path', {
+    class: 'deck-bezier',
+    d: 'M ' + deckSampled.pts.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.y).toFixed(2)}`).join(' L '),
+  }));
 
   // ── Rocker spine: N-knot piecewise Bezier ───────────────────────────
   sideSvg.appendChild(el('path', {
@@ -1229,8 +1215,9 @@ function renderSideView() {
   // ── Stations: keel (bottom) + deck (top) + chord line ──────────────
   const sortedStSide = [...state.stations].sort((a, b) => a.s - b.s);
   sortedStSide.forEach((st, i) => {
-    const { p: kp } = spineAt(spSampled, st.s);
-    const dz = deckLineAt(deckPts, kp.x);   // deck z from global curve
+    const { p: kp } = spineAt(spSampled,   st.s);
+    const { p: dp } = spineAt(deckSampled, st.s);
+    const dz = dp.z;
     const isSel = i === state.selectedStation;
     const sel = isSel ? ' selected' : '';
     // Chord line keel→deck.
@@ -1528,9 +1515,8 @@ lengthEl.addEventListener('input', () => {
       k.aftLen  *= r;
     });
 
-    // Deck line handles.
-    state.deckLine.h1.x = sx(state.deckLine.h1.x);
-    state.deckLine.h2.x = sx(state.deckLine.h2.x);
+    // Deck line knots.
+    state.deckLine.knots.forEach(k => { k.x = sx(k.x); k.foreLen *= r; k.aftLen *= r; });
 
     // Beam line peaks and handles.
     const bl = state.beamLine;
@@ -1991,9 +1977,23 @@ sideSvg.addEventListener('pointermove', (e) => {
     const len = Math.hypot(dx, dz);
     if (len > 0.005) { k.angle = Math.atan2(-dz, -dx); k.aftLen = len; }
     rebuildHull(); renderSideView(); renderTopView();
-  } else if (drag.kind === 'deck-h') {
-    const h = state.deckLine.handles[drag.idx];
-    if (h) { h.x = wx; h.z = wz; }
+  } else if (drag.kind === 'deck-knot') {
+    const k = state.deckLine.knots[drag.idx];
+    if (k) { k.x = wx; k.z = wz; }
+    rebuildHull(); renderSideView();
+  } else if (drag.kind === 'deck-fore') {
+    const k = state.deckLine.knots[drag.idx];
+    if (!k) return;
+    const dx = wx - k.x, dz = wz - k.z;
+    const len = Math.hypot(dx, dz);
+    if (len > 0.005) { k.angle = Math.atan2(dz, dx); k.foreLen = len; }
+    rebuildHull(); renderSideView();
+  } else if (drag.kind === 'deck-aft') {
+    const k = state.deckLine.knots[drag.idx];
+    if (!k) return;
+    const dx = wx - k.x, dz = wz - k.z;
+    const len = Math.hypot(dx, dz);
+    if (len > 0.005) { k.angle = Math.atan2(-dz, -dx); k.aftLen = len; }
     rebuildHull(); renderSideView();
   } else if (drag.kind === 'station') {
     // Slide station along rocker by matching X position to arc-length.
@@ -2185,48 +2185,50 @@ sideSvg.addEventListener('click', (e) => {
     }
   }
 
-  // Check deck line proximity.
-  const deckSamp = sampledDeckLine(state);
-  let dDist = Infinity;
-  for (let i = 0; i < deckSamp.length - 1; i++) {
-    const a = deckSamp[i], b = deckSamp[i+1];
-    const dx = b.x-a.x, dz = b.y-a.y;
-    const ll = dx*dx+dz*dz;
-    const tt = ll>0 ? Math.max(0,Math.min(1,((wx-a.x)*dx+(wz-a.y)*dz)/ll)) : 0;
-    dDist = Math.min(dDist, Math.hypot(wx-(a.x+tt*dx), wz-(a.y+tt*dz)));
+  // Check deck line proximity (same segment-scan as rocker).
+  const dkKnots = state.deckLine.knots;
+  let dDist = Infinity, dSeg = -1, dT = 0;
+  for (let i = 0; i < dkKnots.length - 1; i++) {
+    const k0 = dkKnots[i], k1 = dkKnots[i+1];
+    const P1 = knotHandles(k0).fore, P2 = knotHandles(k1).aft;
+    for (let j = 0; j < 32; j++) {
+      const t0 = j/32;
+      const p0 = cubicBezierPt(k0, P1, P2, k1, t0);
+      const p1 = cubicBezierPt(k0, P1, P2, k1, (j+1)/32);
+      const dx = p1.x-p0.x, dz = p1.y-p0.y;
+      const ll = dx*dx+dz*dz;
+      const tt = ll>0 ? Math.max(0,Math.min(1,((wx-p0.x)*dx+(wz-p0.y)*dz)/ll)) : 0;
+      const d = Math.hypot(wx-(p0.x+tt*dx), wz-(p0.y+tt*dz));
+      if (d < dDist) { dDist = d; dSeg = i; dT = t0 + tt/32; }
+    }
   }
 
   const THRESH = 0.12;
   if (rDist <= THRESH && rDist <= dDist) {
-    // Insert rocker knot.
-    insertRockerKnot(state, rSeg, rT);
+    insertKnot(state.spine.knots, rSeg, rT);
     rebuildHull(); renderSideView(); renderTopView();
   } else if (dDist <= THRESH && dDist < rDist) {
-    // Insert deck handle sorted by x.
-    const newH = { x: wx, z: wz };
-    const handles = state.deckLine.handles;
-    const insertAt = handles.findIndex(h => h.x > wx);
-    handles.splice(insertAt < 0 ? handles.length : insertAt, 0, newH);
+    insertKnot(state.deckLine.knots, dSeg, dT);
     rebuildHull(); renderSideView();
   }
 });
 
-// Right-click: delete rocker shape knot (not endpoints) or deck handle.
+// Right-click: delete interior knot on rocker or deck line (endpoints protected).
 sideSvg.addEventListener('contextmenu', (e) => {
   const t = e.target.closest('[data-drag]');
   if (!t) return;
+  const idx = +t.dataset.idx;
   if (t.dataset.drag === 'knot') {
-    const idx = +t.dataset.idx;
     const knots = state.spine.knots;
-    if (idx === 0 || idx === knots.length - 1) return; // protect endpoints
+    if (idx === 0 || idx === knots.length - 1) return;
     e.preventDefault();
     knots.splice(idx, 1);
     rebuildHull(); renderSideView(); renderTopView();
-  } else if (t.dataset.drag === 'deck-h') {
-    const idx = +t.dataset.idx;
-    if (state.deckLine.handles.length <= 1) return; // keep at least one
+  } else if (t.dataset.drag === 'deck-knot') {
+    const knots = state.deckLine.knots;
+    if (idx === 0 || idx === knots.length - 1) return;
     e.preventDefault();
-    state.deckLine.handles.splice(idx, 1);
+    knots.splice(idx, 1);
     rebuildHull(); renderSideView();
   }
 });
