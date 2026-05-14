@@ -1362,8 +1362,21 @@ function selectedStationObj() {
   return unified[state.selectedStation] || null;
 }
 
+// Section view zoom/pan: base viewBox is "-200 -210 400 295".
+const SECTION_VB = { minX: -200, minY: -210, W: 400, H: 295 };
+const sectionVP = { zoom: 1, offX: 0, offY: 0 };
+function applySectionViewBox() {
+  const cx = (SECTION_VB.minX + SECTION_VB.W/2) + sectionVP.offX;
+  const cy = (SECTION_VB.minY + SECTION_VB.H/2) + sectionVP.offY;
+  const zW = SECTION_VB.W / sectionVP.zoom;
+  const zH = SECTION_VB.H / sectionVP.zoom;
+  sectionSvg.setAttribute('viewBox',
+    `${(cx - zW/2).toFixed(1)} ${(cy - zH/2).toFixed(1)} ${zW.toFixed(1)} ${zH.toFixed(1)}`);
+}
+
 function renderSectionView() {
   sectionSvg.innerHTML = '';
+  applySectionViewBox();
   const bOf = (b) => b * SECTION_SCALE_B;
   const nOf = (n) => -n * SECTION_SCALE_N;
 
@@ -2457,6 +2470,46 @@ sectionSvg.addEventListener('contextmenu', (e) => {
   renderSideView();
 
   renderTopView();
+});
+
+// Section view zoom (wheel) and pan (middle-button or left-drag on background).
+sectionSvg.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const dz = e.deltaY < 0 ? 1.05 : 1 / 1.05;
+  const pt = sectionSvg.createSVGPoint();
+  pt.x = e.clientX; pt.y = e.clientY;
+  const loc = pt.matrixTransform(sectionSvg.getScreenCTM().inverse());
+  sectionVP.offX = loc.x - (loc.x - sectionVP.offX) / dz;
+  sectionVP.offY = loc.y - (loc.y - sectionVP.offY) / dz;
+  sectionVP.zoom = Math.max(0.1, Math.min(20, sectionVP.zoom * dz));
+  renderSectionView();
+}, { passive: false });
+
+let sectionPanDrag = null;
+sectionSvg.addEventListener('pointerdown', (e) => {
+  const isMiddle = e.button === 1;
+  const isBackground = e.button === 0 && !e.target.closest('[data-drag]');
+  if (!isMiddle && !isBackground) return;
+  e.preventDefault(); e.stopPropagation();
+  sectionPanDrag = { startX: e.clientX, startY: e.clientY, startOffX: sectionVP.offX, startOffY: sectionVP.offY };
+  sectionSvg.setPointerCapture(e.pointerId);
+}, true);
+sectionSvg.addEventListener('pointermove', (e) => {
+  if (!sectionPanDrag) return;
+  const vb = sectionSvg.viewBox.baseVal;
+  const bbox = sectionSvg.getBoundingClientRect();
+  const scaleX = vb.width  / Math.max(1, bbox.width);
+  const scaleY = vb.height / Math.max(1, bbox.height);
+  sectionVP.offX = sectionPanDrag.startOffX - (e.clientX - sectionPanDrag.startX) * scaleX;
+  sectionVP.offY = sectionPanDrag.startOffY - (e.clientY - sectionPanDrag.startY) * scaleY;
+  renderSectionView();
+}, true);
+sectionSvg.addEventListener('pointerup',     () => { sectionPanDrag = null; }, true);
+sectionSvg.addEventListener('pointercancel', () => { sectionPanDrag = null; }, true);
+
+document.getElementById('section-reset').addEventListener('click', () => {
+  sectionVP.zoom = 1; sectionVP.offX = 0; sectionVP.offY = 0;
+  renderSectionView();
 });
 
 // Find the index at which a new (b, n) should be inserted into a section's
