@@ -38,8 +38,8 @@ header .subtitle.note strong { color: #e2e8f0; }
 
 main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: minmax(300px, 55vh) minmax(220px, 1fr);
+  grid-template-columns: var(--col-pct, 50%) 1fr;
+  grid-template-rows: var(--row-pct, 55%) 1fr;
   grid-template-areas:
     "top    three"
     "section side";
@@ -47,7 +47,30 @@ main {
   padding: 0.75rem;
   max-width: 1700px;
   margin: 0 auto;
+  position: relative;
+  min-height: 0;
+  height: calc(100vh - var(--header-h, 160px));
 }
+.resizer {
+  position: absolute;
+  background: transparent;
+  z-index: 50;
+}
+.resizer-v {
+  top: 0.75rem; bottom: 0.75rem;
+  left: calc(var(--col-pct, 50%) + 0.375rem);
+  width: 10px;
+  margin-left: -5px;
+  cursor: col-resize;
+}
+.resizer-h {
+  left: 0.75rem; right: 0.75rem;
+  top: calc(var(--row-pct, 55%) + 0.375rem);
+  height: 10px;
+  margin-top: -5px;
+  cursor: row-resize;
+}
+.resizer:hover { background: rgba(0, 145, 178, 0.18); }
 .pane-top      { grid-area: top; }
 .pane-3d       { grid-area: three; }
 .pane-controls {

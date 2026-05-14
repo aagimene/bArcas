@@ -2275,6 +2275,42 @@ function wireRefImage(viewKey, fileId, opacityId, opacityOutId, clearId, renderF
 wireRefImage('sideRef', 'side-ref-file', 'side-ref-opacity', 'side-ref-opacity-out', 'side-ref-clear', renderSideView);
 wireRefImage('topRef',  'top-ref-file',  'top-ref-opacity',  'top-ref-opacity-out',  'top-ref-clear',  renderTopView);
 
+// Resizable view-pane dividers.
+{
+  const main = document.querySelector('main');
+  const initResizer = (el, axis) => {
+    el.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      const onMove = (ev) => {
+        const rect = main.getBoundingClientRect();
+        if (axis === 'v') {
+          const pct = Math.max(10, Math.min(90, ((ev.clientX - rect.left) / rect.width) * 100));
+          main.style.setProperty('--col-pct', `${pct.toFixed(1)}%`);
+        } else {
+          const pct = Math.max(10, Math.min(90, ((ev.clientY - rect.top) / rect.height) * 100));
+          main.style.setProperty('--row-pct', `${pct.toFixed(1)}%`);
+        }
+        sideFit = null; topFit = null;
+        renderSideView(); renderTopView();
+        // Resize three.js canvas too (ResizeObserver should catch it, but force it).
+        const ev0 = new Event('resize'); window.dispatchEvent(ev0);
+      };
+      const onUp = () => {
+        el.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onUp);
+      };
+      el.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
+    });
+  };
+  initResizer(document.querySelector('.resizer-v'), 'v');
+  initResizer(document.querySelector('.resizer-h'), 'h');
+}
+
 // Controls panel show/hide.
 {
   const pane = document.querySelector('.pane-controls');
