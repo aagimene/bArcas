@@ -1903,7 +1903,7 @@ topSvg.addEventListener('click', (e) => {
 });
 
 // Right-click handler: delete a beam peak OR a station, depending on the target.
-topSvg.addEventListener('contextmenu', (e) => {
+function tryTopDelete(e) {
   const peak = e.target.closest('[data-drag="beam-peak"]');
   if (peak) {
     e.preventDefault();
@@ -1912,17 +1912,17 @@ topSvg.addEventListener('contextmenu', (e) => {
     const pk = sorted[+peak.dataset.idx];
     const pi = state.beamLine.peaks.indexOf(pk);
     if (pi >= 0) state.beamLine.peaks.splice(pi, 1);
-    rebuildHull();
-    renderTopView();
+    rebuildHull(); renderTopView();
     return;
   }
   const stationT = e.target.closest('[data-drag="station"]');
   if (stationT) {
     e.preventDefault();
     deleteStation(+stationT.dataset.idx);
-    return;
   }
-});
+}
+topSvg.addEventListener('contextmenu', tryTopDelete);
+topSvg.addEventListener('click', (e) => { if (e.metaKey || e.ctrlKey) tryTopDelete(e); });
 
 // ── Side-view drag/click/delete ──────────────────────────────────────────
 
@@ -2232,7 +2232,7 @@ sideSvg.addEventListener('click', (e) => {
 });
 
 // Right-click: delete interior knot on rocker or deck line (endpoints protected).
-sideSvg.addEventListener('contextmenu', (e) => {
+function trySideDelete(e) {
   const t = e.target.closest('[data-drag]');
   if (!t) return;
   const idx = +t.dataset.idx;
@@ -2249,7 +2249,9 @@ sideSvg.addEventListener('contextmenu', (e) => {
     knots.splice(idx, 1);
     rebuildHull(); renderSideView();
   }
-});
+}
+sideSvg.addEventListener('contextmenu', trySideDelete);
+sideSvg.addEventListener('click', (e) => { if (e.metaKey || e.ctrlKey) trySideDelete(e); });
 
 // ── Cross-section drag / add / delete handlers ───────────────────────────
 //
