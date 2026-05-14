@@ -940,32 +940,6 @@ function renderTopView() {
   // Scale factor: divide SVG-unit sizes by this so control points stay
   // constant pixel size regardless of zoom level.
   const tf = topVP.zoom;
-  // Reference image (behind everything else).
-  if (state.topRef?.url) {
-    const r = state.topRef;
-    // Top view: SVG X = worldY * SCALE, SVG Y = -worldX * SCALE (bow at top).
-    // The image top-left in SVG: x = portEdge(worldY) * scale, y = -bowEdge(worldX) * scale
-    const imgEl = document.createElementNS(SVG_NS, 'image');
-    imgEl.setAttribute('href', r.url);
-    // SVG x = worldY (portEdge) * scale; worldY port edge = r.worldY (negative = port)
-    imgEl.setAttribute('x',      (r.worldY * TOP_SCALE_Y).toFixed(1));
-    // SVG y = -worldX (bowEdge) * scale; bow edge = r.worldX + r.worldW (stern+length=bow)
-    imgEl.setAttribute('y',      (-(r.worldX + r.worldW) * TOP_SCALE_X).toFixed(1));
-    imgEl.setAttribute('width',  (r.worldH * TOP_SCALE_Y).toFixed(1));   // beam maps to SVG X
-    imgEl.setAttribute('height', (r.worldW * TOP_SCALE_X).toFixed(1));   // length maps to SVG Y
-    imgEl.setAttribute('opacity', r.opacity);
-    imgEl.setAttribute('data-drag', 'ref-top');
-    topSvg.appendChild(imgEl);
-    // Corner handles: xi: 0=port(worldY), 1=stbd(worldY+worldH); zi: 0=bow(worldX+worldW), 1=stern(worldX)
-    for (let xi = 0; xi <= 1; xi++) for (let zi = 0; zi <= 1; zi++) {
-      const cx = xOfT(xi === 0 ? r.worldY : r.worldY + r.worldH);
-      const cy = yOfT(zi === 0 ? r.worldX + r.worldW : r.worldX);
-      topSvg.appendChild(el('circle', {
-        cx, cy, r: 6/tf, class: 'ref-corner',
-        'data-drag': 'ref-top-corner', 'data-xi': String(xi), 'data-zi': String(zi),
-      }));
-    }
-  }
   const xOfT = (wy) =>  wy * TOP_SCALE_Y;
   const yOfT = (wx) => -wx * TOP_SCALE_X;
   const p2s  = (wx, wy) => `${xOfT(wy).toFixed(2)},${yOfT(wx).toFixed(2)}`;
@@ -1001,6 +975,28 @@ function renderTopView() {
     const zH     = vbH / topVP.zoom;
     topSvg.setAttribute('viewBox',
       `${(fitCX - zW / 2).toFixed(1)} ${(fitCY - zH / 2).toFixed(1)} ${zW.toFixed(1)} ${zH.toFixed(1)}`);
+  }
+
+  // Reference image (behind everything else; uses freshly-computed TOP_SCALE).
+  if (state.topRef?.url) {
+    const r = state.topRef;
+    const imgEl = document.createElementNS(SVG_NS, 'image');
+    imgEl.setAttribute('href', r.url);
+    imgEl.setAttribute('x',      (r.worldY * TOP_SCALE_Y).toFixed(1));
+    imgEl.setAttribute('y',      (-(r.worldX + r.worldW) * TOP_SCALE_X).toFixed(1));
+    imgEl.setAttribute('width',  (r.worldH * TOP_SCALE_Y).toFixed(1));
+    imgEl.setAttribute('height', (r.worldW * TOP_SCALE_X).toFixed(1));
+    imgEl.setAttribute('opacity', r.opacity);
+    imgEl.setAttribute('data-drag', 'ref-top');
+    topSvg.appendChild(imgEl);
+    for (let xi = 0; xi <= 1; xi++) for (let zi = 0; zi <= 1; zi++) {
+      const cx = xOfT(xi === 0 ? r.worldY : r.worldY + r.worldH);
+      const cy = yOfT(zi === 0 ? r.worldX + r.worldW : r.worldX);
+      topSvg.appendChild(el('circle', {
+        cx, cy, r: 6/tf, class: 'ref-corner',
+        'data-drag': 'ref-top-corner', 'data-xi': String(xi), 'data-zi': String(zi),
+      }));
+    }
   }
 
   const sternKnot = state.spine.knots[0];
@@ -1139,6 +1135,8 @@ function renderSideView() {
 
   // Scale factor for constant-pixel control point sizes.
   const sf = sideVP.zoom;
+  const xOf = (x) => x * SIDE_SCALE;
+  const yOf = (z) => -z * SIDE_SCALE;
   // Reference image (behind everything else).
   if (state.sideRef?.url) {
     const r = state.sideRef;
@@ -1162,9 +1160,6 @@ function renderSideView() {
       }));
     }
   }
-  const xOf = (x) => x * SIDE_SCALE;
-  const yOf = (z) => -z * SIDE_SCALE;
-
   const spSampled   = sampledSpine(state.spine.knots,   64);
   const deckSampled = sampledSpine(state.deckLine.knots, 64);
   const pt2str = p => `${xOf(p.x).toFixed(2)},${yOf(p.z).toFixed(2)}`;
