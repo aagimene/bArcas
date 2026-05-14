@@ -17,7 +17,7 @@
 <body>
 
 <header>
-  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · workshop</span>
+  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · drawer-fix</span>
   <h1>Loft</h1>
   <p class="subtitle">
     Design a 3D kayak hull from a curved spine (rocker) and a set of cross-sections, lofted live.
@@ -43,9 +43,9 @@
     <div id="three-host"></div>
   </section>
 
-  <button type="button" id="controls-show" class="controls-toggle controls-toggle-show" title="Show controls" aria-label="Show controls">☰</button>
   <aside class="pane pane-controls">
-    <div class="pane-title">Controls<button type="button" id="controls-hide" class="controls-toggle-hide" title="Hide controls" aria-label="Hide controls">×</button></div>
+    <button type="button" id="drawer-toggle" class="drawer-toggle" title="Hide/show controls" aria-label="Hide/show controls">▶</button>
+    <div class="pane-title">Controls</div>
     <div class="controls">
       <label>Hull length <output id="length-out"></output>
         <input type="range" id="length" min="3" max="7" step="0.05" value="4.8">

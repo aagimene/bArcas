@@ -2334,13 +2334,14 @@ wireRefImage('topRef',  'top-ref-file',  'top-ref-opacity',  'top-ref-opacity-ou
   initResizer(document.querySelector('.resizer-h'), 'h');
 }
 
-// Controls panel show/hide.
+// Controls drawer toggle (chevron flips direction).
 {
   const pane = document.querySelector('.pane-controls');
-  const showBtn = document.getElementById('controls-show');
-  const hideBtn = document.getElementById('controls-hide');
-  hideBtn.addEventListener('click', () => { pane.classList.add('hidden'); showBtn.classList.add('visible'); });
-  showBtn.addEventListener('click', () => { pane.classList.remove('hidden'); showBtn.classList.remove('visible'); });
+  const btn  = document.getElementById('drawer-toggle');
+  btn.addEventListener('click', () => {
+    const isHidden = pane.classList.toggle('hidden');
+    btn.textContent = isHidden ? '◀' : '▶';
+  });
 }
 
 document.getElementById('export-state').addEventListener('click', () => {

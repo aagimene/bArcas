@@ -1,12 +1,16 @@
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
+html, body { margin: 0; padding: 0; height: 100%; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   color: #1f2937;
   background: #f8fafc;
   line-height: 1.4;
   -webkit-text-size-adjust: 100%;
+  display: flex;
+  flex-direction: column;
 }
+header { flex: 0 0 auto; }
+.footer { flex: 0 0 auto; }
 
 header {
   padding: 0.85rem 1.25rem;
@@ -37,6 +41,8 @@ header .subtitle.note strong { color: #e2e8f0; }
 /* ── Layout grid ─────────────────────────────────────────────── */
 
 main {
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
   grid-template-columns: var(--col-pct, 50%) 1fr;
   grid-template-rows: var(--row-pct, 55%) 1fr;
@@ -45,11 +51,8 @@ main {
     "section side";
   gap: 0.75rem;
   padding: 0.75rem;
-  max-width: 1700px;
-  margin: 0 auto;
+  width: 100%;
   position: relative;
-  min-height: 0;
-  height: calc(100vh - var(--header-h, 160px));
 }
 .resizer {
   position: absolute;
@@ -73,31 +76,44 @@ main {
 .resizer:hover { background: rgba(0, 145, 178, 0.18); }
 .pane-top      { grid-area: top; }
 .pane-3d       { grid-area: three; }
+/* Controls drawer — anchored to right edge of viewport, slides in/out.
+   A single chevron handle on its left edge toggles the drawer. */
 .pane-controls {
-  /* Floating panel: overlays the page, never affects grid sizing. */
   position: fixed;
-  top: 56px;
-  right: 0.75rem;
-  width: 280px;
-  max-height: calc(100vh - 80px);
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 300px;
   z-index: 100;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  border-radius: 6px 0 0 6px;
+  border-right: none;
+  box-shadow: -4px 0 16px rgba(0,0,0,0.12);
   overflow: hidden;
-  transition: transform 0.18s ease;
+  transition: transform 0.2s ease;
 }
-.pane-controls.hidden { transform: translateX(calc(100% + 1rem)); }
+.pane-controls.hidden { transform: translateX(100%); }
 .pane-controls .controls { overflow-y: auto; flex: 1; padding-right: 4px; }
-.controls-toggle, .controls-toggle-hide {
-  border: 1px solid #cbd5e1; background: white; border-radius: 4px;
-  cursor: pointer; padding: 2px 8px; font-size: 0.85rem; color: #475569;
+.drawer-toggle {
+  position: absolute;
+  top: 50%;
+  left: -22px;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 56px;
+  border: 1px solid #cbd5e1;
+  border-right: none;
+  background: white;
+  border-radius: 4px 0 0 4px;
+  cursor: pointer;
+  color: #475569;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  z-index: 101;
 }
-.controls-toggle-show {
-  position: fixed; top: 56px; right: 0.75rem; z-index: 99;
-  padding: 4px 10px; font-size: 1rem;
-  display: none;
-}
-.controls-toggle-show.visible { display: block; }
-.controls-toggle-hide { margin-left: auto; }
+.drawer-toggle:hover { background: #f1f5f9; }
 .pane-section  { grid-area: section; }
 .pane-side     { grid-area: side; }
 
