@@ -13,10 +13,6 @@ until it has been chunked, prioritized, and confirmed by the user.
 
 *Raw feedback captured from the user. Not yet scoped or confirmed.*
 
-- **Sheer start artifact — user has more info coming.** The invisible `startS`
-  junction is still problematic. User will provide more details after the TODO
-  file is established. See also "Remove startS" in Pending below.
-
 - **Reference image positioning UX.** Currently position is set via number
   inputs or dragging. May need finer controls (e.g. scale-by-matching-hull-
   length button, or lock-aspect-ratio when resizing).
@@ -26,23 +22,6 @@ until it has been chunked, prioritized, and confirmed by the user.
 ## Pending (chunked, not yet implemented)
 
 *Confirmed items waiting to be picked up. Ordered roughly by priority.*
-
-### P1 — Remove `startS` from geometry (sheer → interior direct connection)
-All current sheer artifacts stem from this one ghost point:
-- Amber/yellow straight line in side-view silhouette (polygon closing edge)
-- Purple sheer keel terminating at a phantom junction nobody controls
-- 3D geometry kink at the startS boundary
-
-**Model change:** sheer stations connect *directly* to the nearest interior
-(blue rocker) station. No intermediate junction.
-
-What changes:
-- `sampledSheerKeel`: remove junction point; build `[...bottomPts, tip]` only
-- `compositeLengths`: drop `sheer.startS` as the arc boundary; use the
-  first/last interior station's keel-s position instead
-- `sampledTopSheer`: bottom-side junction removed; `deckEndPt` endpoint stays
-- Side-view silhouette `sternKeel`/`bowKeel` splits follow updated boundaries
-- Applies to **both** bow and stern
 
 ### P2 — Spine edge sharpness
 The closure strip (flat chisel edge) is implemented. The sharpness parameter
@@ -61,13 +40,6 @@ Needs design before coding:
 - Gap height: translate top half up by h/2 and bottom down by h/2 (not a scale)
 - How does this interact with P2 (spine edge sharpness)?
 - Export: two separate shells or one mesh with seam metadata?
-
-### ~~P4 — Default starting state~~ → Done ✓ (see Done table)
-
-### P5 — X-ordering constraint tuning
-The constraint (each control point's X cannot cross its immediate neighbour's X)
-is implemented and unblocked (`const→let` fix). Needs evaluation: does it feel
-right, or does it need softening / adjustment after real modeling?
 
 ---
 
@@ -120,3 +92,7 @@ right, or does it need softening / adjustment after real modeling?
 | History log design note (deferred, not implemented) | loft-plan.md |
 | State: `spineSharpness` field added for future use | spine-closed |
 | Default starting state — user-modelled kayak shape from dumbstart.json | kayak-start |
+| Remove sheers entirely; rocker → N-knot piecewise Bezier; deck line Bezier; loft follows curves exactly | no-sheer |
+| Section widest b-coord normalized to beam line (hull always fills top-view silhouette) | beam-fill |
+| Control points and lines stay constant pixel size when zooming | fixed-dots |
+| Font sizes non-scaling; axis badges pinned to pane corners as static HTML SVGs | fixed-labels |

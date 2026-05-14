@@ -17,14 +17,14 @@
 <body>
 
 <header>
-  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · fixed-labels</span>
+  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · no-sheer</span>
   <h1>Loft</h1>
   <p class="subtitle">
     Design a 3D kayak hull from a curved spine (rocker) and a set of cross-sections, lofted live.
     <span class="hint">Drag the 3D view to rotate · scroll to zoom · double-click to reset.</span>
   </p>
     <p class="subtitle note">
-    <strong>Phase F — four-line loft governance.</strong> The hull is defined by four curves: <strong style="color:#2563eb">rocker/keel</strong> (blue Bézier), <strong style="color:#16a34a">deck line</strong> (green), <strong style="color:#f97316">bow sheer keel</strong> (orange), <strong style="color:#7c3aed">stern sheer keel</strong> (purple). Drag the ring-style tip points to position the bow/stern convergence; click near a sheer keel line to add interior control points; right-click to delete. The teal tick sets where the rocker hands off to the sheer keel. Interior stations have keel locked to rocker and deck locked to deck line. Sheer-end stations (via <em>+&nbsp;add station</em>) have keel locked to sheer keel line, deck locked to deck line.
+    Three governing curves: <strong style="color:#2563eb">rocker</strong> (blue, on-curve knots — click to add), <strong style="color:#16a34a">deck line</strong> (green, off-curve handles), <strong style="color:#0891b2">beam line</strong> (teal, top view). Hull converges to a point at stern and bow. Stations define cross-section shapes — add/remove via the panel. Click rocker to insert a shape knot.
   </p>
 </header>
 
@@ -121,8 +121,8 @@
         </div>
         <ol id="stations"></ol>
         <div class="station-actions">
-          <button type="button" id="add-station" disabled title="Phase D">+ add station</button>
-          <button type="button" id="remove-station" disabled title="Phase D">× remove</button>
+          <button type="button" id="add-station">+ add station</button>
+          <button type="button" id="remove-station">× remove</button>
         </div>
       </div>
       <label>Spine radius <output id="spine-r-out"></output>
