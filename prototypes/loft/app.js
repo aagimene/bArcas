@@ -919,13 +919,16 @@ function deckNOf(st) {
   return st.points[st.points.length - 1].n;
 }
 
-// Side view: single isotropic scale (px/m), recomputed each render to auto-fit.
-// sideVP mirrors topVP: {zoom, offX, offY} applied on top of the auto-fit.
-let SIDE_SCALE = 100; // px/m for both X and Z — set in renderSideView()
+// Side view: cached isotropic auto-fit. sideVP zoom/pan applied on top.
+// sideFit is computed once (or when reset/resize); subsequent edits don't
+// shift the viewBox so anchored elements (ref image) don't drift on screen.
+let SIDE_SCALE = 100; // px/m for both X and Z
+let sideFit = null;   // { scale, baseCX, baseCY, paneW, paneH }
 const sideVP = { zoom: 1, offX: 0, offY: 0 };
 
 // Top view: an extra zoom + pan offset applied on top of the isotropic auto-fit.
 const topVP = { zoom: 1, offX: 0, offY: 0 };
+let topFit = null; // { scale, baseCX, baseCY, paneW, paneH }
 
 // ── Top view (plan view, X-Y vertical orientation) ────────────────────────
 // World X (longitudinal) maps to SVG Y (hull runs vertically, bow at top).
@@ -951,28 +954,27 @@ function renderTopView() {
   // Both axes share one scale so 1 m along X (longitudinal, screen Y) and
   // 1 m along Y (transverse, screen X) render at the same pixel size.
   {
-    const knots = state.spine.knots;
-    const stX = knots[0].x, bwX = knots[knots.length-1].x;
-    const maxB = Math.max(...beamPts.map(p => p.y), 0.05);
-    const padX = 0.25, padY = 0.06;  // world-unit padding (metres)
     const bbox  = topSvg.getBoundingClientRect();
     const paneH = Math.max(bbox.height > 10 ? bbox.height : topSvg.parentElement.clientHeight - 44, 100);
     const paneW = Math.max(bbox.width  > 10 ? bbox.width  : topSvg.clientWidth, 60);
-    const Lx = (bwX - stX) + 2 * padX;            // metres needed vertically
-    const Ly = (maxB + padY) * 2;                 // metres needed horizontally
-    const s = Math.min(paneW / Ly, paneH / Lx);   // px/m, isotropic
-    TOP_SCALE_X = s;
-    TOP_SCALE_Y = s;
-    const vbW = paneW;
-    const vbH = paneH;
-    const cxX = (stX + bwX) / 2;                  // world X centre of hull
-    // Base fit centre in SVG coords, then apply topVP zoom/pan on top.
-    const baseCX = 0;
-    const baseCY = -cxX * s;
-    const fitCX  = baseCX + topVP.offX;
-    const fitCY  = baseCY + topVP.offY;
-    const zW     = vbW / topVP.zoom;
-    const zH     = vbH / topVP.zoom;
+    const stale = !topFit || topFit.paneW !== paneW || topFit.paneH !== paneH;
+    if (stale) {
+      const knots = state.spine.knots;
+      const stX = knots[0].x, bwX = knots[knots.length-1].x;
+      const maxB = Math.max(...beamPts.map(p => p.y), 0.05);
+      const padX = 0.25, padY = 0.06;
+      const Lx = (bwX - stX) + 2 * padX;
+      const Ly = (maxB + padY) * 2;
+      const s  = Math.min(paneW / Ly, paneH / Lx);
+      const cxX = (stX + bwX) / 2;
+      topFit = { scale: s, baseCX: 0, baseCY: -cxX * s, paneW, paneH };
+    }
+    TOP_SCALE_X = topFit.scale;
+    TOP_SCALE_Y = topFit.scale;
+    const fitCX = topFit.baseCX + topVP.offX;
+    const fitCY = topFit.baseCY + topVP.offY;
+    const zW = paneW / topVP.zoom;
+    const zH = paneH / topVP.zoom;
     topSvg.setAttribute('viewBox',
       `${(fitCX - zW / 2).toFixed(1)} ${(fitCY - zH / 2).toFixed(1)} ${zW.toFixed(1)} ${zH.toFixed(1)}`);
   }
@@ -1107,26 +1109,30 @@ function renderTopView() {
 function renderSideView() {
   sideSvg.innerHTML = '';
 
-  // ── Compute 1:1 isotropic scale and auto-fit viewBox (like topView) ──
+  // ── Auto-fit (cached): recompute only on first render, reset, or resize ──
   {
-    const spS = sampledSpine(state.spine.knots,   64);
-    const dkS = sampledSpine(state.deckLine.knots, 64);
-    let xMin = Infinity, xMax = -Infinity, zMin = Infinity, zMax = -Infinity;
-    [...spS.pts, ...dkS.pts].forEach(p => {
-      if (p.x < xMin) xMin = p.x; if (p.x > xMax) xMax = p.x;
-      if (p.y < zMin) zMin = p.y; if (p.y > zMax) zMax = p.y;
-    });
-    const pad = 0.3;
-    xMin -= pad; xMax += pad; zMin -= pad; zMax += pad;
     const bbox  = sideSvg.getBoundingClientRect();
     const paneW = Math.max(bbox.width  > 10 ? bbox.width  : sideSvg.parentElement.clientWidth,  60);
     const paneH = Math.max(bbox.height > 10 ? bbox.height : sideSvg.parentElement.clientHeight, 40);
-    SIDE_SCALE  = Math.min(paneW / (xMax - xMin), paneH / (zMax - zMin));
-    // SVG base centre (un-panned, un-zoomed)
-    const baseCX =  (xMin + xMax) / 2 * SIDE_SCALE;
-    const baseCY = -(zMin + zMax) / 2 * SIDE_SCALE;
-    const fitCX  = baseCX + sideVP.offX;
-    const fitCY  = baseCY + sideVP.offY;
+    const stale = !sideFit || sideFit.paneW !== paneW || sideFit.paneH !== paneH;
+    if (stale) {
+      const spS = sampledSpine(state.spine.knots,   64);
+      const dkS = sampledSpine(state.deckLine.knots, 64);
+      let xMin = Infinity, xMax = -Infinity, zMin = Infinity, zMax = -Infinity;
+      [...spS.pts, ...dkS.pts].forEach(p => {
+        if (p.x < xMin) xMin = p.x; if (p.x > xMax) xMax = p.x;
+        if (p.y < zMin) zMin = p.y; if (p.y > zMax) zMax = p.y;
+      });
+      const pad = 0.3;
+      xMin -= pad; xMax += pad; zMin -= pad; zMax += pad;
+      const scale  = Math.min(paneW / (xMax - xMin), paneH / (zMax - zMin));
+      const baseCX =  (xMin + xMax) / 2 * scale;
+      const baseCY = -(zMin + zMax) / 2 * scale;
+      sideFit = { scale, baseCX, baseCY, paneW, paneH };
+    }
+    SIDE_SCALE = sideFit.scale;
+    const fitCX = sideFit.baseCX + sideVP.offX;
+    const fitCY = sideFit.baseCY + sideVP.offY;
     const zW = paneW / sideVP.zoom;
     const zH = paneH / sideVP.zoom;
     sideSvg.setAttribute('viewBox',
@@ -1922,6 +1928,7 @@ document.getElementById('light-reset').addEventListener('click', () => {
 });
 
 document.getElementById('top-reset').addEventListener('click', () => {
+  topFit = null;
   topVP.zoom = 1; topVP.offX = 0; topVP.offY = 0;
   renderTopView();
 });
@@ -2147,6 +2154,7 @@ sideSvg.addEventListener('pointerup',     () => { sidePanDrag = null; }, true);
 sideSvg.addEventListener('pointercancel', () => { sidePanDrag = null; }, true);
 
 document.getElementById('side-reset').addEventListener('click', () => {
+  sideFit = null;
   sideVP.zoom = 1; sideVP.offX = 0; sideVP.offY = 0;
   renderSideView();
 });
@@ -2460,4 +2468,4 @@ renderSideView();
 renderTopView();
 renderSectionView();
 
-window.addEventListener('resize', () => { renderTopView(); renderSideView(); });
+window.addEventListener('resize', () => { sideFit = null; topFit = null; renderTopView(); renderSideView(); });
