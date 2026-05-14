@@ -919,18 +919,10 @@ function deckNOf(st) {
   return st.points[st.points.length - 1].n;
 }
 
-const SIDE_SCALE_X = 100; // px/m horizontal
-const SIDE_SCALE_Z = 200; // px/m vertical (exaggerated so rocker is visible)
-
-// ── Viewport state for zoom / pan ─────────────────────────────────────────
-// Side view: stored as the SVG viewBox (minX, minY, W, H).
-const SIDE_VP_DEFAULT = { minX: -340, minY: -140, W: 680, H: 240 };
-const sideVP = { ...SIDE_VP_DEFAULT };
-
-function applySideViewBox() {
-  sideSvg.setAttribute('viewBox',
-    `${sideVP.minX.toFixed(2)} ${sideVP.minY.toFixed(2)} ${sideVP.W.toFixed(2)} ${sideVP.H.toFixed(2)}`);
-}
+// Side view: single isotropic scale (px/m), recomputed each render to auto-fit.
+// sideVP mirrors topVP: {zoom, offX, offY} applied on top of the auto-fit.
+let SIDE_SCALE = 100; // px/m for both X and Z — set in renderSideView()
+const sideVP = { zoom: 1, offX: 0, offY: 0 };
 
 // Top view: an extra zoom + pan offset applied on top of the isotropic auto-fit.
 const topVP = { zoom: 1, offX: 0, offY: 0 };
@@ -962,7 +954,6 @@ function renderTopView() {
     imgEl.setAttribute('width',  (r.worldH * TOP_SCALE_Y).toFixed(1));   // beam maps to SVG X
     imgEl.setAttribute('height', (r.worldW * TOP_SCALE_X).toFixed(1));   // length maps to SVG Y
     imgEl.setAttribute('opacity', r.opacity);
-    imgEl.setAttribute('preserveAspectRatio', 'none');
     imgEl.setAttribute('data-drag', 'ref-top');
     topSvg.appendChild(imgEl);
   }
@@ -1109,27 +1100,51 @@ function renderTopView() {
 // ── Side view ─────────────────────────────────────────────────────────────
 
 function renderSideView() {
-  applySideViewBox();
   sideSvg.innerHTML = '';
-  // Scale factor: divide SVG-unit sizes by this so control points stay
-  // constant pixel size regardless of zoom level.
-  const sf = SIDE_VP_DEFAULT.W / sideVP.W;
+
+  // ── Compute 1:1 isotropic scale and auto-fit viewBox (like topView) ──
+  {
+    const spS = sampledSpine(state.spine.knots,   64);
+    const dkS = sampledSpine(state.deckLine.knots, 64);
+    let xMin = Infinity, xMax = -Infinity, zMin = Infinity, zMax = -Infinity;
+    [...spS.pts, ...dkS.pts].forEach(p => {
+      if (p.x < xMin) xMin = p.x; if (p.x > xMax) xMax = p.x;
+      if (p.y < zMin) zMin = p.y; if (p.y > zMax) zMax = p.y;
+    });
+    const pad = 0.3;
+    xMin -= pad; xMax += pad; zMin -= pad; zMax += pad;
+    const bbox  = sideSvg.getBoundingClientRect();
+    const paneW = Math.max(bbox.width  > 10 ? bbox.width  : sideSvg.parentElement.clientWidth,  60);
+    const paneH = Math.max(bbox.height > 10 ? bbox.height : sideSvg.parentElement.clientHeight, 40);
+    SIDE_SCALE  = Math.min(paneW / (xMax - xMin), paneH / (zMax - zMin));
+    // SVG base centre (un-panned, un-zoomed)
+    const baseCX =  (xMin + xMax) / 2 * SIDE_SCALE;
+    const baseCY = -(zMin + zMax) / 2 * SIDE_SCALE;
+    const fitCX  = baseCX + sideVP.offX;
+    const fitCY  = baseCY + sideVP.offY;
+    const zW = paneW / sideVP.zoom;
+    const zH = paneH / sideVP.zoom;
+    sideSvg.setAttribute('viewBox',
+      `${(fitCX - zW/2).toFixed(1)} ${(fitCY - zH/2).toFixed(1)} ${zW.toFixed(1)} ${zH.toFixed(1)}`);
+  }
+
+  // Scale factor for constant-pixel control point sizes.
+  const sf = sideVP.zoom;
   // Reference image (behind everything else).
   if (state.sideRef?.url) {
     const r = state.sideRef;
     const imgEl = document.createElementNS(SVG_NS, 'image');
     imgEl.setAttribute('href', r.url);
-    imgEl.setAttribute('x',      (r.worldX * SIDE_SCALE_X).toFixed(1));
-    imgEl.setAttribute('y',      (-r.worldZ * SIDE_SCALE_Z).toFixed(1));
-    imgEl.setAttribute('width',  (r.worldW * SIDE_SCALE_X).toFixed(1));
-    imgEl.setAttribute('height', (r.worldH * SIDE_SCALE_Z).toFixed(1));
+    imgEl.setAttribute('x',      (r.worldX * SIDE_SCALE).toFixed(1));
+    imgEl.setAttribute('y',      (-r.worldZ * SIDE_SCALE).toFixed(1));
+    imgEl.setAttribute('width',  (r.worldW * SIDE_SCALE).toFixed(1));
+    imgEl.setAttribute('height', (r.worldH * SIDE_SCALE).toFixed(1));
     imgEl.setAttribute('opacity', r.opacity);
-    imgEl.setAttribute('preserveAspectRatio', 'none');
     imgEl.setAttribute('data-drag', 'ref-side');
     sideSvg.appendChild(imgEl);
   }
-  const xOf = (x) => x * SIDE_SCALE_X;
-  const yOf = (z) => -z * SIDE_SCALE_Z;
+  const xOf = (x) => x * SIDE_SCALE;
+  const yOf = (z) => -z * SIDE_SCALE;
 
   const spSampled   = sampledSpine(state.spine.knots,   64);
   const deckSampled = sampledSpine(state.deckLine.knots, 64);
@@ -1137,9 +1152,10 @@ function renderSideView() {
   const pathD  = pts => 'M ' + pts.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.z).toFixed(2)}`).join(' L ');
 
   // Waterline.
-  sideSvg.appendChild(el('line', { x1: -340, y1: yOf(0), x2: 340, y2: yOf(0), class: 'water' }));
+  const vb = sideSvg.viewBox.baseVal;
+  sideSvg.appendChild(el('line', { x1: vb.x, y1: yOf(0), x2: vb.x+vb.width, y2: yOf(0), class: 'water' }));
   sideSvg.appendChild(el('text', {
-    x: 320, y: yOf(0) - 3, class: 'label', 'text-anchor': 'end', 'font-size': 9/sf,
+    x: vb.x+vb.width-3/sf, y: yOf(0) - 3/sf, class: 'label', 'text-anchor': 'end', 'font-size': 9/sf,
   }, 'WL (Z = 0)'));
 
   // ── Hull silhouette and curves from mesh ────────────────────────────
@@ -1936,8 +1952,8 @@ sideSvg.addEventListener('pointerdown', (e) => {
   const { x, y } = svgToLocal(sideSvg, e);
   drag = {
     kind, idx, moved: false, pointerId: e.pointerId,
-    startWx: x / SIDE_SCALE_X,
-    startWz: -y / SIDE_SCALE_Z,
+    startWx: x / SIDE_SCALE,
+    startWz: -y / SIDE_SCALE,
   };
   if (kind === 'station') selectStation(idx);
   sideSvg.setPointerCapture(e.pointerId);
@@ -1946,8 +1962,8 @@ sideSvg.addEventListener('pointerdown', (e) => {
 sideSvg.addEventListener('pointermove', (e) => {
   if (!drag) return;
   const { x, y } = svgToLocal(sideSvg, e);
-  const wx = x / SIDE_SCALE_X;
-  const wz = -y / SIDE_SCALE_Z;
+  const wx = x / SIDE_SCALE;
+  const wz = -y / SIDE_SCALE;
   drag.moved = true;
 
   if (drag.kind === 'ref-side') {
@@ -2042,36 +2058,31 @@ let sidePanDrag = null;
 sideSvg.addEventListener('wheel', (e) => {
   e.preventDefault();
   const dz = e.deltaY < 0 ? 1.025 : 1 / 1.025;
-  const { x: mx, y: my } = svgToLocal(sideSvg, e);
-  sideVP.minX = mx - (mx - sideVP.minX) / dz;
-  sideVP.minY = my - (my - sideVP.minY) / dz;
-  sideVP.W   /= dz;
-  sideVP.H   /= dz;
+  const loc = (() => { const pt = sideSvg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; return pt.matrixTransform(sideSvg.getScreenCTM().inverse()); })();
+  sideVP.offX = loc.x - (loc.x - sideVP.offX) / dz;
+  sideVP.offY = loc.y - (loc.y - sideVP.offY) / dz;
+  sideVP.zoom = Math.max(0.1, Math.min(20, sideVP.zoom * dz));
   renderSideView();
 }, { passive: false });
 
-// Pan: left-drag on background (no control target), or middle-button anywhere.
 sideSvg.addEventListener('pointerdown', (e) => {
   const isMiddle = e.button === 1;
   const isBackground = e.button === 0 && !e.target.closest('[data-drag]');
   if (!isMiddle && !isBackground) return;
   e.preventDefault();
   e.stopPropagation();
-  sidePanDrag = {
-    screenX: e.clientX, screenY: e.clientY,
-    vpMinX: sideVP.minX, vpMinY: sideVP.minY,
-  };
+  sidePanDrag = { startX: e.clientX, startY: e.clientY, startOffX: sideVP.offX, startOffY: sideVP.offY };
   sideSvg.setPointerCapture(e.pointerId);
 }, true);
 
 sideSvg.addEventListener('pointermove', (e) => {
   if (!sidePanDrag) return;
-  // Convert pixel delta to SVG units using current viewport scale.
-  const bbox   = sideSvg.getBoundingClientRect();
-  const scaleX = sideVP.W / Math.max(1, bbox.width);
-  const scaleY = sideVP.H / Math.max(1, bbox.height);
-  sideVP.minX  = sidePanDrag.vpMinX - (e.clientX - sidePanDrag.screenX) * scaleX;
-  sideVP.minY  = sidePanDrag.vpMinY - (e.clientY - sidePanDrag.screenY) * scaleY;
+  const vb = sideSvg.viewBox.baseVal;
+  const bbox = sideSvg.getBoundingClientRect();
+  const scaleX = vb.width  / Math.max(1, bbox.width);
+  const scaleY = vb.height / Math.max(1, bbox.height);
+  sideVP.offX = sidePanDrag.startOffX - (e.clientX - sidePanDrag.startX) * scaleX;
+  sideVP.offY = sidePanDrag.startOffY - (e.clientY - sidePanDrag.startY) * scaleY;
   renderSideView();
 }, true);
 
@@ -2079,7 +2090,7 @@ sideSvg.addEventListener('pointerup',     () => { sidePanDrag = null; }, true);
 sideSvg.addEventListener('pointercancel', () => { sidePanDrag = null; }, true);
 
 document.getElementById('side-reset').addEventListener('click', () => {
-  Object.assign(sideVP, SIDE_VP_DEFAULT);
+  sideVP.zoom = 1; sideVP.offX = 0; sideVP.offY = 0;
   renderSideView();
 });
 
@@ -2091,13 +2102,36 @@ function wireRefImage(viewKey, fileId, opacityId, opacityOutId, wId, hId, xId, y
   const refState = () => state[viewKey];
   const fmtPct = v => Math.round(v * 100) + '%';
 
+  const hInput = document.getElementById(hId);
+  const wInput = document.getElementById(wId);
+
+  // Derive worldH from worldW using native image aspect ratio.
+  const applyAspect = () => {
+    const r = refState();
+    if (!r.nativeAspect) return;
+    // Side view: image width=worldW, height=worldH → worldH = worldW / nativeAspect.
+    // Top view:  SVG width=worldH*s, height=worldW*s → worldH = worldW * nativeAspect.
+    r.worldH = viewKey === 'sideRef'
+      ? r.worldW / r.nativeAspect
+      : r.worldW * r.nativeAspect;
+    hInput.value = r.worldH.toFixed(3);
+  };
+
   document.getElementById(fileId).addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      refState().url = ev.target.result;
-      renderFn();
+      const url = ev.target.result;
+      const img = new Image();
+      img.onload = () => {
+        const r = refState();
+        r.url = url;
+        r.nativeAspect = img.naturalWidth / img.naturalHeight;
+        applyAspect();
+        renderFn();
+      };
+      img.src = url;
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -2112,8 +2146,12 @@ function wireRefImage(viewKey, fileId, opacityId, opacityOutId, wId, hId, xId, y
   });
   opOut.textContent = fmtPct(refState().opacity);
 
-  document.getElementById(wId).addEventListener('input', (e) => { refState().worldW = parseFloat(e.target.value) || 0.1; renderFn(); });
-  document.getElementById(hId).addEventListener('input', (e) => { refState().worldH = parseFloat(e.target.value) || 0.1; renderFn(); });
+  document.getElementById(wId).addEventListener('input', (e) => {
+    refState().worldW = parseFloat(e.target.value) || 0.1;
+    applyAspect(); // re-derive height from new width
+    renderFn();
+  });
+  hInput.addEventListener('input', (e) => { refState().worldH = parseFloat(e.target.value) || 0.1; renderFn(); });
   document.getElementById(xId).addEventListener('input', (e) => { refState().worldX = parseFloat(e.target.value) || 0;   renderFn(); });
   document.getElementById(yId).addEventListener('input', (e) => {
     const k = viewKey === 'sideRef' ? 'worldZ' : 'worldY';
@@ -2183,7 +2221,7 @@ sideSvg.addEventListener('click', (e) => {
   if (e.target.closest('[data-drag]')) return;
   if (drag && drag.moved) return;
   const { x, y } = svgToLocal(sideSvg, e);
-  const wx = x / SIDE_SCALE_X, wz = -y / SIDE_SCALE_Z;
+  const wx = x / SIDE_SCALE, wz = -y / SIDE_SCALE;
 
   // Check rocker proximity first.
   const knots = state.spine.knots;
