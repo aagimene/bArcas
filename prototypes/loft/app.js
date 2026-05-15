@@ -2627,8 +2627,22 @@ function nearestSegmentInsertIdx(points, clickB, clickN) {
 lengthOut.textContent = fmtLength(state.length);
 stationLabel.textContent = stationLabelFor(state.selectedStation);
 renderStationList();
-renderSideView();
-renderTopView();
-renderSectionView();
+
+// Defer first render one frame so the CSS grid has finished laying out and
+// getBoundingClientRect() returns real pane dimensions for sideFit/topFit.
+requestAnimationFrame(() => {
+  renderSideView();
+  renderTopView();
+  renderSectionView();
+});
 
 window.addEventListener('resize', () => { sideFit = null; topFit = null; renderTopView(); renderSideView(); });
+
+// Invalidate fit caches whenever the panes change size (e.g. resizer drag,
+// drawer open/close, initial layout settle).
+const paneResizeObserver = new ResizeObserver(() => {
+  sideFit = null; topFit = null;
+  renderSideView(); renderTopView();
+});
+paneResizeObserver.observe(sideSvg.parentElement);
+paneResizeObserver.observe(topSvg.parentElement);
