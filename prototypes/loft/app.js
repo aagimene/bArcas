@@ -905,6 +905,105 @@ const resizeObserver = new ResizeObserver(() => {
 });
 resizeObserver.observe(threeHost);
 
+// ── 3D scale gizmo overlay ────────────────────────────────────────────────
+//
+// A small SVG pinned to the bottom-left of the 3D pane. Axes are projected
+// from the Three.js camera's current orientation so the gizmo rotates with
+// the view. Cube handles are large rotated squares.
+//
+// THREE.js coordinate mapping (see buildLoft): THREE_X=our X, THREE_Y=our Z
+// (up), THREE_Z=our Y (beam/starboard). So world axis unit vectors in THREE
+// space are: X→(1,0,0), Z-up→(0,1,0), Y-beam→(0,0,1).
+
+const THREE_GIZMO_AXES = [
+  { axis: 'X', threeDir: new THREE.Vector3(1, 0, 0), color: '#2563eb' },
+  { axis: 'Z', threeDir: new THREE.Vector3(0, 1, 0), color: '#16a34a' },
+  { axis: 'Y', threeDir: new THREE.Vector3(0, 0, 1), color: '#0891b2' },
+];
+
+const threeGizmoSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+threeGizmoSvg.setAttribute('viewBox', '0 0 110 110');
+Object.assign(threeGizmoSvg.style, {
+  position: 'absolute', bottom: '32px', left: '12px',
+  width: '110px', height: '110px',
+  overflow: 'visible', pointerEvents: 'none',
+});
+threeHost.appendChild(threeGizmoSvg);
+
+function updateThreeGizmo() {
+  threeGizmoSvg.innerHTML = '';
+  const CX = 55, CY = 55, ARM = 42, HS = 7; // SVG pixels
+
+  // Project each world axis direction through the camera's view matrix.
+  const projected = THREE_GIZMO_AXES.map(a => {
+    const camDir = a.threeDir.clone().transformDirection(camera.matrixWorldInverse);
+    // camDir.x → screen right (+), camDir.y → screen up (+)
+    return { ...a, sx: camDir.x, sy: -camDir.y, depth: camDir.z };
+  });
+
+  // Paint back-to-front (largest depth first = behind camera = draw first).
+  projected.sort((a, b) => b.depth - a.depth);
+
+  for (const d of projected) {
+    const ex = CX + d.sx * ARM;
+    const ey = CY + d.sy * ARM;
+
+    // Axis line
+    const line = document.createElementNS(SVG_NS, 'line');
+    line.setAttribute('x1', CX); line.setAttribute('y1', CY);
+    line.setAttribute('x2', ex.toFixed(1)); line.setAttribute('y2', ey.toFixed(1));
+    line.setAttribute('stroke', d.color); line.setAttribute('stroke-width', '2');
+    line.setAttribute('stroke-linecap', 'round');
+    line.style.pointerEvents = 'none';
+    threeGizmoSvg.appendChild(line);
+
+    // Hit area (larger, interactive)
+    const hit = document.createElementNS(SVG_NS, 'rect');
+    hit.setAttribute('x', ex - HS * 2); hit.setAttribute('y', ey - HS * 2);
+    hit.setAttribute('width', HS * 4);  hit.setAttribute('height', HS * 4);
+    hit.setAttribute('fill', 'transparent');
+    hit.dataset.scaleAxis = d.axis;
+    hit.dataset.scaleDirX = d.sx.toFixed(4);
+    hit.dataset.scaleDirY = d.sy.toFixed(4);
+    hit.style.cursor = 'crosshair';
+    hit.style.pointerEvents = 'all';
+    threeGizmoSvg.appendChild(hit);
+
+    // Cube handle: rotated square (diamond)
+    const deg = Math.atan2(d.sy, d.sx) * 180 / Math.PI + 45;
+    const rect = document.createElementNS(SVG_NS, 'rect');
+    rect.setAttribute('x', ex - HS); rect.setAttribute('y', ey - HS);
+    rect.setAttribute('width', HS * 2); rect.setAttribute('height', HS * 2);
+    rect.setAttribute('fill', d.color);
+    rect.setAttribute('transform', `rotate(${deg.toFixed(1)},${ex.toFixed(1)},${ey.toFixed(1)})`);
+    rect.style.pointerEvents = 'none';
+    threeGizmoSvg.appendChild(rect);
+
+    // Axis label
+    const txt = document.createElementNS(SVG_NS, 'text');
+    txt.setAttribute('x', (ex + d.sx * (HS + 5)).toFixed(1));
+    txt.setAttribute('y', (ey + d.sy * (HS + 5) + 1).toFixed(1));
+    txt.setAttribute('fill', d.color); txt.setAttribute('font-size', '10');
+    txt.setAttribute('text-anchor', d.sx > 0.1 ? 'start' : d.sx < -0.1 ? 'end' : 'middle');
+    txt.setAttribute('dominant-baseline', 'middle');
+    txt.style.pointerEvents = 'none';
+    txt.style.fontFamily = 'system-ui, sans-serif';
+    txt.textContent = d.axis;
+    threeGizmoSvg.appendChild(txt);
+  }
+
+  // Centre dot
+  const dot = document.createElementNS(SVG_NS, 'circle');
+  dot.setAttribute('cx', CX); dot.setAttribute('cy', CY); dot.setAttribute('r', '3');
+  dot.setAttribute('fill', '#fff'); dot.setAttribute('stroke', '#666');
+  dot.setAttribute('stroke-width', '1');
+  dot.style.pointerEvents = 'none';
+  threeGizmoSvg.appendChild(dot);
+}
+
+// Wire scale drag for the 3D gizmo SVG.
+attachScaleGizmoPointer(threeGizmoSvg);
+
 // ── Key-light orbit: shift+drag on the 3D canvas ─────────────────────────
 // Horizontal drag = azimuth, vertical drag = elevation.
 // OrbitControls gets the event first; we intercept in capture phase and
@@ -940,6 +1039,7 @@ function animate() {
   requestAnimationFrame(animate);
   controls.update();
   composer.render();
+  if (typeof updateThreeGizmo === 'function') updateThreeGizmo();
 }
 animate();
 
@@ -1147,6 +1247,91 @@ function renderTopView() {
 
   // ── Coordinate-system badge (X-Y plane, top-down) ──────────────────────
   // Bottom-left corner of the viewBox.
+
+  // Scale gizmo — Y (beam) and X (length) axes at hull centre.
+  {
+    appendScaleGizmo2D(topSvg, xOfT(0), yOfT(0), tf, [
+      { axis: 'Y', svgDirX:  1, svgDirY:  0, screenDirX:  1, screenDirY:  0, color: '#0891b2' },
+      { axis: 'X', svgDirX:  0, svgDirY: -1, screenDirX:  0, screenDirY: -1, color: '#2563eb' },
+    ]);
+  }
+}
+
+// ── Scale gizmo helper (2D SVG views) ────────────────────────────────────
+//
+// GIZMO_ARM: screen pixels of each axis arm. Defined here so appendScaleGizmo2D
+// can use it directly; the drag system below re-references it as well.
+const GIZMO_ARM = 60;
+//
+// Draws two or three scale axes at (gcx, gcy) in SVG coordinates.
+// Each axis has a square handle at the positive tip; dragging along the
+// axis direction scales the hull along that world axis.
+//
+// axes: [{ axis:'X'|'Y'|'Z', svgDirX, svgDirY, screenDirX, screenDirY, color }]
+//   svgDir*     – unit vector in SVG user-space pointing toward the positive tip
+//   screenDir*  – unit vector in screen pixels pointing the same way
+//   (for all unrotated SVG views these are the same, but stored separately
+//    in case a view is ever rotated later)
+//
+function appendScaleGizmo2D(svg, gcx, gcy, sf, axes) {
+  const arm = GIZMO_ARM / sf;   // arm length in SVG user-space units
+  const hs  = 5 / sf;           // half-size of square handle
+  const sw  = 1.5 / sf;         // line stroke-width
+  const fs  = 8 / sf;           // label font-size
+
+  const g = el('g', { class: 'scale-gizmo' });
+
+  for (const ax of axes) {
+    const ex = gcx + ax.svgDirX * arm;
+    const ey = gcy + ax.svgDirY * arm;
+
+    // Axis line (non-interactive)
+    g.appendChild(el('line', {
+      x1: gcx, y1: gcy, x2: ex, y2: ey,
+      stroke: ax.color, 'stroke-width': sw, 'stroke-linecap': 'round',
+      style: 'pointer-events:none',
+    }));
+
+    // Large transparent hit area
+    g.appendChild(el('rect', {
+      x: ex - 3 * hs, y: ey - 3 * hs,
+      width: 6 * hs, height: 6 * hs,
+      fill: 'transparent',
+      'data-scale-axis': ax.axis,
+      'data-scale-dir-x': ax.screenDirX.toFixed(4),
+      'data-scale-dir-y': ax.screenDirY.toFixed(4),
+      style: 'cursor:ew-resize; pointer-events:all',
+    }));
+
+    // Visible square handle (rotated 45° → diamond)
+    const deg = Math.atan2(ax.svgDirY, ax.svgDirX) * 180 / Math.PI + 45;
+    g.appendChild(el('rect', {
+      x: ex - hs, y: ey - hs, width: 2 * hs, height: 2 * hs,
+      fill: ax.color,
+      transform: `rotate(${deg.toFixed(1)},${ex},${ey})`,
+      style: 'pointer-events:none',
+    }));
+
+    // Axis label
+    const lx = ex + ax.svgDirX * (hs * 2 + 2 / sf);
+    const ly = ey + ax.svgDirY * (hs * 2 + 2 / sf);
+    g.appendChild(el('text', {
+      x: lx, y: ly, fill: ax.color,
+      'font-size': fs,
+      'text-anchor': ax.svgDirX > 0.1 ? 'start' : ax.svgDirX < -0.1 ? 'end' : 'middle',
+      'dominant-baseline': 'middle',
+      style: 'pointer-events:none; user-select:none; font-family:system-ui,sans-serif',
+    }, ax.axis));
+  }
+
+  // Centre dot
+  g.appendChild(el('circle', {
+    cx: gcx, cy: gcy, r: 3 / sf,
+    fill: '#fff', stroke: '#888', 'stroke-width': 0.8 / sf,
+    style: 'pointer-events:none',
+  }));
+
+  svg.appendChild(g);
 }
 
 // ── Side view ─────────────────────────────────────────────────────────────
@@ -1361,6 +1546,19 @@ function renderSideView() {
     }
     sideSvg.appendChild(group);
   }
+
+  // Scale gizmo — X (longitudinal) and Z (height) axes at hull centre.
+  {
+    const spKnots = state.spine.knots;
+    const dkKnots = state.deckLine.knots;
+    const zMin = Math.min(...spKnots.map(k => k.z));
+    const zMax = Math.max(...dkKnots.map(k => k.z));
+    const zMid = (zMin + zMax) / 2;
+    appendScaleGizmo2D(sideSvg, xOf(0), yOf(zMid), sf, [
+      { axis: 'X', svgDirX:  1, svgDirY:  0, screenDirX:  1, screenDirY:  0, color: '#2563eb' },
+      { axis: 'Z', svgDirX:  0, svgDirY: -1, screenDirX:  0, screenDirY: -1, color: '#16a34a' },
+    ]);
+  }
 }
 
 // Build the unified station list for the UI (interior + sheer; not the
@@ -1473,6 +1671,16 @@ function renderSectionView() {
     sectionSvg.appendChild(el('line', { x1: ax, y1: ay, x2: ax,     y2: ay - L, class: 'axis-arrow' }));
     sectionSvg.appendChild(el('text', { x: ax + L + 3, y: ay + 7,     class: 'axis-label' }, '+Y'));
     sectionSvg.appendChild(el('text', { x: ax - 3,     y: ay - L - 3, class: 'axis-label', 'text-anchor': 'start' }, '+Z'));
+  }
+
+  // Scale gizmo — Y (beam) and Z (height) axes in normalised section space.
+  {
+    const gcx = bOf(0.5);
+    const gcy = nOf(0.5);
+    appendScaleGizmo2D(sectionSvg, gcx, gcy, sectionVP.zoom, [
+      { axis: 'Y', svgDirX:  1, svgDirY:  0, screenDirX:  1, screenDirY:  0, color: '#0891b2' },
+      { axis: 'Z', svgDirX:  0, svgDirY: -1, screenDirX:  0, screenDirY: -1, color: '#16a34a' },
+    ]);
   }
 }
 
@@ -2060,6 +2268,87 @@ function tryTopDelete(e) {
 }
 topSvg.addEventListener('contextmenu', tryTopDelete);
 topSvg.addEventListener('click', (e) => { if (e.metaKey || e.ctrlKey) tryTopDelete(e); });
+
+// ── Scale gizmo — drag system ─────────────────────────────────────────────
+//
+// Scale ratio = (GIZMO_ARM + screen-delta-along-axis) / GIZMO_ARM.
+// GIZMO_ARM is declared near appendScaleGizmo2D above.
+
+function applyScaleX(r) {
+  if (!(r > 0) || !isFinite(r)) return;
+  state.spine.knots.forEach(k    => { k.x *= r; k.foreLen *= r; k.aftLen *= r; });
+  state.deckLine.knots.forEach(k => { k.x *= r; k.foreLen *= r; k.aftLen *= r; });
+  const bl = state.beamLine;
+  bl.sternHandle.dx *= r; bl.bowHandle.dx *= r;
+  bl.peaks.forEach(pk => { pk.x *= r; pk.hdx *= r; });
+  state.length *= r;
+  lengthEl.value        = state.length.toFixed(2);
+  lengthOut.textContent = fmtLength(state.length);
+}
+
+function applyScaleY(r) {
+  if (!(r > 0) || !isFinite(r)) return;
+  const bl = state.beamLine;
+  bl.sternHandle.dy *= r; bl.bowHandle.dy *= r;
+  bl.peaks.forEach(pk => { pk.y *= r; pk.hdy *= r; });
+}
+
+function applyScaleZ(r) {
+  if (!(r > 0) || !isFinite(r)) return;
+  state.spine.knots.forEach(k    => { k.z *= r; });
+  state.deckLine.knots.forEach(k => { k.z *= r; });
+}
+
+// scaleDrag: active scale-gizmo drag state.
+// dirX/dirY: screen-space unit vector toward the positive axis tip.
+// prevR: accumulated ratio (used to compute the incremental change each frame).
+let scaleDrag = null;
+
+document.addEventListener('pointermove', (e) => {
+  if (!scaleDrag) return;
+  const dx = e.clientX - scaleDrag.startX;
+  const dy = e.clientY - scaleDrag.startY;
+  const delta = dx * scaleDrag.dirX + dy * scaleDrag.dirY;
+  const r  = Math.max(0.05, (GIZMO_ARM + delta) / GIZMO_ARM);
+  const dr = r / scaleDrag.prevR;
+  scaleDrag.prevR = r;
+  if (Math.abs(dr - 1) < 1e-6) return;
+  if      (scaleDrag.axis === 'X') { applyScaleX(dr); sideFit = null; topFit = null; }
+  else if (scaleDrag.axis === 'Y')   applyScaleY(dr);
+  else if (scaleDrag.axis === 'Z')   applyScaleZ(dr);
+  rebuildHull();
+  renderSideView(); renderTopView(); renderSectionView();
+  updateThreeGizmo();
+}, true);
+
+document.addEventListener('pointerup',     () => { scaleDrag = null; }, true);
+document.addEventListener('pointercancel', () => { scaleDrag = null; }, true);
+
+// Attach a capture-phase pointerdown listener to a SVG so that clicks on
+// [data-scale-axis] elements start a scale drag and stop further propagation
+// (preventing the pan handler from treating the click as a background tap).
+function attachScaleGizmoPointer(svg) {
+  svg.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    const target = e.target.closest('[data-scale-axis]');
+    if (!target) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    scaleDrag = {
+      axis  : target.dataset.scaleAxis,
+      dirX  : parseFloat(target.dataset.scaleDirX),
+      dirY  : parseFloat(target.dataset.scaleDirY),
+      startX: e.clientX,
+      startY: e.clientY,
+      prevR : 1,
+    };
+    svg.setPointerCapture(e.pointerId);
+  }, true);
+}
+
+attachScaleGizmoPointer(sideSvg);
+attachScaleGizmoPointer(topSvg);
+attachScaleGizmoPointer(sectionSvg);
 
 // ── Side-view drag/click/delete ──────────────────────────────────────────
 
