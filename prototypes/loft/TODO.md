@@ -122,6 +122,69 @@ until it has been chunked, prioritized, and confirmed by the user.
 
 ---
 
+## Execution plan
+
+*Recommended ordering, model, and effort level for the items in
+**Feedback / Unprioritized** above. Goal: ship visible progress quickly
+without burning the 5-hour rate-limit on a single big task.*
+
+**Strategy**
+
+- Front-load cheap wins (Sonnet, low-effort) so the user sees fast progress
+  and the codebase gets simpler as we go.
+- Group items that touch the same code region into a single session so we
+  amortise the read-context cost.
+- Save Opus for items where the wrong approach is expensive: math
+  correctness, architectural choices, ambiguous specs.
+- Defer items that need more user input (vague repros, big design calls)
+  until they bubble up naturally.
+
+**Recommended model picks (heuristics)**
+
+- **Haiku 4.5** — pure CSS / single-file mechanical edits with a clear
+  before/after.
+- **Sonnet 4.6** — most feature work and refactors. Good default.
+- **Opus 4.7** — math correctness, subtle bug hunts, architectural
+  decisions, large multi-file refactors.
+
+| # | Order | Item (short) | Model | Effort | Why this rank |
+|---|-------|--------------|-------|--------|---------------|
+| 1 | 1 | Section axis labels (+Z/+Y) statically positioned in corner | Sonnet | low | Same exact pattern already used in side/top views — copy-paste fix, isolated. |
+| 2 | 2 | Cross-section controls/lines/labels non-scaling | Sonnet | low-med | Mechanical: divide every `r`/`stroke-width`/`font-size` by `sectionVP.zoom` (and respect the new height scaling). Same pattern as side/top. |
+| 3 | 3 | Tip closure: replace with two flat triangles | Sonnet | medium | Localised to `buildLoft()`. Visible quality win, no UI changes. |
+| 4 | 4 | Remove ambient occlusion, simplify render modes (shaded + normals, both with grid) | Sonnet | medium | Pure deletion + small addition. Removes a lot of incidental complexity, makes future render-mode work easier. Do BEFORE the textured-surface mode. |
+| 5 | 5 | Reference image in cross-section view | Sonnet | low | `wireRefImage` already factored — just instantiate a third one. |
+| 6 | 6 | Reference-image positioning UX polish (lock-aspect, fit-to-hull) | Sonnet | low | Small additions next to existing ref-image controls. Bundle with #5. |
+| 7 | 7 | Deck line in loft follows control curve exactly (bug) | Opus | medium | Needs investigation: why does the lofted deck perimeter deviate from the green Bezier? Likely a sampling-resolution or interpolation mismatch. Small fix once root-caused. |
+| 8 | 8 | Scale gizmo: pivot at hull center, no translation drift | Opus | medium | Math correctness — apply scale around (cx, 0, cz) rather than world origin; subtract pivot, scale, add back, also scale knot/handle handle-lengths uniformly. Wrong approach causes regressions in other gizmo uses. |
+| 9 | 9 | Section aspect-ratio instability when dragging widest point | Opus | medium | Subtle: the `max(b)` factor in `SECTION_SCALE_N` creates a feedback loop — as the dragged point shrinks, scale shrinks, the visible position changes, and the user's drag offset interprets differently. Also fix the "no update when station moves along X" degenerate case. |
+| 10 | 10 | Click-to-add station in top/side view, auto-shape from existing geometry | Opus | medium | Needs to interpolate the lofted shape at an arbitrary X (use the existing `denseRows` pipeline), then convert back to (b, n) control points. Some design choices about how many points to keep. |
+| 11 | 11 | Body plan overlay on cross-section view (with bow/stern half controls + opacity) | Sonnet | medium | Composable feature; add behind ref-image / in front. Touches only `renderSectionView()` plus a small controls block. |
+| 12 | 12 | Textured surface render mode (checkerboard or matcap to expose curvature) | Opus | medium | Three.js material design choice. Best done after AO is removed (#4) so the render-mode picker has its final shape. |
+| 13 | 13 | Per-view interactive layer toggles (visibility + editability lock per layer per view) | Opus | high | Biggest UI refactor: every clickable element now consults a per-view per-layer enabled flag. Affects every drag handler, every render function. Do this once the smaller fixes have settled. |
+| 14 | 14 | Station spine line in top/side; uneditable center point in section | Sonnet | low | Trivial after #13 lands (depends on the "stations layer is active" trigger from #13). |
+| 15 | 15 | **Chines** (numbered chine indices on section points; chine edge loops in loft; visualisation in all views) | Opus | high | Largest architectural change: data-model addition, loft change, three new render layers. Do last so other items don't conflict and so the codebase is in its simplest state when we tackle it. Plan a design pass first (separate session, no code) before implementing. |
+| 16 | — | Side view aspect ratio may not match 3D mesh (vague) | — | — | Defer until user can reproduce concretely. Spending Opus on a vague spec is wasteful. |
+
+**Suggested session bundles** (each bundle = one Claude session, ordered top-to-bottom):
+
+1. **Session A — UI polish bundle (Sonnet, low):** items 1, 2, 5, 6. Touches CSS + small JS additions in one region. ~1 commit per item, 4 small commits.
+2. **Session B — Render-mode cleanup (Sonnet, medium):** items 3, 4. Both touch the Three.js / build-loft code; do them together so the AO removal exposes the final render-mode shape. 1–2 commits.
+3. **Session C — Bug-hunt bundle (Opus, medium):** items 7, 8, 9. Three subtle correctness issues. Opus is worth it — wrong approach on any of them costs more than the model tier. Investigate each, propose, then implement. 3 commits.
+4. **Session D — Body plan + station-add UX (mixed):** items 10 (Opus medium) and 11 (Sonnet medium). Item 10 does the geometry; 11 layers visualisation on top of the same geometry. 2 commits.
+5. **Session E — Textured render mode (Opus, medium):** item 12. Standalone. 1 commit.
+6. **Session F — Layer toggle architecture (Opus, high):** item 13 first as a design pass (no code), then implementation. Then item 14 as a tiny follow-up. 2–3 commits.
+7. **Session G — Chines (Opus, high):** item 15. Start with a design doc (no code), then implement in stages: data model → loft → visualisation. 3+ commits.
+
+**Budget guard**
+
+- Sessions A and B together should fit comfortably in one rate-limit window.
+- Sessions C, D, E should each fit in one window.
+- Sessions F and G are the expensive ones — give each its own fresh
+  rate-limit window. Don't start either when less than ~3 hours remain.
+
+---
+
 ## Pending (chunked, not yet implemented)
 
 *Confirmed items waiting to be picked up. Ordered roughly by priority.*
