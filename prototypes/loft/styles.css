@@ -431,7 +431,7 @@ main {
 #side-view .station-deck-top          { fill: #7c3aed; stroke: white; stroke-width: 1; pointer-events: none; }
 #side-view .station-deck-top.selected { fill: #5b21b6; }
 /* Shape knot (interior on-curve rocker knot, not a station) */
-#side-view .spine-anchor.shape-knot { fill: #f59e0b; stroke: white; stroke-width: 1.4; }
+#side-view .spine-anchor.shape-knot { fill: #2563eb; stroke: white; stroke-width: 1.4; }
 #side-view .loft-mesh-line         { fill: none; stroke: #9ca3af; stroke-width: 0.8; pointer-events: none; }
 /* Top view */
 #top-view { width: 100%; flex: 1; }
@@ -448,7 +448,7 @@ main {
 #top-view .station-hit            { stroke: transparent; stroke-width: 16; cursor: ns-resize; fill: none; }
 #top-view .station-label          { font-family: -apple-system, sans-serif; fill: #be185d; pointer-events: none; }
 #top-view .label                  { font-family: -apple-system, sans-serif; fill: #64748b; }
-#top-view .handle-line       { stroke: #64748b; stroke-width: 0.8; pointer-events: none; }
+#top-view .handle-line       { stroke: #64748b; stroke-width: 0.8; stroke-dasharray: 3 2; pointer-events: none; }
 #top-view .spine-anchor      { fill: #0891b2; stroke: white; stroke-width: 1.5; cursor: grab; }
 #top-view .spine-handle      { fill: #64748b; stroke: white; stroke-width: 1;   cursor: grab; }
 #top-view .spine-hit         { fill: transparent; cursor: grab; }

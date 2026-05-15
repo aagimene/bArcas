@@ -107,11 +107,6 @@ until it has been chunked, prioritized, and confirmed by the user.
   grid planes (the normals mode currently does not show grids). AO could be
   re-added from scratch later once the depth pass is fixed.
 
-- **Top-view Bezier handle lines should be dashed/dotted.** Currently solid;
-  should use the same dashed style as handle lines in the other views for
-  visual consistency.
-
-- **Keel control points should be blue, not yellow.**
 
 - **Tip closure flickering polygons.** The bow and stern closures show
   flickering/z-fighting polygons. Since the top and bottom tips share the
@@ -204,6 +199,8 @@ Needs design before coding:
 | Section widest b-coord normalized to beam line (hull always fills top-view silhouette) | beam-fill |
 | Control points and lines stay constant pixel size when zooming | fixed-dots |
 | Font sizes non-scaling; axis badges pinned to pane corners as static HTML SVGs | fixed-labels |
+| Rocker interior knots: amber → blue (#2563eb) | keel-blue |
+| Top-view Bezier handle lines: solid → dashed | keel-blue |
 | Scale gizmo on side/top/3D views (Y/X/Z axes, X updates length slider) | scale-gizmo, gizmo-fix |
 | Scale gizmo removed from cross-section view (meaningless in normalised b/n) | section-bezier |
 | Cross-section points → on-curve Bezier knots with angle/aftLen/foreLen handles (matches rocker / deck-line model) | section-bezier |
