@@ -73,7 +73,36 @@ const state = {
   spineSharpness: 0,
   sideRef: { url: null, worldX: -2.6, worldZ: 0.5, worldW: 5.2, worldH: 0.8, opacity: 0.3 },
   topRef:  { url: null, worldX: -2.6, worldY: -0.4, worldW: 5.2, worldH: 0.8, opacity: 0.3 },
+  // Persisted UI / render state — every UI control writes here so export
+  // captures the full session and import restores it. Defaults here drive the
+  // initial UI on a fresh load.
+  colors: { outside: '#ffffff', inside: '#ffc0cb' },
+  ao:     { enabled: true, kernelRadius: 0.35, minDistance: 0.0001, maxDistance: 0.6, contrast: 12.0, output: 0 },
+  keyLight: { az: 0.69, el: 0.89 },
+  viewports: {
+    side:    { zoom: 1, offX: 0, offY: 0 },
+    top:     { zoom: 1, offX: 0, offY: 0 },
+    section: { zoom: 1, offX: 0, offY: 0 },
+  },
+  layout: { colPct: 50, rowPct: 55, drawerHidden: false },
 };
+
+// Deep-merge `src` into `dst` in place. Objects are recursed (preserving
+// reference identity on `dst`); arrays and primitives are replaced wholesale.
+// Used by the JSON import so local aliases like sideVP === state.viewports.side
+// continue to point at the same nested object after re-loading.
+function deepAssign(dst, src) {
+  if (!src || typeof src !== 'object') return;
+  for (const k of Object.keys(src)) {
+    const sv = src[k];
+    const dv = dst[k];
+    if (sv && typeof sv === 'object' && !Array.isArray(sv) && dv && typeof dv === 'object' && !Array.isArray(dv)) {
+      deepAssign(dv, sv);
+    } else {
+      dst[k] = sv;
+    }
+  }
+}
 
 // ── Rocker spine: piecewise cubic Bézier with on-curve knots ─────────────
 //
@@ -698,7 +727,8 @@ scene.add(rimLight);
 // azimuth = horizontal angle, elevation = vertical angle (0=horizon, π/2=top).
 const KEY_LIGHT_DIST = 6.5;
 const KEY_LIGHT_DEFAULTS = { az: 0.69, el: 0.89 };
-const keyLightAngles = { ...KEY_LIGHT_DEFAULTS };
+// Alias into state so light orbit changes are persisted via JSON export.
+const keyLightAngles = state.keyLight;
 function applyKeyLightPosition() {
   const { az, el } = keyLightAngles;
   keyLight.position.set(
@@ -1103,15 +1133,16 @@ function deckNOf(st) {
   return st.points[st.points.length - 1].n;
 }
 
-// Side view: cached isotropic auto-fit. sideVP zoom/pan applied on top.
+// Side / top view zoom-pan state lives inside `state` so JSON export
+// captures the current view. The locals are aliases — same object reference.
 // sideFit is computed once (or when reset/resize); subsequent edits don't
 // shift the viewBox so anchored elements (ref image) don't drift on screen.
 let SIDE_SCALE = 100; // px/m for both X and Z
 let sideFit = null;   // { scale, baseCX, baseCY, paneW, paneH }
-const sideVP = { zoom: 1, offX: 0, offY: 0 };
+const sideVP = state.viewports.side;
 
 // Top view: an extra zoom + pan offset applied on top of the isotropic auto-fit.
-const topVP = { zoom: 1, offX: 0, offY: 0 };
+const topVP = state.viewports.top;
 let topFit = null; // { scale, baseCX, baseCY, paneW, paneH }
 
 // ── Top view (plan view, X-Y vertical orientation) ────────────────────────
@@ -1624,7 +1655,7 @@ function selectedStationObj() {
 
 // Section view zoom/pan: base viewBox is "-200 -210 400 295".
 const SECTION_VB = { minX: -200, minY: -210, W: 400, H: 295 };
-const sectionVP = { zoom: 1, offX: 0, offY: 0 };
+const sectionVP = state.viewports.section;
 function applySectionViewBox() {
   const cx = (SECTION_VB.minX + SECTION_VB.W/2) + sectionVP.offX;
   const cy = (SECTION_VB.minY + SECTION_VB.H/2) + sectionVP.offY;
@@ -1956,10 +1987,18 @@ spineRadiusEl.addEventListener('input', () => {
 // fragments); inside is the insideColor uniform injected into the shader.
 const colorOutEl = document.getElementById('color-out');
 const colorInEl  = document.getElementById('color-in');
-hullMaterial.color.set(colorOutEl.value);
-insideColorUniform.value.set(colorInEl.value);
-colorOutEl.addEventListener('input', () => hullMaterial.color.set(colorOutEl.value));
-colorInEl .addEventListener('input', () => insideColorUniform.value.set(colorInEl.value));
+function applyColors() {
+  hullMaterial.color.set(state.colors.outside);
+  insideColorUniform.value.set(state.colors.inside);
+}
+function syncColorInputsFromState() {
+  colorOutEl.value = state.colors.outside;
+  colorInEl.value  = state.colors.inside;
+}
+colorOutEl.addEventListener('input', () => { state.colors.outside = colorOutEl.value; applyColors(); });
+colorInEl .addEventListener('input', () => { state.colors.inside  = colorInEl.value;  applyColors(); });
+syncColorInputsFromState();
+applyColors();
 
 // ── Loft mesh overlay controls ────────────────────────────────────────────
 const showMeshEl = document.getElementById('show-mesh');
@@ -2038,37 +2077,46 @@ function syncAOLabels() {
 }
 
 function applyAO() {
-  ssaoPass.enabled      = aoEnabledEl.checked;
-  ssaoPass.kernelRadius = parseFloat(aoKrEl.value);
-  ssaoPass.minDistance  = parseFloat(aoMnEl.value);
-  ssaoPass.maxDistance  = parseFloat(aoMxEl.value);
-  const mode = parseInt(aoOutSel.value, 10);
-  ssaoPass.output       = aoOutputModes[mode] ?? aoOutputModes[0];
-
-  const contrast = parseFloat(aoCtEl.value);
-  aoContrastUniform.value = contrast;
-  // Boost the screen-space view of the raw mask only when SSAO-only or
-  // Blur output mode is active — otherwise the Default mode would get
-  // double-pow'd (blendMaterial already applies pow once).
-  aoVisBoostUniform.value = (mode === 1 || mode === 2) ? contrast : 1.0;
-
+  const ao = state.ao;
+  ssaoPass.enabled      = ao.enabled;
+  ssaoPass.kernelRadius = ao.kernelRadius;
+  ssaoPass.minDistance  = ao.minDistance;
+  ssaoPass.maxDistance  = ao.maxDistance;
+  ssaoPass.output       = aoOutputModes[ao.output] ?? aoOutputModes[0];
+  aoContrastUniform.value = ao.contrast;
+  aoVisBoostUniform.value = (ao.output === 1 || ao.output === 2) ? ao.contrast : 1.0;
   syncAOLabels();
 }
 
-[aoEnabledEl, aoKrEl, aoMnEl, aoMxEl, aoCtEl, aoOutSel].forEach(elx =>
-  elx.addEventListener('input', applyAO)
-);
+aoEnabledEl.addEventListener('input', () => { state.ao.enabled      = aoEnabledEl.checked;            applyAO(); });
+aoKrEl     .addEventListener('input', () => { state.ao.kernelRadius = parseFloat(aoKrEl.value);       applyAO(); });
+aoMnEl     .addEventListener('input', () => { state.ao.minDistance  = parseFloat(aoMnEl.value);       applyAO(); });
+aoMxEl     .addEventListener('input', () => { state.ao.maxDistance  = parseFloat(aoMxEl.value);       applyAO(); });
+aoCtEl     .addEventListener('input', () => { state.ao.contrast     = parseFloat(aoCtEl.value);       applyAO(); });
+aoOutSel   .addEventListener('input', () => { state.ao.output       = parseInt(aoOutSel.value, 10);   applyAO(); });
 
 aoResetBtn.addEventListener('click', () => {
-  aoEnabledEl.checked = AO_DEFAULTS.enabled;
-  aoKrEl.value        = AO_DEFAULTS.kernelRadius;
-  aoMnEl.value        = AO_DEFAULTS.minDistance;
-  aoMxEl.value        = AO_DEFAULTS.maxDistance;
-  aoCtEl.value        = AO_DEFAULTS.contrast;
-  aoOutSel.value      = String(AO_DEFAULTS.output);
+  state.ao.enabled      = AO_DEFAULTS.enabled;
+  state.ao.kernelRadius = AO_DEFAULTS.kernelRadius;
+  state.ao.minDistance  = AO_DEFAULTS.minDistance;
+  state.ao.maxDistance  = AO_DEFAULTS.maxDistance;
+  state.ao.contrast     = AO_DEFAULTS.contrast;
+  state.ao.output       = AO_DEFAULTS.output;
+  syncAOInputsFromState();
   applyAO();
 });
 
+function syncAOInputsFromState() {
+  aoEnabledEl.checked = state.ao.enabled;
+  aoKrEl.value        = state.ao.kernelRadius;
+  aoMnEl.value        = state.ao.minDistance;
+  aoMxEl.value        = state.ao.maxDistance;
+  aoCtEl.value        = state.ao.contrast;
+  aoOutSel.value      = String(state.ao.output);
+}
+
+// Initial: push state defaults into inputs, then apply.
+syncAOInputsFromState();
 applyAO();
 
 // ── Side-view drag handlers ──────────────────────────────────────────────
@@ -2651,27 +2699,35 @@ function wireRefImage(viewKey, fileId, opacityId, opacityOutId, clearId, renderF
 wireRefImage('sideRef', 'side-ref-file', 'side-ref-opacity', 'side-ref-opacity-out', 'side-ref-clear', renderSideView);
 wireRefImage('topRef',  'top-ref-file',  'top-ref-opacity',  'top-ref-opacity-out',  'top-ref-clear',  renderTopView);
 
-// Resizable view-pane dividers.
+// Resizable view-pane dividers. Pane percentages live in state.layout so a
+// JSON export captures the workspace shape.
+const mainEl = document.querySelector('main');
+function applyLayoutFromState() {
+  mainEl.style.setProperty('--col-pct', `${state.layout.colPct.toFixed(1)}%`);
+  mainEl.style.setProperty('--row-pct', `${state.layout.rowPct.toFixed(1)}%`);
+  const pane = document.querySelector('.pane-controls');
+  const btn  = document.getElementById('drawer-toggle');
+  pane.classList.toggle('hidden', !!state.layout.drawerHidden);
+  btn.textContent = state.layout.drawerHidden ? '◀' : '▶';
+}
 {
-  const main = document.querySelector('main');
   const initResizer = (el, axis) => {
     el.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
       e.preventDefault();
       el.setPointerCapture(e.pointerId);
       const onMove = (ev) => {
-        const rect = main.getBoundingClientRect();
+        const rect = mainEl.getBoundingClientRect();
         if (axis === 'v') {
-          const pct = Math.max(10, Math.min(90, ((ev.clientX - rect.left) / rect.width) * 100));
-          main.style.setProperty('--col-pct', `${pct.toFixed(1)}%`);
+          state.layout.colPct = Math.max(10, Math.min(90, ((ev.clientX - rect.left) / rect.width) * 100));
         } else {
-          const pct = Math.max(10, Math.min(90, ((ev.clientY - rect.top) / rect.height) * 100));
-          main.style.setProperty('--row-pct', `${pct.toFixed(1)}%`);
+          state.layout.rowPct = Math.max(10, Math.min(90, ((ev.clientY - rect.top) / rect.height) * 100));
         }
+        applyLayoutFromState();
         sideFit = null; topFit = null;
         renderSideView(); renderTopView();
         // Resize three.js canvas too (ResizeObserver should catch it, but force it).
-        const ev0 = new Event('resize'); window.dispatchEvent(ev0);
+        window.dispatchEvent(new Event('resize'));
       };
       const onUp = () => {
         el.removeEventListener('pointermove', onMove);
@@ -2689,11 +2745,10 @@ wireRefImage('topRef',  'top-ref-file',  'top-ref-opacity',  'top-ref-opacity-ou
 
 // Controls drawer toggle (chevron flips direction).
 {
-  const pane = document.querySelector('.pane-controls');
   const btn  = document.getElementById('drawer-toggle');
   btn.addEventListener('click', () => {
-    const isHidden = pane.classList.toggle('hidden');
-    btn.textContent = isHidden ? '◀' : '▶';
+    state.layout.drawerHidden = !state.layout.drawerHidden;
+    applyLayoutFromState();
   });
 }
 
@@ -2714,15 +2769,15 @@ document.getElementById('import-state').addEventListener('change', (e) => {
   reader.onload = (ev) => {
     try {
       const parsed = JSON.parse(ev.target.result);
-      // Shallow-merge top-level keys so we keep any new keys not in the file.
-      Object.assign(state, parsed);
+      // Deep-merge so nested objects (viewports, keyLight, ao, colors, refs)
+      // keep their identity — local aliases like sideVP/keyLightAngles must
+      // continue pointing at the same nested object after the import.
+      deepAssign(state, parsed);
       const n = listAllStations(state).length;
       if (state.selectedStation >= n) state.selectedStation = Math.max(0, n - 1);
-      // Sync UI controls that mirror state.
-      loftResEl.value  = state.loftRes;
-      xSubdivEl.value  = String(state.xSubdiv);
-      lengthEl.value   = state.length.toFixed(2);
-      lengthOut.textContent = fmtLength(state.length);
+      syncUIFromState();
+      // The auto-fit caches depend on hull bounds and may be stale.
+      sideFit = null; topFit = null;
       rebuildHull();
       renderStationList();
       renderSideView();
@@ -2736,6 +2791,40 @@ document.getElementById('import-state').addEventListener('change', (e) => {
   };
   reader.readAsText(file);
 });
+
+// Push every state field into the corresponding UI control and Three.js
+// object. Called once at init and again after JSON import so the visible
+// UI always matches `state`. Programmatic .value assignment doesn't fire
+// 'input'/'change' events — that's intentional, the work below is the
+// canonical source of truth.
+function syncUIFromState() {
+  // Sliders / dropdowns
+  lengthEl.value         = state.length.toFixed(2);
+  lengthOut.textContent  = fmtLength(state.length);
+  loftResEl.value        = state.loftRes;
+  xSubdivEl.value        = String(state.xSubdiv);
+  spineRadiusEl.value    = String(state.spineRadius);
+  spineRadiusOut.textContent = fmtR(state.spineRadius);
+  showMeshEl.checked     = state.showLoftMesh;
+  meshOpacityEl.value    = state.meshOpacity;
+  meshOpacityOut.textContent = state.meshOpacity.toFixed(0) + '%';
+  // Reference image opacity sliders + labels
+  document.getElementById('side-ref-opacity').value    = state.sideRef.opacity ?? 0.3;
+  document.getElementById('side-ref-opacity-out').textContent = Math.round((state.sideRef.opacity ?? 0.3) * 100) + '%';
+  document.getElementById('top-ref-opacity').value     = state.topRef.opacity  ?? 0.3;
+  document.getElementById('top-ref-opacity-out').textContent  = Math.round((state.topRef.opacity  ?? 0.3) * 100) + '%';
+  // Colors + AO push into inputs and Three.js
+  syncColorInputsFromState();
+  applyColors();
+  syncAOInputsFromState();
+  applyAO();
+  // Key light — already aliased into state, just re-apply.
+  applyKeyLightPosition();
+  // Pane resizer percentages + drawer state
+  applyLayoutFromState();
+  // Station label/count display
+  stationLabel.textContent = stationLabelFor(state.selectedStation);
+}
 
 // Click near rocker → insert on-curve knot; click near deck curve → insert handle.
 sideSvg.addEventListener('click', (e) => {
@@ -2996,8 +3085,10 @@ function nearestSegmentInsertIdx(points, clickB, clickN) {
 
 // ── Initial render ───────────────────────────────────────────────────────
 
-lengthOut.textContent = fmtLength(state.length);
-stationLabel.textContent = stationLabelFor(state.selectedStation);
+// Single source of truth: push state into every UI control and Three.js
+// uniform/material. Replaces the scattered "sync .value/.textContent = state.X"
+// calls that lived in this section before.
+syncUIFromState();
 renderStationList();
 
 // Defer first render one frame so the CSS grid has finished laying out and
