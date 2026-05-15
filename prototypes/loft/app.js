@@ -222,33 +222,66 @@ function sampleSpline(points, xKey, yKey, samplesPerSpan = 16) {
   return out;
 }
 
+// Fill in (angle, aftLen, foreLen) for any section knot that lacks them, so
+// older saved sections still load. Endpoint angles are fixed: keel heads
+// outward (+b) so angle=0; deck-tip heads back to the centerline so angle=π.
+// Interior knot angles are derived from neighbour chord direction; handle
+// lengths default to one-third of the adjacent segment length.
+function deriveSectionHandles(points) {
+  const np = points.length;
+  for (let i = 0; i < np; i++) {
+    const p = points[i];
+    if (p.angle != null && p.aftLen != null && p.foreLen != null) continue;
+    const prev = points[i - 1] || points[0];
+    const next = points[i + 1] || points[np - 1];
+    let angle;
+    if      (i === 0)        angle = 0;
+    else if (i === np - 1)   angle = Math.PI;
+    else                     angle = Math.atan2(next.n - prev.n, next.b - prev.b);
+    const segPrev = Math.hypot(p.b - prev.b, p.n - prev.n);
+    const segNext = Math.hypot(next.b - p.b, next.n - p.n);
+    p.angle   = angle;
+    p.aftLen  = (i === 0)        ? 0 : segPrev / 3;
+    p.foreLen = (i === np - 1)   ? 0 : segNext / 3;
+  }
+}
+
+// Handle endpoints for a section knot in (b, n) space. Mirrors knotHandles()
+// for the rocker — same on-curve-knot + tangent-angle + aft/fore-length model.
+function sectionKnotHandles(k) {
+  const ca = Math.cos(k.angle), sa = Math.sin(k.angle);
+  return {
+    aft:  { b: k.b - ca * k.aftLen,  n: k.n - sa * k.aftLen  },
+    fore: { b: k.b + ca * k.foreLen, n: k.n + sa * k.foreLen },
+  };
+}
+
 // Sample a starboard-only cross-section to N transverse points by arc-length
-// equal spacing. Uses Catmull-Rom → cubic Bezier conversion so each segment
-// is a true Bezier curve through the control points (local control,
-// C1 smooth, more predictable than natural cubic).
+// equal spacing. Curve is a piecewise cubic Bezier through on-curve knots
+// with C1-continuous tangent handles (angle/aftLen/foreLen) — same model as
+// the rocker and deck-line, so authoring feels consistent across all views.
 function sampleSection(section, N) {
   const pts = section;
   const np  = pts.length;
   if (np < 2) return Array.from({length: N}, () => ({b: 0, n: 0}));
 
-  // Build a dense polyline from piecewise cubic Beziers (Catmull-Rom tension=0.5).
+  // Defensive: ensure handles exist (older JSON / fresh-inserted knots).
+  deriveSectionHandles(pts);
+
+  // Build a dense polyline from piecewise cubic Beziers.
   const dense = [];
-  const tension = 0.5;
   for (let i = 0; i < np - 1; i++) {
-    const p0 = pts[Math.max(0,    i - 1)];
-    const p1 = pts[i];
-    const p2 = pts[i + 1];
-    const p3 = pts[Math.min(np-1, i + 2)];
-    const c1b = p1.b + (p2.b - p0.b) * tension / 3;
-    const c1n = p1.n + (p2.n - p0.n) * tension / 3;
-    const c2b = p2.b - (p3.b - p1.b) * tension / 3;
-    const c2n = p2.n - (p3.n - p1.n) * tension / 3;
+    const k0 = pts[i], k1 = pts[i + 1];
+    const h0 = sectionKnotHandles(k0);
+    const h1 = sectionKnotHandles(k1);
+    const c1 = h0.fore;
+    const c2 = h1.aft;
     const steps = 24;
     for (let s = 0; s < steps; s++) {
       const t = s / steps, u = 1 - t;
       dense.push({
-        b: u*u*u*p1.b + 3*u*u*t*c1b + 3*u*t*t*c2b + t*t*t*p2.b,
-        n: u*u*u*p1.n + 3*u*u*t*c1n + 3*u*t*t*c2n + t*t*t*p2.n,
+        b: u*u*u*k0.b + 3*u*u*t*c1.b + 3*u*t*t*c2.b + t*t*t*k1.b,
+        n: u*u*u*k0.n + 3*u*u*t*c1.n + 3*u*t*t*c2.n + t*t*t*k1.n,
       });
     }
   }
@@ -1646,7 +1679,41 @@ function renderSectionView() {
   sectionSvg.appendChild(el('path', { class: 'section-curve',  d: stbdPath }));
   sectionSvg.appendChild(el('path', { class: 'section-mirror', d: portPath }));
 
-  // Control points. Keel (index 0) and deck-end (last) are locked.
+  // Tangent handles (drawn first so they sit underneath the knot circles).
+  deriveSectionHandles(station.points);
+  station.points.forEach((p, i) => {
+    const h = sectionKnotHandles(p);
+    if (i > 0) {
+      const ax = bOf(h.aft.b), ay = nOf(h.aft.n);
+      sectionSvg.appendChild(el('line', {
+        x1: bOf(p.b), y1: nOf(p.n), x2: ax, y2: ay, class: 'section-handle-line',
+      }));
+      sectionSvg.appendChild(el('circle', {
+        cx: ax, cy: ay, r: 14, class: 'handle-hit',
+        'data-drag': 'ctrl-aft', 'data-idx': String(i),
+      }));
+      sectionSvg.appendChild(el('circle', {
+        cx: ax, cy: ay, r: 5, class: 'section-handle',
+        'data-drag': 'ctrl-aft', 'data-idx': String(i),
+      }));
+    }
+    if (i < lastIdx) {
+      const fx = bOf(h.fore.b), fy = nOf(h.fore.n);
+      sectionSvg.appendChild(el('line', {
+        x1: bOf(p.b), y1: nOf(p.n), x2: fx, y2: fy, class: 'section-handle-line',
+      }));
+      sectionSvg.appendChild(el('circle', {
+        cx: fx, cy: fy, r: 14, class: 'handle-hit',
+        'data-drag': 'ctrl-fore', 'data-idx': String(i),
+      }));
+      sectionSvg.appendChild(el('circle', {
+        cx: fx, cy: fy, r: 5, class: 'section-handle',
+        'data-drag': 'ctrl-fore', 'data-idx': String(i),
+      }));
+    }
+  });
+
+  // On-curve knots. Keel (index 0) and deck-end (last) are locked at (0, *).
   station.points.forEach((p, i) => {
     const isKeel       = i === 0;
     const isDeck       = i === lastIdx;
@@ -1677,16 +1744,6 @@ function renderSectionView() {
     sectionSvg.appendChild(el('line', { x1: ax, y1: ay, x2: ax,     y2: ay - L, class: 'axis-arrow' }));
     sectionSvg.appendChild(el('text', { x: ax + L + 3, y: ay + 7,     class: 'axis-label' }, '+Y'));
     sectionSvg.appendChild(el('text', { x: ax - 3,     y: ay - L - 3, class: 'axis-label', 'text-anchor': 'start' }, '+Z'));
-  }
-
-  // Scale gizmo — Y (beam) and Z (height) axes in normalised section space.
-  {
-    const gcx = bOf(0.5);
-    const gcy = nOf(0.5);
-    appendScaleGizmo2D(sectionSvg, gcx, gcy, sectionVP.zoom, [
-      { axis: 'Y', svgDirX:  1, svgDirY:  0, screenDirX:  1, screenDirY:  0, color: '#0891b2' },
-      { axis: 'Z', svgDirX:  0, svgDirY: -1, screenDirX:  0, screenDirY: -1, color: '#16a34a' },
-    ]);
   }
 }
 
@@ -2354,7 +2411,8 @@ function attachScaleGizmoPointer(svg) {
 
 attachScaleGizmoPointer(sideSvg);
 attachScaleGizmoPointer(topSvg);
-attachScaleGizmoPointer(sectionSvg);
+// Section view intentionally has no scale gizmo: scaling is meaningless in
+// normalised (b, n) section space — Y/Z scaling lives on top/side/3D views.
 
 // ── Side-view drag/click/delete ──────────────────────────────────────────
 
@@ -2769,7 +2827,12 @@ sectionSvg.addEventListener('pointerdown', (e) => {
   const target = e.target.closest('[data-drag]');
   if (!target) return;
   e.preventDefault();
-  sectionDrag = { idx: +target.dataset.idx, pointerId: e.pointerId, moved: false };
+  sectionDrag = {
+    kind: target.dataset.drag,
+    idx: +target.dataset.idx,
+    pointerId: e.pointerId,
+    moved: false,
+  };
   sectionSvg.setPointerCapture(e.pointerId);
 });
 
@@ -2780,22 +2843,36 @@ sectionSvg.addEventListener('pointermove', (e) => {
   const station = sel.ref;
   const i       = sectionDrag.idx;
   const lastIdx = station.points.length - 1;
-  if (i === 0 || i === lastIdx) return; // keel and deck-end both locked
-  const isCenterline = i === lastIdx;   // (never true now, kept for safety)
   const { x, y } = svgToLocal(sectionSvg, e);
+  const b = x / SECTION_SCALE_B;
   const n = -y / SECTION_SCALE_N;
-  if (isCenterline) {
-    station.points[i].b = 0;
+
+  if (sectionDrag.kind === 'ctrl') {
+    // Move on-curve knot. Keel (idx 0) and deck-end (last) are locked.
+    if (i === 0 || i === lastIdx) return;
+    station.points[i].b = Math.max(0, b);
     station.points[i].n = n;
+  } else if (sectionDrag.kind === 'ctrl-fore') {
+    // Drag outgoing handle: updates angle (shared) + foreLen; aftLen stays.
+    const k = station.points[i];
+    if (!k) return;
+    const db = b - k.b, dn = n - k.n;
+    const len = Math.hypot(db, dn);
+    if (len > 0.005) { k.angle = Math.atan2(dn, db); k.foreLen = len; }
+  } else if (sectionDrag.kind === 'ctrl-aft') {
+    // Drag incoming handle: updates angle (shared, flipped) + aftLen.
+    const k = station.points[i];
+    if (!k) return;
+    const db = b - k.b, dn = n - k.n;
+    const len = Math.hypot(db, dn);
+    if (len > 0.005) { k.angle = Math.atan2(-dn, -db); k.aftLen = len; }
   } else {
-    station.points[i].b = Math.max(0, x / SECTION_SCALE_B);
-    station.points[i].n = n;
+    return;
   }
   sectionDrag.moved = true;
   renderSectionView();
   rebuildHull();
   renderSideView();
-
   renderTopView();
 });
 
@@ -2837,7 +2914,7 @@ sectionSvg.addEventListener('click', (e) => {
 // fully protected. Sections must keep at least 3 points so the natural
 // cubic spline still resolves.
 sectionSvg.addEventListener('contextmenu', (e) => {
-  const target = e.target.closest('[data-drag]');
+  const target = e.target.closest('[data-drag="ctrl"]');
   if (!target) return;
   e.preventDefault();
   const i = +target.dataset.idx;

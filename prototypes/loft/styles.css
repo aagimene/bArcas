@@ -508,6 +508,16 @@ main {
 }
 #section-view .ctrl-hit               { fill: transparent; cursor: grab; }
 
+#section-view .section-handle-line {
+  stroke: #2563eb; stroke-width: 1.4; stroke-dasharray: 4 3;
+  pointer-events: none; opacity: 0.7;
+}
+#section-view .section-handle {
+  fill: #2563eb; stroke: white; stroke-width: 1.4; cursor: grab;
+}
+#section-view .section-handle:active { cursor: grabbing; }
+#section-view .handle-hit { fill: transparent; cursor: grab; }
+
 /* ── Coordinate-system badge (used in side, top, section panes) ────── */
 /* Side/top badges are HTML-overlaid fixed SVGs — not in the main SVG. */
 .axis-badge {
