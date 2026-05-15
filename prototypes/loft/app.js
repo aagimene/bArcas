@@ -1642,10 +1642,13 @@ function listAllStations(state) {
     .map((st, i) => ({ kind: 'interior', stationIdx: i, ref: st, label: String(i + 1) }));
 }
 
-// Section-view scale constants — also used by drag-handler coordinate math.
+// Section-view scale constants. SECTION_SCALE_B (b axis = beam) is fixed;
+// SECTION_SCALE_N (n axis = height) is recomputed on every renderSectionView()
+// to give the visible section the same H/B aspect ratio as the actual hull
+// at the selected station's longitudinal position.
 const SECTION_SCALE   = 600; // px/m  (reference, not used directly for b or n)
-const SECTION_SCALE_N = SECTION_SCALE * DEFAULT_DECK_N;    // px/unit (n, normalised)
-const SECTION_SCALE_B = SECTION_SCALE * DEFAULT_HALF_BEAM; // px/unit (b, normalised)
+let   SECTION_SCALE_N = SECTION_SCALE * DEFAULT_DECK_N;    // px/unit (n, dynamic)
+const SECTION_SCALE_B = SECTION_SCALE * DEFAULT_HALF_BEAM; // px/unit (b, fixed)
 
 // Look up the currently selected station object (interior or sheer).
 function selectedStationObj() {
@@ -1653,26 +1656,31 @@ function selectedStationObj() {
   return unified[state.selectedStation] || null;
 }
 
-// Section view zoom/pan: base viewBox is "-200 -210 400 295".
-const SECTION_VB = { minX: -200, minY: -210, W: 400, H: 295 };
+// Section view viewBox is computed dynamically from SECTION_SCALE_N so the
+// deck (n=1) and keel (n=0) reference lines stay visible no matter how tall
+// or short the live aspect makes the section.
+const SECTION_VB_PAD_TOP = 30;   // pixel headroom above the deck
+const SECTION_VB_PAD_BOT = 85;   // pixel room below the keel for the badge / hint
+const SECTION_VB_W       = 400;  // fixed pane width in viewBox pixels
+const SECTION_VB_MIN_X   = -200;
 const sectionVP = state.viewports.section;
 function applySectionViewBox() {
-  const cx = (SECTION_VB.minX + SECTION_VB.W/2) + sectionVP.offX;
-  const cy = (SECTION_VB.minY + SECTION_VB.H/2) + sectionVP.offY;
-  const zW = SECTION_VB.W / sectionVP.zoom;
-  const zH = SECTION_VB.H / sectionVP.zoom;
+  const baseH    = SECTION_SCALE_N + SECTION_VB_PAD_TOP + SECTION_VB_PAD_BOT;
+  const baseMinY = -SECTION_SCALE_N - SECTION_VB_PAD_TOP;
+  const cx = (SECTION_VB_MIN_X + SECTION_VB_W/2) + sectionVP.offX;
+  const cy = (baseMinY + baseH/2) + sectionVP.offY;
+  const zW = SECTION_VB_W / sectionVP.zoom;
+  const zH = baseH        / sectionVP.zoom;
   sectionSvg.setAttribute('viewBox',
     `${(cx - zW/2).toFixed(1)} ${(cy - zH/2).toFixed(1)} ${zW.toFixed(1)} ${zH.toFixed(1)}`);
 }
 
 function renderSectionView() {
   sectionSvg.innerHTML = '';
-  applySectionViewBox();
-  const bOf = (b) => b * SECTION_SCALE_B;
-  const nOf = (n) => -n * SECTION_SCALE_N;
 
   const sel = selectedStationObj();
   if (!sel) {
+    applySectionViewBox();
     sectionSvg.appendChild(el('text', {
       x: 0, y: 0, class: 'label', 'text-anchor': 'middle',
     }, 'no station selected'));
@@ -1681,11 +1689,30 @@ function renderSectionView() {
   const station = sel.ref;
   const lastIdx = station.points.length - 1;
 
-  // Centerline (b = 0).
+  // Live aspect: use the actual half-beam (B) and height (H) at this station's
+  // longitudinal position so 1 metre on the b axis renders the same number of
+  // pixels as 1 metre on the n axis. As the user drags the beam line or the
+  // deck/keel knots, the section's apparent height updates in real time.
+  {
+    const spS = sampledSpine(state.spine.knots,   64);
+    const dkS = sampledSpine(state.deckLine.knots, 64);
+    const xAt = spineAt(spS, station.s).p.x;
+    const Hm  = Math.max(0.005, spineAt(dkS, station.s).p.z - spineAt(spS, station.s).p.z);
+    const Bm  = Math.max(0.005, beamEvalAt(sampledBeamLine(state), xAt));
+    SECTION_SCALE_N = Math.max(40, Math.min(900, SECTION_SCALE_B * (Hm / Bm)));
+  }
+  applySectionViewBox();
+
+  const bOf = (b) => b * SECTION_SCALE_B;
+  const nOf = (n) => -n * SECTION_SCALE_N;
+
+  // Centerline (b = 0). Spans the full vertical viewBox extent.
+  const clTop = -SECTION_SCALE_N - SECTION_VB_PAD_TOP + 5;
+  const clBot =  SECTION_VB_PAD_BOT - 5;
   sectionSvg.appendChild(el('line', {
-    x1: 0, y1: -205, x2: 0, y2: 85, class: 'axis',
+    x1: 0, y1: clTop, x2: 0, y2: clBot, class: 'axis',
   }));
-  sectionSvg.appendChild(el('text', { x: 5, y: -192, class: 'label' }, 'CL'));
+  sectionSvg.appendChild(el('text', { x: 5, y: clTop + 13, class: 'label' }, 'CL'));
 
   // Keel reference (n = 0).
   sectionSvg.appendChild(el('line', {
@@ -1764,13 +1791,14 @@ function renderSectionView() {
 
   if (station.points.length <= 5) {
     sectionSvg.appendChild(el('text', {
-      x: 0, y: 72, class: 'label', 'text-anchor': 'middle',
+      x: 0, y: SECTION_VB_PAD_BOT - 13, class: 'label', 'text-anchor': 'middle',
     }, 'click · right-click to delete'));
   }
 
   // Coordinate-system badge (Y-Z plane, looking forward toward bow).
+  // Pinned to the bottom-left of the dynamic viewBox.
   {
-    const ax = -193, ay = 80, L = 22;
+    const ax = -193, ay = SECTION_VB_PAD_BOT - 5, L = 22;
     sectionSvg.appendChild(el('line', { x1: ax, y1: ay, x2: ax + L, y2: ay,     class: 'axis-arrow' }));
     sectionSvg.appendChild(el('line', { x1: ax, y1: ay, x2: ax,     y2: ay - L, class: 'axis-arrow' }));
     sectionSvg.appendChild(el('text', { x: ax + L + 3, y: ay + 7,     class: 'axis-label' }, '+Y'));
@@ -1951,6 +1979,7 @@ lengthEl.addEventListener('input', () => {
   rebuildHull();
   renderSideView();
   renderTopView();
+  renderSectionView();
 });
 
 loftResEl.addEventListener('change', () => {
@@ -2274,6 +2303,10 @@ topSvg.addEventListener('pointermove', (e) => {
   rebuildHull();
   renderSideView();
   renderTopView();
+  // Beam-line and station drags shift the live H/B aspect at the selected
+  // station — keep the cross-section view in sync so its apparent height
+  // tracks the new beam width in real time.
+  renderSectionView();
 });
 
 topSvg.addEventListener('pointerup',     () => { topDrag = null; });
@@ -2353,6 +2386,7 @@ topSvg.addEventListener('click', (e) => {
       { x: wx, y: Math.max(0.01, Math.abs(wy)), hdx: half * 0.2, hdy: 0 });
     rebuildHull();
     renderTopView();
+    renderSectionView();
     return;
   }
 
@@ -2368,7 +2402,7 @@ function tryTopDelete(e) {
     const pk = sorted[+peak.dataset.idx];
     const pi = state.beamLine.peaks.indexOf(pk);
     if (pi >= 0) state.beamLine.peaks.splice(pi, 1);
-    rebuildHull(); renderTopView();
+    rebuildHull(); renderTopView(); renderSectionView();
     return;
   }
   const stationT = e.target.closest('[data-drag="station"]');
@@ -2583,6 +2617,9 @@ sideSvg.addEventListener('pointermove', (e) => {
     st.s = Math.max(lo, Math.min(hi, s));
     renderStationList(); rebuildHull(); renderSideView(); renderTopView();
   }
+  // Section view depends on the live H/B aspect at the selected station —
+  // re-render so the cross-section's apparent height tracks Z/beam edits.
+  renderSectionView();
 });
 
 function endDrag(e) {
@@ -2873,10 +2910,10 @@ sideSvg.addEventListener('click', (e) => {
   const THRESH = 0.12;
   if (rDist <= THRESH && rDist <= dDist) {
     insertKnot(state.spine.knots, rSeg, rT);
-    rebuildHull(); renderSideView(); renderTopView();
+    rebuildHull(); renderSideView(); renderTopView(); renderSectionView();
   } else if (dDist <= THRESH && dDist < rDist) {
     insertKnot(state.deckLine.knots, dSeg, dT);
-    rebuildHull(); renderSideView();
+    rebuildHull(); renderSideView(); renderSectionView();
   }
 });
 
@@ -2890,13 +2927,13 @@ function trySideDelete(e) {
     if (idx === 0 || idx === knots.length - 1) return;
     e.preventDefault();
     knots.splice(idx, 1);
-    rebuildHull(); renderSideView(); renderTopView();
+    rebuildHull(); renderSideView(); renderTopView(); renderSectionView();
   } else if (t.dataset.drag === 'deck-knot') {
     const knots = state.deckLine.knots;
     if (idx === 0 || idx === knots.length - 1) return;
     e.preventDefault();
     knots.splice(idx, 1);
-    rebuildHull(); renderSideView();
+    rebuildHull(); renderSideView(); renderSectionView();
   }
 }
 sideSvg.addEventListener('contextmenu', trySideDelete);
