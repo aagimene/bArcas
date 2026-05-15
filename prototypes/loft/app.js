@@ -905,6 +905,12 @@ const resizeObserver = new ResizeObserver(() => {
 });
 resizeObserver.observe(threeHost);
 
+// SVG namespace — declared early because the 3D gizmo overlay (below) and
+// the el() helper (further down) both use it. Must precede any synchronous
+// call to updateThreeGizmo() (animate() invokes it on its first synchronous
+// pass).
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
 // ── 3D scale gizmo overlay ────────────────────────────────────────────────
 //
 // A small SVG pinned to the bottom-left of the 3D pane. Axes are projected
@@ -1045,7 +1051,7 @@ animate();
 
 // ── SVG side view ────────────────────────────────────────────────────────
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
+// SVG_NS declared above (before 3D gizmo overlay).
 const el = (tag, attrs = {}, content) => {
   const e = document.createElementNS(SVG_NS, tag);
   for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
