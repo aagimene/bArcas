@@ -77,8 +77,10 @@ main {
 .pane-top      { grid-area: top; }
 .pane-3d       { grid-area: three; }
 /* Controls drawer — anchored to right edge of viewport, slides in/out.
-   A single chevron handle on its left edge toggles the drawer. */
-.pane-controls {
+   A single chevron handle on its left edge toggles the drawer.
+   Uses .pane.pane-controls compound selector so it wins over the generic
+   `.pane { position: relative }` declared later in this file. */
+.pane.pane-controls {
   position: fixed;
   top: 0;
   bottom: 0;
@@ -88,11 +90,11 @@ main {
   border-radius: 6px 0 0 6px;
   border-right: none;
   box-shadow: -4px 0 16px rgba(0,0,0,0.12);
-  overflow: hidden;
+  overflow: visible; /* drawer-toggle sticks out on the left */
   transition: transform 0.2s ease;
 }
-.pane-controls.hidden { transform: translateX(100%); }
-.pane-controls .controls { overflow-y: auto; flex: 1; padding-right: 4px; }
+.pane.pane-controls.hidden { transform: translateX(100%); }
+.pane.pane-controls .controls { overflow-y: auto; flex: 1; padding-right: 4px; min-height: 0; }
 .drawer-toggle {
   position: absolute;
   top: 50%;
