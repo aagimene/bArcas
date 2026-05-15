@@ -1690,16 +1690,21 @@ function renderSectionView() {
   const lastIdx = station.points.length - 1;
 
   // Live aspect: use the actual half-beam (B) and height (H) at this station's
-  // longitudinal position so 1 metre on the b axis renders the same number of
-  // pixels as 1 metre on the n axis. As the user drags the beam line or the
-  // deck/keel knots, the section's apparent height updates in real time.
+  // longitudinal position so the displayed cross-section always matches the
+  // real H/halfB ratio. The b axis stays at b * SECTION_SCALE_B (so the
+  // editor's width visibly tracks the section's max-b — as the loft's
+  // auto-stretch maps that point to halfB, max-b is the section's effective
+  // scale relative to halfB). To keep the display's aspect correct as max-b
+  // changes, SECTION_SCALE_N picks up the same max-b factor — the section
+  // view shrinks/grows uniformly while H/halfB stays the apparent aspect.
   {
     const spS = sampledSpine(state.spine.knots,   64);
     const dkS = sampledSpine(state.deckLine.knots, 64);
     const xAt = spineAt(spS, station.s).p.x;
     const Hm  = Math.max(0.005, spineAt(dkS, station.s).p.z - spineAt(spS, station.s).p.z);
     const Bm  = Math.max(0.005, beamEvalAt(sampledBeamLine(state), xAt));
-    SECTION_SCALE_N = Math.max(40, Math.min(900, SECTION_SCALE_B * (Hm / Bm)));
+    const maxB = Math.max(1e-9, ...station.points.map(p => p.b));
+    SECTION_SCALE_N = Math.max(40, Math.min(900, SECTION_SCALE_B * (Hm / Bm) * maxB));
   }
   applySectionViewBox();
 
