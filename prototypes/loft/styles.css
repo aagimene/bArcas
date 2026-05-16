@@ -773,3 +773,23 @@ main {
 [data-layer-gizmo="off"] [data-scale-axis] {
   pointer-events: none;
 }
+
+/* ── Station-add line: longitudinal centerline you can click to add a station ── */
+#side-view .station-add-line,
+#top-view  .station-add-line {
+  stroke: #c4b5fd;
+  stroke-width: 1;
+  stroke-dasharray: 6 4;
+  pointer-events: none;
+  opacity: 0.7;
+}
+#side-view .station-add-hit,
+#top-view  .station-add-hit {
+  stroke: transparent;
+  stroke-width: 14;
+  cursor: copy;
+}
+#side-view .station-add-hit:hover,
+#top-view  .station-add-hit:hover {
+  stroke: rgba(124, 58, 237, 0.18);
+}

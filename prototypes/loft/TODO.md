@@ -41,13 +41,10 @@ until it has been chunked, prioritized, and confirmed by the user.
   cross-section shape of the existing lofted geometry at that point, so the
   hull shape does not change at all upon insertion.
 
-- **Drawing new stations from the top or side view when the station layer is
-  active.** When the stations layer is active in the top or side view, a
-  "station spine line" — a vertical or longitudinal line running through the
-  center of the loft — should be visible and clickable to insert a new
-  station at that position (same behavior as the desired click-to-add
-  station, described above). The same center line should appear in the
-  cross-section view as a non-editable reference point (center of loft).
+- **Section view: uneditable center-loft marker.** The companion to the
+  station-add line — show a small dot/cross in the cross-section view at
+  the centerline that represents the "where the loft passes through the
+  middle" reference. Non-editable. (Side/top spine lines are done.)
 
 
 - **Side view aspect ratio may not always match the shaded 3D mesh.** Under
@@ -84,8 +81,7 @@ without burning the 5-hour rate-limit on a single big task.*
 
 | # | Order | Item (short) | Model | Effort | Why this rank |
 |---|-------|--------------|-------|--------|---------------|
-| 10 | 3 | Click-to-add station in top/side view, auto-shape from existing geometry | Opus | medium | Needs to interpolate the lofted shape at an arbitrary X (use the existing `denseRows` pipeline), then convert back to (b, n) control points. Some design choices about how many points to keep. |
-| 14 | 5 | Station spine line in top/side; uneditable center point in section | Sonnet | low | Trivial after #13 lands (depends on the "stations layer is active" trigger from #13). |
+| 14b | 5 | Section view: uneditable centre-of-loft marker (companion to side/top station spine line) | Sonnet | low | Tiny SVG addition in renderSectionView; non-interactive marker at the centerline of the section. |
 | 15 | 6 | **Chines** (numbered chine indices on section points; chine edge loops in loft; visualisation in all views) | Opus | high | Largest architectural change: data-model addition, loft change, three new render layers. Do last so other items don't conflict and so the codebase is in its simplest state when we tackle it. Plan a design pass first (separate session, no code) before implementing. |
 | 16 | — | Side view aspect ratio may not match 3D mesh (vague) | — | — | Defer until user can reproduce concretely. Spending Opus on a vague spec is wasteful. |
 
@@ -201,6 +197,7 @@ Needs design before coding:
 | Textured render modes for curvature: Matcap (procedural sphere texture, base + highlight colour pickers) and Checker (world-space cubic checker via shader injection, configurable size + 2 colours) | matcap-checker |
 | Scale gizmo pivots at hull centre (X-mid / Z-mid); anisotropic correction on knot angles + handle lengths so a one-axis scale stretches only that axis | gizmo-center |
 | Per-view layer toggles (≡ chip per pane → popover with coloured dots + checkboxes): side {keel/deck/stations/refImage/gizmo}, top {beam/stations/refImage/gizmo}, section {controls/refImage}.  CSS-driven grey-out + pointer-events lock via [class*] selectors keyed off data-layer-* attrs; click-to-add suppressed via state check.  Bold consistent colours: blue=keel, green=deck, teal=beam, purple=stations, neutral=refImage, amber=gizmo, dark=section curve.  Persisted via JSON. | layer-toggles |
+| Station-add line in side + top views — dashed light-purple longitudinal centerline; click anywhere on it to insert a station with shape interpolated from the current loft (sectionAtS).  Loft drift on insertion < 0.04 SVG px in tests.  Auto-greyed/locked when stations layer is off. | station-add-line |
 | Scale gizmo on side/top/3D views (Y/X/Z axes, X updates length slider) | scale-gizmo, gizmo-fix |
 | Scale gizmo removed from cross-section view (meaningless in normalised b/n) | section-bezier |
 | Cross-section points → on-curve Bezier knots with angle/aftLen/foreLen handles (matches rocker / deck-line model) | section-bezier |

@@ -1260,6 +1260,19 @@ function renderTopView() {
     topSvg.appendChild(el('circle', { cx, cy, r: 5/tf,  class: 'spine-anchor', 'data-drag': dragAnchor, 'data-idx': nd.id }));
   });
 
+  // ── Station-add line: longitudinal centerline (world Y = 0). Click → add ──
+  {
+    const x1 = 0, x2 = 0;
+    const y1 = yOfT(sternKnot.x), y2 = yOfT(bowKnot.x);
+    topSvg.appendChild(el('line', {
+      x1, y1, x2, y2, class: 'station-add-line',
+    }));
+    topSvg.appendChild(el('line', {
+      x1, y1, x2, y2, class: 'station-add-hit',
+      'data-drag-action': 'add-station',
+    }));
+  }
+
   // ── Station marks ────────────────────────────────────────────────────
   const spSampled = sampledSpine(state.spine.knots, 64);
   const sortedStTop = [...state.stations].sort((a, b) => a.s - b.s);
@@ -1517,6 +1530,28 @@ function renderSideView() {
     if (ki === state.spine.knots.length-1)
       sideSvg.appendChild(el('text', { x: xOf(k.x), y: yOf(0) + 22/sf, class: 'label', 'text-anchor': 'middle', 'font-size': 9/sf }, 'bow'));
   });
+
+  // ── Station-add line: longitudinal centerline through the loft ──────
+  // Visible when the stations layer is active.  Click → insert a new
+  // station at that X with section shape interpolated from the current
+  // loft (so the lofted surface is unchanged at the moment of insertion).
+  {
+    const sp = state.spine.knots;
+    const stX = sp[0].x, bwX = sp[sp.length-1].x;
+    const dkS_ = sampledSpine(state.deckLine.knots, 32);
+    // Midline z = average of keel z and deck z along the length.
+    const midZ = (sp.reduce((a,k) => a + k.z, 0) / sp.length
+                + state.deckLine.knots.reduce((a,k) => a + k.z, 0) / state.deckLine.knots.length) / 2;
+    void dkS_; // silence unused
+    const x1 = xOf(stX), x2 = xOf(bwX), y = yOf(midZ);
+    sideSvg.appendChild(el('line', {
+      x1, y1: y, x2, y2: y, class: 'station-add-line',
+    }));
+    sideSvg.appendChild(el('line', {
+      x1, y1: y, x2, y2: y, class: 'station-add-hit',
+      'data-drag-action': 'add-station',
+    }));
+  }
 
   // ── Stations: keel (bottom) + deck (top) + chord line ──────────────
   const sortedStSide = [...state.stations].sort((a, b) => a.s - b.s);
@@ -1902,23 +1937,24 @@ const MAX_SHEER_STATIONS_PER_END = 5;
 // + add station: contextual based on the currently selected entry.
 //   - interior selected: add a new interior station at the largest rocker gap
 //   - sheer selected:    add a new sheer station on the same end at the largest sheer gap
-function addStation() {
-  if (state.stations.length >= MAX_INTERIOR) return;
-  // Insert at the midpoint of the largest gap in s-space.
-  const sortedSs = [0, ...state.stations.map(st => st.s).sort((a, b) => a - b), 1];
-  let maxGap = 0, gapStart = 0;
-  for (let i = 0; i < sortedSs.length - 1; i++) {
-    const g = sortedSs[i + 1] - sortedSs[i];
-    if (g > maxGap) { maxGap = g; gapStart = sortedSs[i]; }
+// Insert a station at arc-length fraction s ∈ (0, 1).  Shape is seeded from
+// sectionAtS() so the loft is unchanged at the moment of insertion (modulo
+// the small re-interpolation drift from the new station appearing in the
+// b/n spline base).  Returns true if inserted, false if too close to a tip
+// or an existing station.
+function addStationAtS(s) {
+  if (state.stations.length >= MAX_INTERIOR) return false;
+  if (s < 0.02 || s > 0.98) return false;
+  const minGap = 0.015;
+  for (const st of state.stations) {
+    if (Math.abs(st.s - s) < minGap) return false;
   }
-  const newS = gapStart + maxGap / 2;
-  const points = sectionAtS(state, newS, 7);
+  const points = sectionAtS(state, s, 7);
   state.stations.sort((a, b) => a.s - b.s);
-  let insertIdx = state.stations.findIndex(st => st.s > newS);
+  let insertIdx = state.stations.findIndex(st => st.s > s);
   if (insertIdx === -1) insertIdx = state.stations.length;
-  state.stations.splice(insertIdx, 0, { s: newS, points });
+  state.stations.splice(insertIdx, 0, { s, points });
   state.selectedStation = insertIdx;
-
   stationLabel.textContent = stationLabelFor(state.selectedStation);
   rebuildHull();
   renderStationList();
@@ -1926,6 +1962,18 @@ function addStation() {
   renderTopView();
   renderSectionView();
   syncStationButtons();
+  return true;
+}
+
+function addStation() {
+  // Insert at the midpoint of the largest gap in s-space.
+  const sortedSs = [0, ...state.stations.map(st => st.s).sort((a, b) => a - b), 1];
+  let maxGap = 0, gapStart = 0;
+  for (let i = 0; i < sortedSs.length - 1; i++) {
+    const g = sortedSs[i + 1] - sortedSs[i];
+    if (g > maxGap) { maxGap = g; gapStart = sortedSs[i]; }
+  }
+  addStationAtS(gapStart + maxGap / 2);
 }
 
 function removeStation() {
@@ -2378,7 +2426,7 @@ topSvg.addEventListener('wheel', (e) => {
 // Pan: left-drag on background (no control target), or middle-button anywhere.
 topSvg.addEventListener('pointerdown', (e) => {
   const isMiddle = e.button === 1;
-  const isBackground = e.button === 0 && !e.target.closest('[data-drag]') && !e.target.closest('[data-scale-axis]');
+  const isBackground = e.button === 0 && !e.target.closest('[data-drag]') && !e.target.closest('[data-scale-axis]') && !e.target.closest('[data-drag-action]');
   if (!isMiddle && !isBackground) return;
   e.preventDefault();
   e.stopPropagation();
@@ -2415,8 +2463,15 @@ document.getElementById('top-reset').addEventListener('click', () => {
 topSvg.addEventListener('click', (e) => {
   if (e.target.closest('[data-drag]')) return;
   if (topDrag?.moved) return;
-  if (!state.layers.top.beam) return; // beam layer off → no click-to-add
   const { wx, wy } = svgToLocalTop(e);
+  // Click on the station-add line (only when stations layer is active)?
+  if (e.target.closest('[data-drag-action="add-station"]')) {
+    if (!state.layers.top.stations) return;
+    const spS = sampledSpine(state.spine.knots, 64);
+    addStationAtS(spineXToS(spS, wx));
+    return;
+  }
+  if (!state.layers.top.beam) return; // beam layer off → no click-to-add
   const beamPts = sampledBeamLine(state);
   let best = Infinity;
   for (let i = 0; i < beamPts.length - 1; i++) {
@@ -2716,7 +2771,7 @@ sideSvg.addEventListener('wheel', (e) => {
 
 sideSvg.addEventListener('pointerdown', (e) => {
   const isMiddle = e.button === 1;
-  const isBackground = e.button === 0 && !e.target.closest('[data-drag]') && !e.target.closest('[data-scale-axis]');
+  const isBackground = e.button === 0 && !e.target.closest('[data-drag]') && !e.target.closest('[data-scale-axis]') && !e.target.closest('[data-drag-action]');
   if (!isMiddle && !isBackground) return;
   e.preventDefault();
   e.stopPropagation();
@@ -3363,6 +3418,13 @@ sideSvg.addEventListener('click', (e) => {
   if (drag && drag.moved) return;
   const { x, y } = svgToLocal(sideSvg, e);
   const wx = x / SIDE_SCALE, wz = -y / SIDE_SCALE;
+  // Click on the station-add line (only when stations layer is active)?
+  if (e.target.closest('[data-drag-action="add-station"]')) {
+    if (!state.layers.side.stations) return;
+    const spS = sampledSpine(state.spine.knots, 64);
+    addStationAtS(spineXToS(spS, wx));
+    return;
+  }
 
   // Check rocker proximity first.
   const knots = state.spine.knots;
