@@ -86,7 +86,7 @@ const state = {
     top:     { zoom: 1, offX: 0, offY: 0 },
     section: { zoom: 1, offX: 0, offY: 0 },
   },
-  layout: { colPct: 25, rowPct: 75, drawerHidden: false },
+  layout: { colPct: 25, rowPct: 66, drawerHidden: false },
 };
 
 // Deep-merge `src` into `dst` in place. Objects are recursed (preserving
