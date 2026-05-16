@@ -617,6 +617,41 @@ main {
   display: block;
   pointer-events: none;
 }
+#ref-crop-box {
+  position: absolute;
+  top: 10%; left: 10%; right: 10%; bottom: 10%;
+  border: 2px dashed #2563eb;
+  background: rgba(37, 99, 235, 0.05);
+  cursor: move;
+  box-sizing: border-box;
+}
+.crop-handle {
+  position: absolute;
+  width: 12px; height: 12px;
+  background: white; border: 1px solid #2563eb;
+  box-sizing: border-box;
+}
+.crop-handle.nw { top: -6px; left: -6px; cursor: nwse-resize; }
+.crop-handle.n  { top: -6px; left: calc(50% - 6px); cursor: ns-resize; }
+.crop-handle.ne { top: -6px; right: -6px; cursor: nesw-resize; }
+.crop-handle.w  { top: calc(50% - 6px); left: -6px; cursor: ew-resize; }
+.crop-handle.e  { top: calc(50% - 6px); right: -6px; cursor: ew-resize; }
+.crop-handle.sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+.crop-handle.s  { bottom: -6px; left: calc(50% - 6px); cursor: ns-resize; }
+.crop-handle.se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+
+.ref-editor-controls {
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+}
+.ref-editor-controls label {
+  display: flex; align-items: center; gap: 0.75rem;
+  font-size: 0.85rem; color: #334155; width: 100%;
+}
+.ref-editor-controls input[type="range"] { flex: 1; }
+.ref-editor-controls output { font-variant-numeric: tabular-nums; font-weight: 500; width: 3rem; }
 
 
 .ref-editor-footer {

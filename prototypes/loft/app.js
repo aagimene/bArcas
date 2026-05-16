@@ -1374,24 +1374,12 @@ function renderSideView() {
     const r = state.sideRef;
     const imgEl = document.createElementNS(SVG_NS, 'image');
     imgEl.setAttribute('href', r.url);
-    imgEl.setAttribute('width', r.nativeW);
-    imgEl.setAttribute('height', r.nativeH);
+    imgEl.setAttribute('x',      (r.worldX * SIDE_SCALE).toFixed(1));
+    imgEl.setAttribute('y',      (-r.worldZ * SIDE_SCALE).toFixed(1));
+    imgEl.setAttribute('width',  (r.worldW * SIDE_SCALE).toFixed(1));
+    imgEl.setAttribute('height', (r.worldH * SIDE_SCALE).toFixed(1));
     imgEl.setAttribute('opacity', r.opacity);
-    
-    let t1, t2;
-    if (r.worldT1 && r.worldT2) {
-      t1 = { x: xOf(r.worldT1.x), y: yOf(r.worldT1.y) };
-      t2 = { x: xOf(r.worldT2.x), y: yOf(r.worldT2.y) };
-    } else {
-      const sK = state.spine.knots;
-      const dK = state.deckLine.knots;
-      const sternZ = (sK[0].z + dK[0].z) / 2;
-      const bowZ = (sK[sK.length - 1].z + dK[dK.length - 1].z) / 2;
-      t1 = { x: xOf(sK[0].x), y: yOf(sternZ) };
-      t2 = { x: xOf(sK[sK.length - 1].x), y: yOf(bowZ) };
-    }
-    
-    imgEl.setAttribute('transform', computeImageTransform(r, t1, t2));
+    imgEl.setAttribute('data-drag', 'ref-side');
     sideSvg.appendChild(imgEl);
   }
   const spSampled   = sampledSpine(state.spine.knots,   64);
@@ -2569,38 +2557,129 @@ function drawRefCanvas() {
   if (!refEditorImg) return;
   const w = refEditorImg.naturalWidth;
   const h = refEditorImg.naturalHeight;
-  
   const MAX_SIZE = 600;
-  let scale = 1;
-  if (w > MAX_SIZE || h > MAX_SIZE) {
-    scale = MAX_SIZE / Math.max(w, h);
+  
+  if (refEditorViewKey === 'sideRef') {
+    refSvg.style.display = 'none';
+    refCropBox.style.display = 'block';
+    document.getElementById('ref-editor-controls').style.display = 'flex';
+    
+    const rad = refRot * Math.PI / 180;
+    const sin = Math.abs(Math.sin(rad));
+    const cos = Math.abs(Math.cos(rad));
+    const cw = w * cos + h * sin;
+    const ch = w * sin + h * cos;
+    
+    let scale = 1;
+    if (cw > MAX_SIZE || ch > MAX_SIZE) {
+      scale = MAX_SIZE / Math.max(cw, ch);
+    }
+    
+    refEditorCanvas.width = cw * scale;
+    refEditorCanvas.height = ch * scale;
+    refCanvasContainer.style.width = refEditorCanvas.width + 'px';
+    refCanvasContainer.style.height = refEditorCanvas.height + 'px';
+    
+    refEditorCtx.save();
+    refEditorCtx.translate(refEditorCanvas.width / 2, refEditorCanvas.height / 2);
+    refEditorCtx.rotate(rad);
+    refEditorCtx.scale(scale, scale);
+    refEditorCtx.drawImage(refEditorImg, -w/2, -h/2);
+    refEditorCtx.restore();
+  } else {
+    refSvg.style.display = 'block';
+    refCropBox.style.display = 'none';
+    document.getElementById('ref-editor-controls').style.display = 'none';
+
+    let scale = 1;
+    if (w > MAX_SIZE || h > MAX_SIZE) {
+      scale = MAX_SIZE / Math.max(w, h);
+    }
+    
+    refEditorCanvas.width = w * scale;
+    refEditorCanvas.height = h * scale;
+    refCanvasContainer.style.width = refEditorCanvas.width + 'px';
+    refCanvasContainer.style.height = refEditorCanvas.height + 'px';
+    
+    refEditorCtx.save();
+    refEditorCtx.scale(scale, scale);
+    refEditorCtx.drawImage(refEditorImg, 0, 0);
+    refEditorCtx.restore();
+
+    refSvg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    
+    const isf = 1 / scale;
+    document.getElementById('ref-p1').setAttribute('r', 8 * isf);
+    document.getElementById('ref-p2').setAttribute('r', 8 * isf);
+    document.getElementById('ref-p1').setAttribute('stroke-width', 2 * isf);
+    document.getElementById('ref-p2').setAttribute('stroke-width', 2 * isf);
+    document.getElementById('ref-p1-label').setAttribute('font-size', 14 * isf);
+    document.getElementById('ref-p2-label').setAttribute('font-size', 14 * isf);
+    document.getElementById('ref-p1-label').setAttribute('x', 14 * isf);
+    document.getElementById('ref-p2-label').setAttribute('x', 14 * isf);
+    refAlignLine.setAttribute('stroke-width', 2 * isf);
+
+    updateRefOverlay();
+  }
+}
+
+refRotSlider.addEventListener('input', () => {
+  refRot = parseFloat(refRotSlider.value);
+  refRotOut.textContent = refRot.toFixed(1) + '°';
+  drawRefCanvas();
+});
+
+let cropDrag = null;
+refCropBox.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  const dir = e.target.dataset.dir || 'move';
+  const bounds = refCanvasContainer.getBoundingClientRect();
+  const cropBounds = refCropBox.getBoundingClientRect();
+  cropDrag = {
+    dir,
+    startX: e.clientX,
+    startY: e.clientY,
+    origL: cropBounds.left - bounds.left,
+    origT: cropBounds.top - bounds.top,
+    origW: cropBounds.width,
+    origH: cropBounds.height,
+  };
+});
+window.addEventListener('pointermove', (e) => {
+  if (!cropDrag) return;
+  e.preventDefault();
+  const dx = e.clientX - cropDrag.startX;
+  const dy = e.clientY - cropDrag.startY;
+  let { origL: l, origT: t, origW: w, origH: h } = cropDrag;
+  
+  const contW = refEditorCanvas.width;
+  const contH = refEditorCanvas.height;
+
+  if (cropDrag.dir === 'move') {
+    l = Math.max(0, Math.min(contW - w, l + dx));
+    t = Math.max(0, Math.min(contH - h, t + dy));
+  } else {
+    if (cropDrag.dir.includes('e')) { w = Math.min(contW - l, Math.max(20, w + dx)); }
+    if (cropDrag.dir.includes('s')) { h = Math.min(contH - t, Math.max(20, h + dy)); }
+    if (cropDrag.dir.includes('w')) {
+      const maxDx = w - 20;
+      const actDx = Math.min(maxDx, Math.max(-l, dx));
+      l += actDx; w -= actDx;
+    }
+    if (cropDrag.dir.includes('n')) {
+      const maxDy = h - 20;
+      const actDy = Math.min(maxDy, Math.max(-t, dy));
+      t += actDy; h -= actDy;
+    }
   }
   
-  refEditorCanvas.width = w * scale;
-  refEditorCanvas.height = h * scale;
-  refCanvasContainer.style.width = refEditorCanvas.width + 'px';
-  refCanvasContainer.style.height = refEditorCanvas.height + 'px';
-  
-  refEditorCtx.save();
-  refEditorCtx.scale(scale, scale);
-  refEditorCtx.drawImage(refEditorImg, 0, 0);
-  refEditorCtx.restore();
-
-  refSvg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-  
-  const isf = 1 / scale;
-  document.getElementById('ref-p1').setAttribute('r', 8 * isf);
-  document.getElementById('ref-p2').setAttribute('r', 8 * isf);
-  document.getElementById('ref-p1').setAttribute('stroke-width', 2 * isf);
-  document.getElementById('ref-p2').setAttribute('stroke-width', 2 * isf);
-  document.getElementById('ref-p1-label').setAttribute('font-size', 14 * isf);
-  document.getElementById('ref-p2-label').setAttribute('font-size', 14 * isf);
-  document.getElementById('ref-p1-label').setAttribute('x', 14 * isf);
-  document.getElementById('ref-p2-label').setAttribute('x', 14 * isf);
-  refAlignLine.setAttribute('stroke-width', 2 * isf);
-
-  updateRefOverlay();
-}
+  refCropBox.style.left = (l / contW * 100) + '%';
+  refCropBox.style.top = (t / contH * 100) + '%';
+  refCropBox.style.width = (w / contW * 100) + '%';
+  refCropBox.style.height = (h / contH * 100) + '%';
+});
+window.addEventListener('pointerup', () => { cropDrag = null; });
+window.addEventListener('pointercancel', () => { cropDrag = null; });
 
 refEditorCancel.addEventListener('click', () => {
   refEditorModal.close();
@@ -2633,30 +2712,62 @@ refSvg.addEventListener('pointercancel', () => { refDragHandle = null; });
 
 refEditorApply.addEventListener('click', () => {
   const r = state[refEditorViewKey];
-  r.url = refEditorImg.src;
-  r.nativeW = refEditorImg.naturalWidth;
-  r.nativeH = refEditorImg.naturalHeight;
-  r.p1 = { x: refP1_native.x, y: refP1_native.y };
-  r.p2 = { x: refP2_native.x, y: refP2_native.y };
   
   if (refEditorViewKey === 'sideRef') {
-    const sK = state.spine.knots;
-    const dK = state.deckLine.knots;
-    const sternZ = (sK[0].z + dK[0].z) / 2;
-    const bowZ = (sK[sK.length - 1].z + dK[dK.length - 1].z) / 2;
-    r.worldT1 = { x: sK[0].x, y: sternZ };
-    r.worldT2 = { x: sK[sK.length - 1].x, y: bowZ };
-  } else if (refEditorViewKey === 'topRef') {
-    const sK = state.spine.knots;
-    r.worldT1 = { x: 0, y: sK[0].x };
-    r.worldT2 = { x: 0, y: sK[sK.length - 1].x };
-  } else if (refEditorViewKey === 'sectionRef') {
+    const cropL = parseFloat(refCropBox.style.left) / 100 || 0.1;
+    const cropT = parseFloat(refCropBox.style.top) / 100 || 0.1;
+    const cropW = parseFloat(refCropBox.style.width) / 100 || 0.8;
+    const cropH = parseFloat(refCropBox.style.height) / 100 || 0.8;
+    
+    const sx = cropL * refEditorCanvas.width;
+    const sy = cropT * refEditorCanvas.height;
+    const sw = cropW * refEditorCanvas.width;
+    const sh = cropH * refEditorCanvas.height;
+    
+    const cropCanvas = document.createElement('canvas');
+    cropCanvas.width = sw;
+    cropCanvas.height = sh;
+    const cropCtx = cropCanvas.getContext('2d');
+    cropCtx.drawImage(refEditorCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+    
+    r.url = cropCanvas.toDataURL('image/png');
+    r.nativeAspect = sw / sh;
+    
     const spKnots = state.spine.knots;
+    const sternX = spKnots[0].x, bowX = spKnots[spKnots.length - 1].x;
+    const hullLen = bowX - sternX;
+    
     const dkPts = sampledSpine(state.deckLine.knots, 16).pts;
     const maxZ = Math.max(...dkPts.map(p => p.y));
     const minZ = Math.min(...spKnots.map(k => k.z));
-    r.worldT1 = { x: 0, y: minZ };
-    r.worldT2 = { x: 0, y: maxZ };
+    r.worldW = hullLen;
+    r.worldH = maxZ - minZ;
+    if (hullLen / r.worldH > r.nativeAspect) {
+      r.worldH = hullLen / r.nativeAspect;
+    } else {
+      r.worldW = r.worldH * r.nativeAspect;
+    }
+    r.worldX = sternX;
+    r.worldZ = maxZ;
+  } else {
+    r.url = refEditorImg.src;
+    r.nativeW = refEditorImg.naturalWidth;
+    r.nativeH = refEditorImg.naturalHeight;
+    r.p1 = { x: refP1_native.x, y: refP1_native.y };
+    r.p2 = { x: refP2_native.x, y: refP2_native.y };
+    
+    if (refEditorViewKey === 'topRef') {
+      const sK = state.spine.knots;
+      r.worldT1 = { x: 0, y: sK[0].x };
+      r.worldT2 = { x: 0, y: sK[sK.length - 1].x };
+    } else if (refEditorViewKey === 'sectionRef') {
+      const spKnots = state.spine.knots;
+      const dkPts = sampledSpine(state.deckLine.knots, 16).pts;
+      const maxZ = Math.max(...dkPts.map(p => p.y));
+      const minZ = Math.min(...spKnots.map(k => k.z));
+      r.worldT1 = { x: 0, y: minZ };
+      r.worldT2 = { x: 0, y: maxZ };
+    }
   }
   
   refEditorModal.close();
@@ -2693,16 +2804,26 @@ function wireRefImage(viewKey, fileId, opacityId, opacityOutId, clearId, renderF
             }
         }
         
-        // Update labels and help text
         const helpP = document.getElementById('ref-editor-help');
-        if (viewKey === 'sectionRef') {
-            document.getElementById('ref-p1-label').textContent = 'Keel';
-            document.getElementById('ref-p2-label').textContent = 'Deck';
-            helpP.textContent = "Align the Keel (bottom) and Deck (top) points.";
+        if (viewKey === 'sideRef') {
+            refRotSlider.value = 0;
+            refRot = 0;
+            refRotOut.textContent = '0°';
+            refCropBox.style.left = '10%';
+            refCropBox.style.top = '10%';
+            refCropBox.style.width = '80%';
+            refCropBox.style.height = '80%';
+            helpP.textContent = "Rotate the image and drag the crop box to tightly enclose the hull in this view.";
         } else {
-            document.getElementById('ref-p1-label').textContent = 'Stern';
-            document.getElementById('ref-p2-label').textContent = 'Bow';
-            helpP.textContent = "Align the Stern (rear) and Bow (front) points.";
+            if (viewKey === 'sectionRef') {
+                document.getElementById('ref-p1-label').textContent = 'Keel';
+                document.getElementById('ref-p2-label').textContent = 'Deck';
+                helpP.textContent = "Align the Keel (bottom) and Deck (top) points.";
+            } else {
+                document.getElementById('ref-p1-label').textContent = 'Stern';
+                document.getElementById('ref-p2-label').textContent = 'Bow';
+                helpP.textContent = "Align the Stern (rear) and Bow (front) points.";
+            }
         }
         
         openRefEditor(img, viewKey, renderFn);

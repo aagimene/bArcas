@@ -178,6 +178,11 @@
       <div class="ref-editor-body">
         <div class="ref-canvas-container" id="ref-canvas-container">
           <canvas id="ref-editor-canvas"></canvas>
+          <div id="ref-crop-box" style="display: none;">
+            <div class="crop-handle nw" data-dir="nw"></div><div class="crop-handle n" data-dir="n"></div><div class="crop-handle ne" data-dir="ne"></div>
+            <div class="crop-handle w" data-dir="w"></div><div class="crop-handle e" data-dir="e"></div>
+            <div class="crop-handle sw" data-dir="sw"></div><div class="crop-handle s" data-dir="s"></div><div class="crop-handle se" data-dir="se"></div>
+          </div>
           <svg id="ref-editor-svg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible;">
             <line id="ref-align-line" x1="0" y1="0" x2="0" y2="0" stroke="#2563eb" stroke-width="2" stroke-dasharray="4 4" />
             <g id="ref-p1-group" style="pointer-events: auto; cursor: grab;">
@@ -190,6 +195,11 @@
             </g>
           </svg>
         </div>
+      </div>
+      <div class="ref-editor-controls" id="ref-editor-controls" style="display: none;">
+        <label>Rotation <output id="ref-rot-out">0°</output>
+          <input type="range" id="ref-rot" min="-180" max="180" step="0.1" value="0">
+        </label>
       </div>
       <div class="ref-editor-footer">
         <button type="button" id="ref-editor-cancel">Cancel</button>
