@@ -13,30 +13,12 @@ until it has been chunked, prioritized, and confirmed by the user.
 
 *Raw feedback captured from the user. Not yet scoped or confirmed.*
 
-- **Reference image positioning UX.** Currently position is set via number
-  inputs or dragging. May need finer controls (e.g. scale-by-matching-hull-
-  length button, or lock-aspect-ratio when resizing).
-
 - **Chines.** Chines are numbered. Chine points are cross-section control
   points with a chine index assigned. The loft should produce edge loops that
   follow the chine points longitudinally, making chine lines visible in all
   views. Because chine control points are on the Bezier curve, handle lengths
   naturally control chine sharpness. A chine must span at least two
   neighboring stations but does not need to extend to all stations.
-
-- **Body plan overlay on the cross-section view.** The body plan is a
-  half-and-half front view: one side shows stations from the widest point
-  toward the bow, the other from the widest point toward the stern. It
-  overlays the cross-section view as a background layer (behind
-  control-point curves and handles). Controls: enabled/disabled, opacity,
-  and which half shows bow vs. stern (both halves can show the same
-  direction). Layering order from back to front: reference image, body plan,
-  control curves and points.
-
-- **Reference image in the cross-section view.** The cross-section view
-  needs a reference image background like the side and top views, loaded and
-  positioned independently.
-
 
 - **Scale gizmo: unexpected translation during scaling.** For example,
   scaling horizontally (Y axis) in the top view also translates the whole
@@ -45,10 +27,6 @@ until it has been chunked, prioritized, and confirmed by the user.
   shifts the hull. Need to decide the correct pivot point (hull geometric
   center? bounding-box center?) and ensure scaling applies purely as a scale
   with no net translation.
-
-- **"Textured surface" render mode to accentuate curvature.** Not yet sure
-  of the best approach — checkerboard UV or similar. Intent is to make
-  curvature deviations visually obvious.
 
 - **Cross-section aspect-ratio instability during station-point edits.**
   When dragging the widest control point, the aspect scaling can rapidly
@@ -86,15 +64,6 @@ until it has been chunked, prioritized, and confirmed by the user.
   cross-section view as a non-editable reference point (center of loft).
 
 
-- **Remove ambient occlusion; simplify render modes.** AO currently does
-  nothing visible (depth map appears to be entirely white, suggesting depth
-  scaling is off, which would also break AO). Remove AO entirely and
-  simplify render modes to: "shaded" (current beauty pass) and "normals"
-  (surface normal vectors visualized as color). Both modes should include the
-  grid planes (the normals mode currently does not show grids). AO could be
-  re-added from scratch later once the depth pass is fixed.
-
-
 - **Side view aspect ratio may not always match the shaded 3D mesh.** Under
   certain conditions the 2D side view silhouette does not appear to match
   the 3D render's proportions. Not yet fully reproduced — needs further
@@ -129,18 +98,12 @@ without burning the 5-hour rate-limit on a single big task.*
 
 | # | Order | Item (short) | Model | Effort | Why this rank |
 |---|-------|--------------|-------|--------|---------------|
-| 3 | 1 | Tip closure: replace with two flat triangles | Sonnet | medium | Localised to `buildLoft()`. Visible quality win, no UI changes. |
-| 4 | 4 | Remove ambient occlusion, simplify render modes (shaded + normals, both with grid) | Sonnet | medium | Pure deletion + small addition. Removes a lot of incidental complexity, makes future render-mode work easier. Do BEFORE the textured-surface mode. |
-| 5 | 5 | Reference image in cross-section view | Sonnet | low | `wireRefImage` already factored — just instantiate a third one. |
-| 6 | 6 | Reference-image positioning UX polish (lock-aspect, fit-to-hull) | Sonnet | low | Small additions next to existing ref-image controls. Bundle with #5. |
-| 8 | 8 | Scale gizmo: pivot at hull center, no translation drift | Opus | medium | Math correctness — apply scale around (cx, 0, cz) rather than world origin; subtract pivot, scale, add back, also scale knot/handle handle-lengths uniformly. Wrong approach causes regressions in other gizmo uses. |
-| 9 | 9 | Section aspect-ratio instability when dragging widest point | Opus | medium | Subtle: the `max(b)` factor in `SECTION_SCALE_N` creates a feedback loop — as the dragged point shrinks, scale shrinks, the visible position changes, and the user's drag offset interprets differently. Also fix the "no update when station moves along X" degenerate case. |
-| 10 | 10 | Click-to-add station in top/side view, auto-shape from existing geometry | Opus | medium | Needs to interpolate the lofted shape at an arbitrary X (use the existing `denseRows` pipeline), then convert back to (b, n) control points. Some design choices about how many points to keep. |
-| 11 | 11 | Body plan overlay on cross-section view (with bow/stern half controls + opacity) | Sonnet | medium | Composable feature; add behind ref-image / in front. Touches only `renderSectionView()` plus a small controls block. |
-| 12 | 12 | Textured surface render mode (checkerboard or matcap to expose curvature) | Opus | medium | Three.js material design choice. Best done after AO is removed (#4) so the render-mode picker has its final shape. |
-| 13 | 13 | Per-view interactive layer toggles (visibility + editability lock per layer per view) | Opus | high | Biggest UI refactor: every clickable element now consults a per-view per-layer enabled flag. Affects every drag handler, every render function. Do this once the smaller fixes have settled. |
-| 14 | 14 | Station spine line in top/side; uneditable center point in section | Sonnet | low | Trivial after #13 lands (depends on the "stations layer is active" trigger from #13). |
-| 15 | 15 | **Chines** (numbered chine indices on section points; chine edge loops in loft; visualisation in all views) | Opus | high | Largest architectural change: data-model addition, loft change, three new render layers. Do last so other items don't conflict and so the codebase is in its simplest state when we tackle it. Plan a design pass first (separate session, no code) before implementing. |
+| 8 | 1 | Scale gizmo: pivot at hull center, no translation drift | Opus | medium | Math correctness — apply scale around (cx, 0, cz) rather than world origin; subtract pivot, scale, add back, also scale knot/handle handle-lengths uniformly. Wrong approach causes regressions in other gizmo uses. |
+| 9 | 2 | Section aspect-ratio instability when dragging widest point | Opus | medium | Subtle: the `max(b)` factor in `SECTION_SCALE_N` creates a feedback loop — as the dragged point shrinks, scale shrinks, the visible position changes, and the user's drag offset interprets differently. Also fix the "no update when station moves along X" degenerate case. |
+| 10 | 3 | Click-to-add station in top/side view, auto-shape from existing geometry | Opus | medium | Needs to interpolate the lofted shape at an arbitrary X (use the existing `denseRows` pipeline), then convert back to (b, n) control points. Some design choices about how many points to keep. |
+| 13 | 4 | Per-view interactive layer toggles (visibility + editability lock per layer per view) | Opus | high | Biggest UI refactor: every clickable element now consults a per-view per-layer enabled flag. Affects every drag handler, every render function. Do this once the smaller fixes have settled. |
+| 14 | 5 | Station spine line in top/side; uneditable center point in section | Sonnet | low | Trivial after #13 lands (depends on the "stations layer is active" trigger from #13). |
+| 15 | 6 | **Chines** (numbered chine indices on section points; chine edge loops in loft; visualisation in all views) | Opus | high | Largest architectural change: data-model addition, loft change, three new render layers. Do last so other items don't conflict and so the codebase is in its simplest state when we tackle it. Plan a design pass first (separate session, no code) before implementing. |
 | 16 | — | Side view aspect ratio may not match 3D mesh (vague) | — | — | Defer until user can reproduce concretely. Spending Opus on a vague spec is wasteful. |
 
 **Suggested session bundles** (each bundle = one Claude session, ordered top-to-bottom):
@@ -248,6 +211,11 @@ Needs design before coding:
 | Tip closure: N-1 z-fighting triangles → 2 flat triangles per tip | tip-flat |
 | Deck line in loft now follows the green deck Bezier exactly (sample deck Z at row's actual X, not at arc-length s) | deck-init-fix |
 | Initial-render retry loop: 2D views blank-on-load fix when ResizeObserver's first callback fired before layout settled | deck-init-fix |
+| Remove ambient occlusion; simplify render modes to Shaded + Normals (both with grid) | (user) |
+| Reference image in cross-section view (third wireRefImage instance) | (user) |
+| Reference image positioning UX polish (lock-aspect / fit-to-hull) | (user) |
+| Body plan overlay on cross-section view (bow/stern half + opacity controls) | (user) |
+| Textured render modes for curvature: Matcap (procedural sphere texture, base + highlight colour pickers) and Checker (world-space cubic checker via shader injection, configurable size + 2 colours) | matcap-checker |
 | Scale gizmo on side/top/3D views (Y/X/Z axes, X updates length slider) | scale-gizmo, gizmo-fix |
 | Scale gizmo removed from cross-section view (meaningless in normalised b/n) | section-bezier |
 | Cross-section points → on-curve Bezier knots with angle/aftLen/foreLen handles (matches rocker / deck-line model) | section-bezier |

@@ -73,6 +73,12 @@ const state = {
   // captures the full session and import restores it. Defaults here drive the
   // initial UI on a fresh load.
   colors: { outside: '#ffffff', inside: '#ffc0cb' },
+  // Render mode + per-mode parameters (persisted via JSON export).
+  render: {
+    mode: 'shaded', // shaded | normals | matcap | checker
+    matcap:  { base: '#3a5a8a', highlight: '#dceaff' },
+    checker: { size: 0.10, light: '#f1f5f9', dark: '#1f2937' },
+  },
   ao:     { enabled: true, kernelRadius: 0.35, minDistance: 0.0001, maxDistance: 0.6, contrast: 12.0, output: 0 },
   keyLight: { az: 0.69, el: 0.89 },
   viewports: {
@@ -875,6 +881,9 @@ function rebuildHull() {
   });
 
   lastLoft = loft;
+  // Re-apply the current render mode so freshly-created meshes pick up the
+  // correct material (matcap/checker/normals instead of the default hullMaterial).
+  if (typeof applyRenderMode === 'function') applyRenderMode();
   return loft;
 }
 
@@ -2054,20 +2063,158 @@ meshOpacityEl.addEventListener('input', () => {
 });
 
 // ── Render Mode ─────────────────────────────────────────────────────────
+//
+// Four modes:
+//   shaded   — physical lighting (hullMaterial) with inside/outside colours
+//   normals  — world-space normal vectors as colour (curvature check)
+//   matcap   — procedural matcap sphere texture, user picks base + highlight
+//   checker  — world-space cubic checkerboard, user picks square size + 2 colours
+//
+// matcap + checker are "textured" curvature-inspection modes.  The matcap
+// texture is a procedurally-generated CanvasTexture regenerated whenever
+// the user picks new colours.  The checker uses the standard PBR material
+// with onBeforeCompile injecting world-position-driven checker colours
+// into the diffuseColor — so it still gets lit nicely while the pattern
+// reveals deformation/curvature.
 
-const renderModeSel = document.getElementById('render-mode');
-const normalMaterial = new THREE.MeshNormalMaterial({ side: THREE.DoubleSide });
+const renderModeSel    = document.getElementById('render-mode');
+const matcapBaseEl     = document.getElementById('matcap-base');
+const matcapHiEl       = document.getElementById('matcap-highlight');
+const checkerSizeEl    = document.getElementById('checker-size');
+const checkerSizeOut   = document.getElementById('checker-size-out');
+const checkerLightEl   = document.getElementById('checker-light');
+const checkerDarkEl    = document.getElementById('checker-dark');
 
-function updateRenderMode() {
-  const mode = renderModeSel.value;
-  hullGroup.children.forEach(mesh => {
-    if (mesh.isMesh) {
-      mesh.material = mode === 'normals' ? normalMaterial : hullMaterial;
-    }
+const normalMaterial   = new THREE.MeshNormalMaterial({ side: THREE.DoubleSide });
+
+// ── Matcap (procedural sphere texture) ──────────────────────────────────
+const matcapTexture = (() => {
+  const tex = new THREE.CanvasTexture(document.createElement('canvas'));
+  tex.colorSpace = THREE.SRGBColorSpace ?? THREE.sRGBEncoding;
+  return tex;
+})();
+function rebuildMatcapTexture() {
+  const size = 256;
+  const c = matcapTexture.image;
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, size, size);
+  // Sphere — vertical gradient top→bottom (highlight at top, base at middle, dark at base).
+  const grad = ctx.createLinearGradient(0, 0, 0, size);
+  grad.addColorStop(0.0, state.render.matcap.highlight);
+  grad.addColorStop(0.55, state.render.matcap.base);
+  grad.addColorStop(1.0, '#0a0a0a');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, size / 2 - 1, 0, Math.PI * 2);
+  ctx.fill();
+  // Small specular highlight upper-left.
+  const spec = ctx.createRadialGradient(size * 0.35, size * 0.3, 2, size * 0.35, size * 0.3, size * 0.32);
+  spec.addColorStop(0, 'rgba(255,255,255,0.55)');
+  spec.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.globalCompositeOperation = 'source-atop';
+  ctx.fillStyle = spec;
+  ctx.fillRect(0, 0, size, size);
+  ctx.globalCompositeOperation = 'source-over';
+  matcapTexture.needsUpdate = true;
+}
+const matcapMaterial = new THREE.MeshMatcapMaterial({
+  matcap: matcapTexture, side: THREE.DoubleSide,
+});
+
+// ── Checker (shader injection on a PBR material) ────────────────────────
+const checkerUniforms = {
+  uCheckSize:  { value: 0.10 },
+  uCheckLight: { value: new THREE.Color('#f1f5f9') },
+  uCheckDark:  { value: new THREE.Color('#1f2937') },
+};
+const checkerMaterial = new THREE.MeshStandardMaterial({
+  color: 0xffffff, side: THREE.DoubleSide,
+  metalness: 0.0, roughness: 0.65,
+});
+checkerMaterial.onBeforeCompile = (shader) => {
+  shader.uniforms.uCheckSize  = checkerUniforms.uCheckSize;
+  shader.uniforms.uCheckLight = checkerUniforms.uCheckLight;
+  shader.uniforms.uCheckDark  = checkerUniforms.uCheckDark;
+  shader.vertexShader =
+    'varying vec3 vCheckPos;\n' +
+    shader.vertexShader.replace(
+      '#include <fog_vertex>',
+      '#include <fog_vertex>\nvCheckPos = (modelMatrix * vec4(transformed, 1.0)).xyz;'
+    );
+  shader.fragmentShader =
+    'varying vec3 vCheckPos;\n' +
+    'uniform float uCheckSize;\n' +
+    'uniform vec3 uCheckLight;\n' +
+    'uniform vec3 uCheckDark;\n' +
+    shader.fragmentShader.replace(
+      '#include <color_fragment>',
+      '#include <color_fragment>\n' +
+      'float chk = mod(floor(vCheckPos.x / uCheckSize) + ' +
+                    'floor(vCheckPos.y / uCheckSize) + ' +
+                    'floor(vCheckPos.z / uCheckSize), 2.0);\n' +
+      'diffuseColor.rgb = mix(uCheckLight, uCheckDark, chk);'
+    );
+};
+
+// ── Apply + sync ────────────────────────────────────────────────────────
+function applyRenderMode() {
+  const mode = state.render.mode;
+  let mat;
+  if      (mode === 'normals') mat = normalMaterial;
+  else if (mode === 'matcap')  mat = matcapMaterial;
+  else if (mode === 'checker') mat = checkerMaterial;
+  else                          mat = hullMaterial;
+  hullGroup.children.forEach(mesh => { if (mesh.isMesh) mesh.material = mat; });
+  // Show only the option block matching the current mode.
+  document.querySelectorAll('.render-mode-opts').forEach(div => {
+    div.style.display = (div.dataset.renderMode === mode) ? '' : 'none';
   });
 }
+function applyMatcap() {
+  rebuildMatcapTexture();
+}
+function applyChecker() {
+  checkerUniforms.uCheckSize.value = state.render.checker.size;
+  checkerUniforms.uCheckLight.value.set(state.render.checker.light);
+  checkerUniforms.uCheckDark .value.set(state.render.checker.dark);
+  checkerSizeOut.textContent = (state.render.checker.size * 100).toFixed(0) + ' cm';
+}
+function syncRenderInputsFromState() {
+  renderModeSel.value   = state.render.mode;
+  matcapBaseEl.value    = state.render.matcap.base;
+  matcapHiEl.value      = state.render.matcap.highlight;
+  checkerSizeEl.value   = String(state.render.checker.size);
+  checkerLightEl.value  = state.render.checker.light;
+  checkerDarkEl.value   = state.render.checker.dark;
+}
 
-renderModeSel.addEventListener('change', updateRenderMode);
+renderModeSel.addEventListener('change', () => {
+  state.render.mode = renderModeSel.value;
+  applyRenderMode();
+});
+matcapBaseEl.addEventListener('input', () => {
+  state.render.matcap.base = matcapBaseEl.value; applyMatcap();
+});
+matcapHiEl.addEventListener('input', () => {
+  state.render.matcap.highlight = matcapHiEl.value; applyMatcap();
+});
+checkerSizeEl.addEventListener('input', () => {
+  state.render.checker.size = parseFloat(checkerSizeEl.value); applyChecker();
+});
+checkerLightEl.addEventListener('input', () => {
+  state.render.checker.light = checkerLightEl.value; applyChecker();
+});
+checkerDarkEl.addEventListener('input', () => {
+  state.render.checker.dark = checkerDarkEl.value; applyChecker();
+});
+
+// Initial: push defaults into UI, build the matcap, set checker uniforms, apply.
+syncRenderInputsFromState();
+applyMatcap();
+applyChecker();
+applyRenderMode();
 
 // ── Side-view drag handlers ──────────────────────────────────────────────
 //
@@ -3033,6 +3180,11 @@ function syncUIFromState() {
   // Colors push into inputs and Three.js
   syncColorInputsFromState();
   applyColors();
+  // Render mode + matcap + checker
+  syncRenderInputsFromState();
+  applyMatcap();
+  applyChecker();
+  applyRenderMode();
   // Key light — already aliased into state, just re-apply.
   applyKeyLightPosition();
   // Pane resizer percentages + drawer state
