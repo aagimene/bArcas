@@ -8,11 +8,7 @@
 
 import * as THREE       from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass }     from 'three/addons/postprocessing/RenderPass.js';
-import { SSAOPass }       from 'three/addons/postprocessing/SSAOPass.js';
-import { ShaderPass }     from 'three/addons/postprocessing/ShaderPass.js';
-import { OutputPass }     from 'three/addons/postprocessing/OutputPass.js';
+// Removed post-processing imports.
 
 // ── Constants ────────────────────────────────────────────────────────────
 // Declared before state so stationsPlaceholder() can reference them without
@@ -857,111 +853,11 @@ function rebuildHull() {
 
 rebuildHull(); // populates lastLoft
 
-// ── Post-processing: ambient occlusion ───────────────────────────────────
-//
-// SSAOPass — screen-space AO. The user-facing knobs (collapsible advanced
-// panel below) are the actual SSAOPass parameters; ranges go intentionally
-// far past sensible defaults so the look can be pushed to extremes.
-
-const _w0 = threeHost.clientWidth, _h0 = threeHost.clientHeight;
-const composer = new EffectComposer(renderer);
-composer.setPixelRatio(window.devicePixelRatio);
-composer.setSize(_w0, _h0);
-
-composer.addPass(new RenderPass(scene, camera));
-
-const ssaoPass = new SSAOPass(scene, camera, _w0, _h0);
-// Defaults tuned for kayak-scale geometry (boat ~5 m): kernel radius
-// generous enough to sample neighborhoods comparable to hull curvature,
-// max distance wide enough to count gunwale-corner-style depth steps.
-ssaoPass.kernelRadius = 0.2;
-ssaoPass.minDistance  = 0.00001;
-ssaoPass.maxDistance  = 0.5;
-
-// Replace SSAOPass's internal blendMaterial with one that does
-// pow(mask, contrast) before the multiply-blend with the beauty pass.
-// SSAOPass's stock blendMaterial just copies the mask straight out, so a
-// "0.9" occlusion value dims the pixel by 10% — invisible. With pow(0.9, 4)
-// it dims by ~34%; pow(0.9, 16) by ~81%. Contrast > 1 darkens crevices
-// non-linearly without changing the underlying SSAO algorithm.
-const aoContrastUniform = { value: 4.0 };
-ssaoPass.blendMaterial = new THREE.ShaderMaterial({
-  uniforms: {
-    tDiffuse:   { value: null },
-    aoContrast: aoContrastUniform,
-  },
-  vertexShader: `
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
-  fragmentShader: `
-    uniform sampler2D tDiffuse;
-    uniform float aoContrast;
-    varying vec2 vUv;
-    void main() {
-      vec3 ao = texture2D(tDiffuse, vUv).rgb;
-      gl_FragColor = vec4(pow(ao, vec3(aoContrast)), 1.0);
-    }
-  `,
-  transparent: true,
-  depthTest:  false,
-  depthWrite: false,
-  blending:           THREE.CustomBlending,
-  blendSrc:           THREE.DstColorFactor,
-  blendDst:           THREE.ZeroFactor,
-  blendEquation:      THREE.AddEquation,
-  blendSrcAlpha:      THREE.DstAlphaFactor,
-  blendDstAlpha:      THREE.ZeroFactor,
-  blendEquationAlpha: THREE.AddEquation,
-});
-composer.addPass(ssaoPass);
-
-// Debug-visibility boost for the SSAO-only / Blur output modes. The stock
-// SSAOPass output for those modes is the raw mask, which is hard to read
-// when contrast is in pow-amplified ranges. This pass applies the same
-// pow curve in screen space, but only when one of those modes is active
-// (boost = 1.0 = passthrough otherwise).
-//
-// Note: ShaderPass *clones* the uniforms object when you hand it a plain
-// shader descriptor, so we take a reference to the cloned uniform after
-// construction — `aoVisPass.uniforms.boost` — and write its `.value`.
-const aoVisPass = new ShaderPass({
-  uniforms: {
-    tDiffuse: { value: null },
-    boost:    { value: 1.0 },
-  },
-  vertexShader: `
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
-  fragmentShader: `
-    uniform sampler2D tDiffuse;
-    uniform float boost;
-    varying vec2 vUv;
-    void main() {
-      vec4 c = texture2D(tDiffuse, vUv);
-      gl_FragColor = vec4(pow(c.rgb, vec3(boost)), c.a);
-    }
-  `,
-});
-composer.addPass(aoVisPass);
-const aoVisBoostUniform = aoVisPass.uniforms.boost;  // reference into the cloned uniform set
-
-composer.addPass(new OutputPass());
-
-// Resize handling.
+// ── Resize handling ────────────────────────────────────────────────────────
 const resizeObserver = new ResizeObserver(() => {
   const w = threeHost.clientWidth, h = threeHost.clientHeight;
   if (w > 0 && h > 0) {
     renderer.setSize(w, h, false);
-    composer.setSize(w, h);
-    ssaoPass.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   }
@@ -1107,7 +1003,7 @@ attachScaleGizmoPointer(threeGizmoSvg);
 function animate() {
   requestAnimationFrame(animate);
   controls.update();
-  composer.render();
+  renderer.render(scene, camera);
   if (typeof updateThreeGizmo === 'function') updateThreeGizmo();
 }
 animate();
@@ -1206,14 +1102,7 @@ function renderTopView() {
     imgEl.setAttribute('opacity', r.opacity);
     imgEl.setAttribute('data-drag', 'ref-top');
     topSvg.appendChild(imgEl);
-    for (let xi = 0; xi <= 1; xi++) for (let zi = 0; zi <= 1; zi++) {
-      const cx = xOfT(xi === 0 ? r.worldY : r.worldY + r.worldH);
-      const cy = yOfT(zi === 0 ? r.worldX + r.worldW : r.worldX);
-      topSvg.appendChild(el('circle', {
-        cx, cy, r: 6/tf, class: 'ref-corner',
-        'data-drag': 'ref-top-corner', 'data-xi': String(xi), 'data-zi': String(zi),
-      }));
-    }
+
   }
 
   const sternKnot = state.spine.knots[0];
@@ -1455,16 +1344,7 @@ function renderSideView() {
     imgEl.setAttribute('opacity', r.opacity);
     imgEl.setAttribute('data-drag', 'ref-side');
     sideSvg.appendChild(imgEl);
-    // Corner handles for scaling (aspect-ratio constrained).
-    // xi: 0=left, 1=right;  zi: 0=top (higher Z), 1=bottom (lower Z)
-    for (let xi = 0; xi <= 1; xi++) for (let zi = 0; zi <= 1; zi++) {
-      const cx = xOf(xi === 0 ? r.worldX : r.worldX + r.worldW);
-      const cy = yOf(zi === 0 ? r.worldZ : r.worldZ - r.worldH);
-      sideSvg.appendChild(el('circle', {
-        cx, cy, r: 6/sf, class: 'ref-corner',
-        'data-drag': 'ref-side-corner', 'data-xi': String(xi), 'data-zi': String(zi),
-      }));
-    }
+
   }
   const spSampled   = sampledSpine(state.spine.knots,   64);
   const deckSampled = sampledSpine(state.deckLine.knots, 64);
@@ -1697,16 +1577,38 @@ function renderSectionView() {
   // scale relative to halfB). To keep the display's aspect correct as max-b
   // changes, SECTION_SCALE_N picks up the same max-b factor — the section
   // view shrinks/grows uniformly while H/halfB stays the apparent aspect.
+  let Hm, Bm, keelZ;
   {
     const spS = sampledSpine(state.spine.knots,   64);
     const dkS = sampledSpine(state.deckLine.knots, 64);
     const xAt = spineAt(spS, station.s).p.x;
-    const Hm  = Math.max(0.005, spineAt(dkS, station.s).p.z - spineAt(spS, station.s).p.z);
-    const Bm  = Math.max(0.005, beamEvalAt(sampledBeamLine(state), xAt));
+    keelZ = spineAt(spS, station.s).p.z;
+    Hm  = Math.max(0.005, spineAt(dkS, station.s).p.z - keelZ);
+    Bm  = Math.max(0.005, beamEvalAt(sampledBeamLine(state), xAt));
     const maxB = Math.max(1e-9, ...station.points.map(p => p.b));
     SECTION_SCALE_N = Math.max(40, Math.min(900, SECTION_SCALE_B * (Hm / Bm) * maxB));
   }
   applySectionViewBox();
+
+  if (state.sectionRef && state.sectionRef.url) {
+    const r = state.sectionRef;
+    const imgEl = document.createElementNS(SVG_NS, 'image');
+    imgEl.setAttribute('href', r.url);
+    imgEl.setAttribute('preserveAspectRatio', 'none');
+    
+    const svgX = (r.worldX / Bm) * SECTION_SCALE_B;
+    const svgY = -((r.worldZ - keelZ) / Hm) * SECTION_SCALE_N;
+    const svgW = (r.worldW / Bm) * SECTION_SCALE_B;
+    const svgH = (r.worldH / Hm) * SECTION_SCALE_N;
+    
+    imgEl.setAttribute('x', svgX.toFixed(1));
+    imgEl.setAttribute('y', svgY.toFixed(1));
+    imgEl.setAttribute('width', svgW.toFixed(1));
+    imgEl.setAttribute('height', svgH.toFixed(1));
+    imgEl.setAttribute('opacity', r.opacity);
+    sectionSvg.appendChild(imgEl);
+  }
+
 
   // True screen→SVG scale factor.  sectionVP.zoom alone is not enough because
   // SECTION_SCALE_N (and therefore the viewBox height) also changes when the
@@ -2079,99 +1981,21 @@ meshOpacityEl.addEventListener('input', () => {
   renderTopView();
 });
 
-// ── Ambient occlusion — direct SSAOPass parameter knobs ──────────────────
-//
-// All four sliders + the output selector talk straight to the SSAOPass
-// fields. Ranges are intentionally permissive (kernel radius up to 10 m,
-// max distance up to 10 m) so the look can be pushed to extremes.
+// ── Render Mode ─────────────────────────────────────────────────────────
 
-const aoEnabledEl = document.getElementById('ao-enabled');
-const aoKrEl      = document.getElementById('ao-kr');
-const aoMnEl      = document.getElementById('ao-mn');
-const aoMxEl      = document.getElementById('ao-mx');
-const aoCtEl      = document.getElementById('ao-ct');
-const aoOutSel    = document.getElementById('ao-output');
-const aoKrOut     = document.getElementById('ao-kr-out');
-const aoMnOut     = document.getElementById('ao-mn-out');
-const aoMxOut     = document.getElementById('ao-mx-out');
-const aoCtOut     = document.getElementById('ao-ct-out');
-const aoResetBtn  = document.getElementById('ao-reset');
+const renderModeSel = document.getElementById('render-mode');
+const normalMaterial = new THREE.MeshNormalMaterial({ side: THREE.DoubleSide });
 
-// AO defaults tuned for visible contour shading on a kayak hull. Combined
-// with the lower ambient + stronger key light above, contours on the hull
-// belly should read clearly.
-const AO_DEFAULTS = {
-  enabled:      true,
-  kernelRadius: 0.35,
-  minDistance:  0.0001,
-  maxDistance:  0.6,
-  contrast:     12.0,
-  output:       0,   // Default (beauty + AO)
-};
-
-const aoOutputModes = [
-  SSAOPass.OUTPUT.Default,
-  SSAOPass.OUTPUT.SSAO,
-  SSAOPass.OUTPUT.Blur,
-  SSAOPass.OUTPUT.Beauty,
-  SSAOPass.OUTPUT.Depth,
-  SSAOPass.OUTPUT.Normal,
-];
-
-function fmtFixed(v, digits) {
-  // Compact display: trim trailing zeros after the decimal.
-  return parseFloat(v).toFixed(digits).replace(/\.?0+$/, '');
+function updateRenderMode() {
+  const mode = renderModeSel.value;
+  hullGroup.children.forEach(mesh => {
+    if (mesh.isMesh) {
+      mesh.material = mode === 'normals' ? normalMaterial : hullMaterial;
+    }
+  });
 }
 
-function syncAOLabels() {
-  aoKrOut.textContent = fmtFixed(aoKrEl.value, 3) + ' m';
-  aoMnOut.textContent = fmtFixed(aoMnEl.value, 5) + ' m';
-  aoMxOut.textContent = fmtFixed(aoMxEl.value, 4) + ' m';
-  aoCtOut.textContent = '×' + fmtFixed(aoCtEl.value, 1);
-}
-
-function applyAO() {
-  const ao = state.ao;
-  ssaoPass.enabled      = ao.enabled;
-  ssaoPass.kernelRadius = ao.kernelRadius;
-  ssaoPass.minDistance  = ao.minDistance;
-  ssaoPass.maxDistance  = ao.maxDistance;
-  ssaoPass.output       = aoOutputModes[ao.output] ?? aoOutputModes[0];
-  aoContrastUniform.value = ao.contrast;
-  aoVisBoostUniform.value = (ao.output === 1 || ao.output === 2) ? ao.contrast : 1.0;
-  syncAOLabels();
-}
-
-aoEnabledEl.addEventListener('input', () => { state.ao.enabled      = aoEnabledEl.checked;            applyAO(); });
-aoKrEl     .addEventListener('input', () => { state.ao.kernelRadius = parseFloat(aoKrEl.value);       applyAO(); });
-aoMnEl     .addEventListener('input', () => { state.ao.minDistance  = parseFloat(aoMnEl.value);       applyAO(); });
-aoMxEl     .addEventListener('input', () => { state.ao.maxDistance  = parseFloat(aoMxEl.value);       applyAO(); });
-aoCtEl     .addEventListener('input', () => { state.ao.contrast     = parseFloat(aoCtEl.value);       applyAO(); });
-aoOutSel   .addEventListener('input', () => { state.ao.output       = parseInt(aoOutSel.value, 10);   applyAO(); });
-
-aoResetBtn.addEventListener('click', () => {
-  state.ao.enabled      = AO_DEFAULTS.enabled;
-  state.ao.kernelRadius = AO_DEFAULTS.kernelRadius;
-  state.ao.minDistance  = AO_DEFAULTS.minDistance;
-  state.ao.maxDistance  = AO_DEFAULTS.maxDistance;
-  state.ao.contrast     = AO_DEFAULTS.contrast;
-  state.ao.output       = AO_DEFAULTS.output;
-  syncAOInputsFromState();
-  applyAO();
-});
-
-function syncAOInputsFromState() {
-  aoEnabledEl.checked = state.ao.enabled;
-  aoKrEl.value        = state.ao.kernelRadius;
-  aoMnEl.value        = state.ao.minDistance;
-  aoMxEl.value        = state.ao.maxDistance;
-  aoCtEl.value        = state.ao.contrast;
-  aoOutSel.value      = String(state.ao.output);
-}
-
-// Initial: push state defaults into inputs, then apply.
-syncAOInputsFromState();
-applyAO();
+renderModeSel.addEventListener('change', updateRenderMode);
 
 // ── Side-view drag handlers ──────────────────────────────────────────────
 //
@@ -2256,33 +2080,6 @@ topSvg.addEventListener('pointermove', (e) => {
   const { wx, wy } = svgToLocalTop(e);
   topDrag.moved = true;
 
-  if (topDrag.kind === 'ref-top') {
-    // wx = worldX (longitudinal), wy = worldY (beam)
-    if (!topDrag.startWX) { topDrag.startWX = wx; topDrag.startWY = wy; topDrag.origX = state.topRef.worldX; topDrag.origY = state.topRef.worldY; }
-    state.topRef.worldX = topDrag.origX + (wx - topDrag.startWX);
-    state.topRef.worldY = topDrag.origY + (wy - topDrag.startWY);
-    renderTopView();
-    return;
-  }
-
-  if (topDrag.kind === 'ref-top-corner') {
-    const r = state.topRef;
-    if (!topDrag.anchorSet) {
-      topDrag.anchorSet = true;
-      // zi=0(bow end)→anchor stern, zi=1(stern end)→anchor bow
-      topDrag.anchorWx = topDrag.zi === 0 ? r.worldX         : r.worldX + r.worldW;
-      // xi=0(port)→anchor stbd, xi=1(stbd)→anchor port
-      topDrag.anchorWy = topDrag.xi === 0 ? r.worldY + r.worldH : r.worldY;
-    }
-    const newW = Math.max(0.05, Math.abs(wx - topDrag.anchorWx)); // length
-    const newH = r.nativeAspect ? newW * r.nativeAspect : newW;   // beam
-    r.worldW = newW;
-    r.worldH = newH;
-    r.worldX = topDrag.zi === 0 ? topDrag.anchorWx         : topDrag.anchorWx - newW;
-    r.worldY = topDrag.xi === 0 ? topDrag.anchorWy - newH   : topDrag.anchorWy;
-    renderTopView();
-    return;
-  }
 
   const bl = state.beamLine;
   const sorted = [...bl.peaks].sort((a, b) => a.x - b.x);
@@ -2548,32 +2345,6 @@ sideSvg.addEventListener('pointermove', (e) => {
   const wz = -y / SIDE_SCALE;
   drag.moved = true;
 
-  if (drag.kind === 'ref-side') {
-    if (!drag.startWX) { drag.startWX = wx; drag.startWZ = wz; drag.origX = state.sideRef.worldX; drag.origZ = state.sideRef.worldZ; }
-    state.sideRef.worldX = drag.origX + (wx - drag.startWX);
-    state.sideRef.worldZ = drag.origZ + (wz - drag.startWZ);
-    renderSideView();
-    return;
-  }
-
-  if (drag.kind === 'ref-side-corner') {
-    const r = state.sideRef;
-    if (!drag.anchorSet) {
-      drag.anchorSet = true;
-      // Anchor = opposite corner: xi=0(left)→anchor right, xi=1(right)→anchor left
-      drag.anchorWx = drag.xi === 0 ? r.worldX + r.worldW : r.worldX;
-      // zi=0(top)→anchor bottom, zi=1(bottom)→anchor top
-      drag.anchorWz = drag.zi === 0 ? r.worldZ - r.worldH : r.worldZ;
-    }
-    const newW = Math.max(0.05, Math.abs(wx - drag.anchorWx));
-    const newH = r.nativeAspect ? newW / r.nativeAspect : newW;
-    r.worldW = newW;
-    r.worldH = newH;
-    r.worldX = drag.xi === 0 ? drag.anchorWx - newW : drag.anchorWx;
-    r.worldZ = drag.zi === 0 ? drag.anchorWz + newH : drag.anchorWz;
-    renderSideView();
-    return;
-  }
 
   if (drag.kind === 'knot') {
     // Move on-curve knot; handles move with it.
@@ -2703,8 +2474,201 @@ document.getElementById('side-reset').addEventListener('click', () => {
 
 // ── Reference image controls ──────────────────────────────────────────────
 
+const refEditorModal = document.getElementById('ref-editor-modal');
+const refEditorCanvas = document.getElementById('ref-editor-canvas');
+const refEditorCtx = refEditorCanvas.getContext('2d');
+const refRotSlider = document.getElementById('ref-rot');
+const refRotOut = document.getElementById('ref-rot-out');
+const refEditorApply = document.getElementById('ref-editor-apply');
+const refEditorCancel = document.getElementById('ref-editor-cancel');
+const refCropBox = document.getElementById('ref-crop-box');
+const refCanvasContainer = document.getElementById('ref-canvas-container');
+
+let refEditorImg = null;
+let refEditorViewKey = null;
+let refEditorRenderFn = null;
+let refRot = 0;
+
+function openRefEditor(img, viewKey, renderFn) {
+  refEditorImg = img;
+  refEditorViewKey = viewKey;
+  refEditorRenderFn = renderFn;
+  refEditorModal.showModal();
+}
+
+function drawRefCanvas() {
+  if (!refEditorImg) return;
+  const w = refEditorImg.naturalWidth;
+  const h = refEditorImg.naturalHeight;
+  
+  // Calculate bounding box of rotated image to size canvas
+  const rad = refRot * Math.PI / 180;
+  const sin = Math.abs(Math.sin(rad));
+  const cos = Math.abs(Math.cos(rad));
+  const cw = w * cos + h * sin;
+  const ch = w * sin + h * cos;
+  
+  // Max dimension we want to render in the UI
+  const MAX_SIZE = 600;
+  let scale = 1;
+  if (cw > MAX_SIZE || ch > MAX_SIZE) {
+    scale = MAX_SIZE / Math.max(cw, ch);
+  }
+  
+  refEditorCanvas.width = cw * scale;
+  refEditorCanvas.height = ch * scale;
+  refCanvasContainer.style.width = refEditorCanvas.width + 'px';
+  refCanvasContainer.style.height = refEditorCanvas.height + 'px';
+  
+  refEditorCtx.save();
+  refEditorCtx.translate(refEditorCanvas.width / 2, refEditorCanvas.height / 2);
+  refEditorCtx.rotate(rad);
+  refEditorCtx.scale(scale, scale);
+  refEditorCtx.drawImage(refEditorImg, -w/2, -h/2);
+  refEditorCtx.restore();
+}
+
+refRotSlider.addEventListener('input', () => {
+  refRot = parseFloat(refRotSlider.value);
+  refRotOut.textContent = refRot.toFixed(1) + '°';
+  drawRefCanvas();
+});
+
+refEditorCancel.addEventListener('click', () => {
+  refEditorModal.close();
+});
+
+// Basic crop box interaction
+let cropDrag = null;
+refCropBox.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  const dir = e.target.dataset.dir || 'move';
+  const bounds = refCanvasContainer.getBoundingClientRect();
+  const cropBounds = refCropBox.getBoundingClientRect();
+  cropDrag = {
+    dir,
+    startX: e.clientX,
+    startY: e.clientY,
+    origL: cropBounds.left - bounds.left,
+    origT: cropBounds.top - bounds.top,
+    origW: cropBounds.width,
+    origH: cropBounds.height,
+  };
+});
+window.addEventListener('pointermove', (e) => {
+  if (!cropDrag) return;
+  e.preventDefault();
+  const dx = e.clientX - cropDrag.startX;
+  const dy = e.clientY - cropDrag.startY;
+  let { origL: l, origT: t, origW: w, origH: h } = cropDrag;
+  
+  const contW = refEditorCanvas.width;
+  const contH = refEditorCanvas.height;
+
+  if (cropDrag.dir === 'move') {
+    l = Math.max(0, Math.min(contW - w, l + dx));
+    t = Math.max(0, Math.min(contH - h, t + dy));
+  } else {
+    if (cropDrag.dir.includes('e')) { w = Math.min(contW - l, Math.max(20, w + dx)); }
+    if (cropDrag.dir.includes('s')) { h = Math.min(contH - t, Math.max(20, h + dy)); }
+    if (cropDrag.dir.includes('w')) {
+      const maxDx = w - 20;
+      const actDx = Math.min(maxDx, Math.max(-l, dx));
+      l += actDx; w -= actDx;
+    }
+    if (cropDrag.dir.includes('n')) {
+      const maxDy = h - 20;
+      const actDy = Math.min(maxDy, Math.max(-t, dy));
+      t += actDy; h -= actDy;
+    }
+  }
+  
+  refCropBox.style.left = (l / contW * 100) + '%';
+  refCropBox.style.top = (t / contH * 100) + '%';
+  refCropBox.style.width = (w / contW * 100) + '%';
+  refCropBox.style.height = (h / contH * 100) + '%';
+});
+window.addEventListener('pointerup', () => { cropDrag = null; });
+window.addEventListener('pointercancel', () => { cropDrag = null; });
+
+refEditorApply.addEventListener('click', () => {
+  // Extract cropped region
+  const cropL = parseFloat(refCropBox.style.left) / 100 || 0.1;
+  const cropT = parseFloat(refCropBox.style.top) / 100 || 0.1;
+  const cropW = parseFloat(refCropBox.style.width) / 100 || 0.8;
+  const cropH = parseFloat(refCropBox.style.height) / 100 || 0.8;
+  
+  const sx = cropL * refEditorCanvas.width;
+  const sy = cropT * refEditorCanvas.height;
+  const sw = cropW * refEditorCanvas.width;
+  const sh = cropH * refEditorCanvas.height;
+  
+  const cropCanvas = document.createElement('canvas');
+  cropCanvas.width = sw;
+  cropCanvas.height = sh;
+  const cropCtx = cropCanvas.getContext('2d');
+  cropCtx.drawImage(refEditorCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+  
+  const r = state[refEditorViewKey];
+  r.url = cropCanvas.toDataURL('image/png');
+  r.nativeAspect = sw / sh;
+  
+  // Fit to hull bounding box
+  const spKnots = state.spine.knots;
+  const sternX = spKnots[0].x, bowX = spKnots[spKnots.length - 1].x;
+  const hullLen = bowX - sternX;
+  
+  if (refEditorViewKey === 'sideRef') {
+    const dkPts = sampledSpine(state.deckLine.knots, 16).pts;
+    const maxZ = Math.max(...dkPts.map(p => p.y));
+    const minZ = Math.min(...spKnots.map(k => k.z));
+    r.worldW = hullLen;
+    r.worldH = maxZ - minZ;
+    // Fix aspect by fitting to longest axis (meaning image completely covers hull)
+    if (hullLen / r.worldH > r.nativeAspect) {
+      r.worldH = hullLen / r.nativeAspect;
+    } else {
+      r.worldW = r.worldH * r.nativeAspect;
+    }
+    r.worldX = sternX;
+    r.worldZ = maxZ; // top edge at highest deck pt
+  } else if (refEditorViewKey === 'topRef') {
+    const beamPts = sampledBeamLine(state);
+    const maxY = Math.max(...beamPts.map(p => Math.abs(p.y)));
+    r.worldW = hullLen;
+    r.worldH = maxY * 2;
+    if (hullLen / r.worldH > r.nativeAspect) {
+      r.worldH = hullLen / r.nativeAspect;
+    } else {
+      r.worldW = r.worldH * r.nativeAspect;
+    }
+    r.worldX = sternX;
+    r.worldY = -r.worldH / 2;
+  } else if (refEditorViewKey === 'sectionRef') {
+    const dkPts = sampledSpine(state.deckLine.knots, 16).pts;
+    const maxZ = Math.max(...dkPts.map(p => p.y));
+    const minZ = Math.min(...spKnots.map(k => k.z));
+    const beamPts = sampledBeamLine(state);
+    const maxY = Math.max(...beamPts.map(p => Math.abs(p.y)));
+    const sectW = maxY * 2;
+    const sectH = maxZ - minZ;
+    r.worldW = sectW;
+    r.worldH = sectH;
+    if (sectW / sectH > r.nativeAspect) {
+      r.worldH = sectW / r.nativeAspect;
+    } else {
+      r.worldW = r.worldH * r.nativeAspect;
+    }
+    r.worldX = -r.worldW / 2; // Y in top view translates to X in section view
+    r.worldZ = maxZ;
+  }
+  
+  refEditorModal.close();
+  if (refEditorRenderFn) refEditorRenderFn();
+});
+
 function wireRefImage(viewKey, fileId, opacityId, opacityOutId, clearId, renderFn) {
-  const refState = () => state[viewKey];
+  const refState = () => state[viewKey] || (state[viewKey] = { url: null, opacity: 0.3 });
   const fmtPct = v => Math.round(v * 100) + '%';
 
   document.getElementById(fileId).addEventListener('change', (e) => {
@@ -2715,27 +2679,16 @@ function wireRefImage(viewKey, fileId, opacityId, opacityOutId, clearId, renderF
       const url = ev.target.result;
       const img = new Image();
       img.onload = () => {
-        const r = refState();
-        r.url = url;
-        r.nativeAspect = img.naturalWidth / img.naturalHeight;
-        // Auto-position to cover the hull on first load.
-        const spKnots = state.spine.knots;
-        const sternX = spKnots[0].x, bowX = spKnots[spKnots.length - 1].x;
-        const hullLen = bowX - sternX;
-        if (viewKey === 'sideRef') {
-          r.worldW = hullLen;
-          r.worldH = r.worldW / r.nativeAspect;
-          r.worldX = sternX;
-          // Top edge at highest deck point + small pad.
-          const dkPts = sampledSpine(state.deckLine.knots, 16).pts;
-          r.worldZ = Math.max(...dkPts.map(p => p.y)) + 0.05 + r.worldH;
-        } else {
-          r.worldW = hullLen;
-          r.worldH = r.worldW * r.nativeAspect;
-          r.worldX = sternX;
-          r.worldY = -r.worldH / 2;
-        }
-        renderFn();
+        refRotSlider.value = 0;
+        refRot = 0;
+        refRotOut.textContent = '0°';
+        refCropBox.style.left = '10%';
+        refCropBox.style.top = '10%';
+        refCropBox.style.width = '80%';
+        refCropBox.style.height = '80%';
+        
+        openRefEditor(img, viewKey, renderFn);
+        drawRefCanvas();
       };
       img.src = url;
     };
@@ -2750,7 +2703,10 @@ function wireRefImage(viewKey, fileId, opacityId, opacityOutId, clearId, renderF
     opOut.textContent = fmtPct(refState().opacity);
     renderFn();
   });
-  opOut.textContent = fmtPct(refState().opacity);
+  // Ensure state has the section
+  const s = refState();
+  if (s.opacity === undefined) s.opacity = 0.3;
+  opOut.textContent = fmtPct(s.opacity);
 
   document.getElementById(clearId).addEventListener('click', () => {
     refState().url = null;
@@ -2760,6 +2716,7 @@ function wireRefImage(viewKey, fileId, opacityId, opacityOutId, clearId, renderF
 
 wireRefImage('sideRef', 'side-ref-file', 'side-ref-opacity', 'side-ref-opacity-out', 'side-ref-clear', renderSideView);
 wireRefImage('topRef',  'top-ref-file',  'top-ref-opacity',  'top-ref-opacity-out',  'top-ref-clear',  renderTopView);
+wireRefImage('sectionRef', 'section-ref-file', 'section-ref-opacity', 'section-ref-opacity-out', 'section-ref-clear', renderSectionView);
 
 // Resizable view-pane dividers. Pane percentages live in state.layout so a
 // JSON export captures the workspace shape.

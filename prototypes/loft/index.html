@@ -17,7 +17,7 @@
 <body>
 
 <header>
-  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · tip-flat</span>
+  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · normals-editor</span>
   <h1>Loft</h1>
   <p class="subtitle">
     Design a 3D kayak hull from a curved spine (rocker) and a set of cross-sections, lofted live.
@@ -78,36 +78,12 @@
           <input type="color" id="color-in" value="#ffc0cb">
         </label>
       </div>
-      <details class="ao-details" open>
-        <summary>Ambient occlusion</summary>
-        <label class="ao-toggle">
-          <input type="checkbox" id="ao-enabled" checked>
-          Enabled
-        </label>
-        <label>kernel radius <output id="ao-kr-out"></output>
-          <input type="range" id="ao-kr" min="0.001" max="10" step="0.001" value="0.35">
-        </label>
-        <label>min distance <output id="ao-mn-out"></output>
-          <input type="range" id="ao-mn" min="0.00001" max="2" step="0.00001" value="0.0001">
-        </label>
-        <label>max distance <output id="ao-mx-out"></output>
-          <input type="range" id="ao-mx" min="0.0001" max="10" step="0.0001" value="0.6">
-        </label>
-        <label>contrast (boost) <output id="ao-ct-out"></output>
-          <input type="range" id="ao-ct" min="1" max="40" step="0.1" value="12">
-        </label>
-        <label>output
-          <select id="ao-output">
-            <option value="0" selected>Default (beauty + AO)</option>
-            <option value="1">SSAO only</option>
-            <option value="2">Blur</option>
-            <option value="3">Beauty only</option>
-            <option value="4">Depth</option>
-            <option value="5">Normal</option>
-          </select>
-        </label>
-        <button type="button" id="ao-reset" class="ao-reset">reset to defaults</button>
-      </details>
+      <label>Render mode
+        <select id="render-mode">
+          <option value="shaded" selected>Shaded</option>
+          <option value="normals">Normals</option>
+        </select>
+      </label>
       <details class="mesh-details">
         <summary>Loft mesh overlay</summary>
         <label class="mesh-toggle">
@@ -145,6 +121,12 @@
           <label class="ref-file-label">Load image<input type="file" id="top-ref-file" accept="image/*"></label>
           <label>Opacity <input type="range" id="top-ref-opacity" min="0" max="1" step="0.05" value="0.3"><output id="top-ref-opacity-out">30%</output></label>
           <button type="button" id="top-ref-clear">Clear</button>
+        </div>
+        <div class="ref-group">
+          <div class="ref-label">Cross-section</div>
+          <label class="ref-file-label">Load image<input type="file" id="section-ref-file" accept="image/*"></label>
+          <label>Opacity <input type="range" id="section-ref-opacity" min="0" max="1" step="0.05" value="0.3"><output id="section-ref-opacity-out">30%</output></label>
+          <button type="button" id="section-ref-clear">Clear</button>
         </div>
       </details>
       <div class="state-io">
@@ -186,6 +168,34 @@
 
   <div class="resizer resizer-v" aria-hidden="true"></div>
   <div class="resizer resizer-h" aria-hidden="true"></div>
+
+  <dialog id="ref-editor-modal">
+    <div class="ref-editor-content">
+      <div class="ref-editor-header">
+        <h3>Align Reference Image</h3>
+        <p>Rotate the image and drag the crop box to tightly enclose the hull in this view.</p>
+      </div>
+      <div class="ref-editor-body">
+        <div class="ref-canvas-container" id="ref-canvas-container">
+          <canvas id="ref-editor-canvas"></canvas>
+          <div id="ref-crop-box">
+            <div class="crop-handle nw" data-dir="nw"></div><div class="crop-handle n" data-dir="n"></div><div class="crop-handle ne" data-dir="ne"></div>
+            <div class="crop-handle w" data-dir="w"></div><div class="crop-handle e" data-dir="e"></div>
+            <div class="crop-handle sw" data-dir="sw"></div><div class="crop-handle s" data-dir="s"></div><div class="crop-handle se" data-dir="se"></div>
+          </div>
+        </div>
+      </div>
+      <div class="ref-editor-controls">
+        <label>Rotation <output id="ref-rot-out">0°</output>
+          <input type="range" id="ref-rot" min="-180" max="180" step="0.1" value="0">
+        </label>
+      </div>
+      <div class="ref-editor-footer">
+        <button type="button" id="ref-editor-cancel">Cancel</button>
+        <button type="button" id="ref-editor-apply" class="primary">Apply</button>
+      </div>
+    </div>
+  </dialog>
 </main>
 
 <p class="footer">
