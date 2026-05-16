@@ -85,10 +85,6 @@ until it has been chunked, prioritized, and confirmed by the user.
   station, described above). The same center line should appear in the
   cross-section view as a non-editable reference point (center of loft).
 
-- **Deck line in loft should follow the deck control curve exactly.** The
-  pink rendered deck perimeter sometimes deviates from the green deck control
-  curve. The keel line follows the spine exactly; the deck line should behave
-  identically.
 
 - **Remove ambient occlusion; simplify render modes.** AO currently does
   nothing visible (depth map appears to be entirely white, suggesting depth
@@ -137,7 +133,6 @@ without burning the 5-hour rate-limit on a single big task.*
 | 4 | 4 | Remove ambient occlusion, simplify render modes (shaded + normals, both with grid) | Sonnet | medium | Pure deletion + small addition. Removes a lot of incidental complexity, makes future render-mode work easier. Do BEFORE the textured-surface mode. |
 | 5 | 5 | Reference image in cross-section view | Sonnet | low | `wireRefImage` already factored — just instantiate a third one. |
 | 6 | 6 | Reference-image positioning UX polish (lock-aspect, fit-to-hull) | Sonnet | low | Small additions next to existing ref-image controls. Bundle with #5. |
-| 7 | 7 | Deck line in loft follows control curve exactly (bug) | Opus | medium | Needs investigation: why does the lofted deck perimeter deviate from the green Bezier? Likely a sampling-resolution or interpolation mismatch. Small fix once root-caused. |
 | 8 | 8 | Scale gizmo: pivot at hull center, no translation drift | Opus | medium | Math correctness — apply scale around (cx, 0, cz) rather than world origin; subtract pivot, scale, add back, also scale knot/handle handle-lengths uniformly. Wrong approach causes regressions in other gizmo uses. |
 | 9 | 9 | Section aspect-ratio instability when dragging widest point | Opus | medium | Subtle: the `max(b)` factor in `SECTION_SCALE_N` creates a feedback loop — as the dragged point shrinks, scale shrinks, the visible position changes, and the user's drag offset interprets differently. Also fix the "no update when station moves along X" degenerate case. |
 | 10 | 10 | Click-to-add station in top/side view, auto-shape from existing geometry | Opus | medium | Needs to interpolate the lofted shape at an arbitrary X (use the existing `denseRows` pipeline), then convert back to (b, n) control points. Some design choices about how many points to keep. |
@@ -251,6 +246,8 @@ Needs design before coding:
 | Top-view and section-view axis badge viewBox widened (110px) so "+Y (stbd)" doesn't clip | const-pixels |
 | Top-view Bezier handle lines: solid → dashed | keel-blue |
 | Tip closure: N-1 z-fighting triangles → 2 flat triangles per tip | tip-flat |
+| Deck line in loft now follows the green deck Bezier exactly (sample deck Z at row's actual X, not at arc-length s) | deck-init-fix |
+| Initial-render retry loop: 2D views blank-on-load fix when ResizeObserver's first callback fired before layout settled | deck-init-fix |
 | Scale gizmo on side/top/3D views (Y/X/Z axes, X updates length slider) | scale-gizmo, gizmo-fix |
 | Scale gizmo removed from cross-section view (meaningless in normalised b/n) | section-bezier |
 | Cross-section points → on-curve Bezier knots with angle/aftLen/foreLen handles (matches rocker / deck-line model) | section-bezier |

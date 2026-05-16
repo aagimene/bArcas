@@ -170,6 +170,28 @@ function sampledDeckLine(state) {
   return sampledSpine(state.deckLine.knots, 64);
 }
 
+// Interpolate y from a sampledSpine result at a specific x.  The curve is
+// assumed monotonic in x (true for rocker and deck — the user can't make
+// either loop back).  Binary-search the sample array for the bracketing
+// pair, then linearly interpolate y.  Used by buildLoft() so that the deck
+// height at each loft row is sampled at the row's actual X — not at the
+// same arc-length s as the keel, which would pick the wrong point on the
+// deck curve whenever its shape differs from the keel's.
+function curveYAtX(sampled, x) {
+  const pts = sampled.pts;
+  if (pts.length === 0) return 0;
+  if (x <= pts[0].x) return pts[0].y;
+  if (x >= pts[pts.length - 1].x) return pts[pts.length - 1].y;
+  let lo = 0, hi = pts.length - 1;
+  while (hi - lo > 1) {
+    const m = (lo + hi) >> 1;
+    if (pts[m].x <= x) lo = m; else hi = m;
+  }
+  const dx = pts[hi].x - pts[lo].x;
+  const t = dx > 1e-12 ? (x - pts[lo].x) / dx : 0;
+  return pts[lo].y + t * (pts[hi].y - pts[lo].y);
+}
+
 // Insert an on-curve knot at Bezier parameter `t` on segment `segIdx` of
 // any knots[] array (rocker or deck line) via De Casteljau subdivision.
 function insertKnot(knots, segIdx, t) {
@@ -491,9 +513,14 @@ function buildLoft(state) {
   const denseRows = [];
   for (let i = 0; i < Mdense; i++) {
     const s = i / (Mdense - 1);
-    const { p: keel } = spineAt(spSampled,   s);
-    const { p: deck } = spineAt(deckSampled, s);
-    const height = Math.max(0.001, deck.z - keel.z);
+    const { p: keel } = spineAt(spSampled, s);
+    // Sample the deck at the row's actual X — not at arc-length s — so the
+    // deck row of the loft traces the green deck Bezier exactly.  Using
+    // spineAt(deckSampled, s) would pick the deck point at the same arc-
+    // length fraction along the deck, whose x usually differs from keel.x
+    // whenever the curves have different shapes.
+    const deckZ  = curveYAtX(deckSampled, keel.x);
+    const height = Math.max(0.001, deckZ - keel.z);
     const halfB  = beamEvalAt(beamPts, keel.x);
     const samples = Array.from({ length: N }, (_, k) => ({
       b: Math.max(0, bSplines[k](s)),
@@ -590,9 +617,9 @@ function buildLoft(state) {
 
   // Expose dense rows for SVG wireframe and station row data for selection.
   const stationRows = sortedSt.map((st, i) => {
-    const { p: keel } = spineAt(spSampled,   st.s);
-    const { p: deck } = spineAt(deckSampled, st.s);
-    const height = Math.max(0.001, deck.z - keel.z);
+    const { p: keel } = spineAt(spSampled, st.s);
+    const deckZ       = curveYAtX(deckSampled, keel.x);  // same fix as the dense loft
+    const height = Math.max(0.001, deckZ - keel.z);
     const halfB  = beamEvalAt(beamPts, keel.x);
     const samples = sampleSection(st.points, N);
     const maxB = Math.max(...samples.map(s => s.b), 1e-9);
@@ -1093,8 +1120,11 @@ function renderTopView() {
   // 1 m along Y (transverse, screen X) render at the same pixel size.
   {
     const bbox  = topSvg.getBoundingClientRect();
-    const paneH = Math.max(bbox.height > 10 ? bbox.height : topSvg.parentElement.clientHeight - 44, 100);
-    const paneW = Math.max(bbox.width  > 10 ? bbox.width  : topSvg.clientWidth, 60);
+    console.log('[renderTopView] bbox:', bbox.width, bbox.height,
+                'parent:', topSvg.parentElement?.clientWidth, topSvg.parentElement?.clientHeight,
+                'parent.parent:', topSvg.parentElement?.parentElement?.clientWidth, topSvg.parentElement?.parentElement?.clientHeight);
+    const paneH = Math.max(bbox.height > 10 ? bbox.height : topSvg.parentElement.clientHeight, 100);
+    const paneW = Math.max(bbox.width  > 10 ? bbox.width  : topSvg.parentElement.clientWidth, 60);
     const stale = !topFit || topFit.paneW !== paneW || topFit.paneH !== paneH;
     if (stale) {
       const knots = state.spine.knots;
@@ -1474,9 +1504,9 @@ function renderSideView() {
   // ── Stations: keel (bottom) + deck (top) + chord line ──────────────
   const sortedStSide = [...state.stations].sort((a, b) => a.s - b.s);
   sortedStSide.forEach((st, i) => {
-    const { p: kp } = spineAt(spSampled,   st.s);
-    const { p: dp } = spineAt(deckSampled, st.s);
-    const dz = dp.z;
+    const { p: kp } = spineAt(spSampled, st.s);
+    // Deck Z at the station's actual X (same fix as buildLoft).
+    const dz = curveYAtX(deckSampled, kp.x);
     const isSel = i === state.selectedStation;
     const sel = isSel ? ' selected' : '';
     // Chord line keel→deck.
@@ -3000,11 +3030,9 @@ function syncUIFromState() {
   document.getElementById('side-ref-opacity-out').textContent = Math.round((state.sideRef.opacity ?? 0.3) * 100) + '%';
   document.getElementById('top-ref-opacity').value     = state.topRef.opacity  ?? 0.3;
   document.getElementById('top-ref-opacity-out').textContent  = Math.round((state.topRef.opacity  ?? 0.3) * 100) + '%';
-  // Colors + AO push into inputs and Three.js
+  // Colors push into inputs and Three.js
   syncColorInputsFromState();
   applyColors();
-  syncAOInputsFromState();
-  applyAO();
   // Key light — already aliased into state, just re-apply.
   applyKeyLightPosition();
   // Pane resizer percentages + drawer state
@@ -3280,15 +3308,17 @@ syncUIFromState();
 renderStationList();
 
 // Ensure panes are properly laid out before initial render.
-// A single requestAnimationFrame can fire before the browser finishes layout,
-// so we use a double-rAF (fires after at least one paint) plus a setTimeout
-// safety net to guarantee dimensions are available.
+// SVG elements with `flex: 1` and no intrinsic height report 0×0 from
+// getBoundingClientRect() until the browser paints — but their parent
+// pane containers get sized by the CSS grid layout.  The ResizeObserver
+// fires at exactly that moment, so we use it as the primary trigger.
 let initialRenderDone = false;
 function doInitialRender() {
   if (initialRenderDone) return;
+  // Check *parent* containers, not the SVGs themselves.
   const allReady = [sideSvg, topSvg, sectionSvg].every(svg => {
-    const r = svg.getBoundingClientRect();
-    return r.width > 10 && r.height > 10;
+    const p = svg.parentElement;
+    return p && p.clientWidth > 10 && p.clientHeight > 10;
   });
   if (allReady) {
     initialRenderDone = true;
@@ -3298,11 +3328,6 @@ function doInitialRender() {
     renderSectionView();
   }
 }
-// Double-rAF ensures at least one full paint cycle has completed.
-requestAnimationFrame(() => requestAnimationFrame(doInitialRender));
-// Safety-net: if the double-rAF still missed layout (e.g. slow tab), retry.
-setTimeout(doInitialRender, 200);
-setTimeout(doInitialRender, 600);
 
 window.addEventListener('resize', () => { 
   sideFit = null; topFit = null; 
@@ -3312,10 +3337,24 @@ window.addEventListener('resize', () => {
 });
 
 const paneResizeObserver = new ResizeObserver(() => {
-  if (!initialRenderDone) return;
+  if (!initialRenderDone) {
+    // First resize event — the grid just laid out the panes.
+    doInitialRender();
+    return;
+  }
   sideFit = null; topFit = null;
   renderSideView(); renderTopView(); renderSectionView();
 });
 paneResizeObserver.observe(sideSvg.parentElement);
 paneResizeObserver.observe(topSvg.parentElement);
 paneResizeObserver.observe(sectionSvg.parentElement);
+
+// Fallback: poll on every animation frame until the parents are sized
+// and doInitialRender succeeds.  Without this, if the ResizeObserver's
+// first callback fires before layout settles (parents still 0×0), no
+// further size change ever triggers it and the 2D views stay blank.
+(function retryInit() {
+  if (initialRenderDone) return;
+  doInitialRender();
+  if (!initialRenderDone) requestAnimationFrame(retryInit);
+})();
