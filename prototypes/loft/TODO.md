@@ -37,11 +37,6 @@ until it has been chunked, prioritized, and confirmed by the user.
   needs a reference image background like the side and top views, loaded and
   positioned independently.
 
-- **Cross-section panning triggers accidental control-point insertion.**
-  When panning (middle-button or background left-drag) in the cross-section
-  view, the pointerup sometimes fires a click event which inserts a new
-  control point. Insertion should only happen on a genuine stationary
-  click (no drag movement).
 
 - **Scale gizmo: unexpected translation during scaling.** For example,
   scaling horizontally (Y axis) in the top view also translates the whole
@@ -264,6 +259,10 @@ Needs design before coding:
 | Control points and lines stay constant pixel size when zooming | fixed-dots |
 | Font sizes non-scaling; axis badges pinned to pane corners as static HTML SVGs | fixed-labels |
 | Rocker interior knots: amber → blue (#2563eb) | keel-blue |
+| Section view: static axis badge (pinned corner, +Z/+Y), non-scaling via sf | section-scale |
+| Section pan no longer triggers click-to-add control point | section-fix |
+| Section strokes/fonts/dots truly constant screen-px via inline style= + actual SVG scale factor | const-pixels |
+| Top-view and section-view axis badge viewBox widened (110px) so "+Y (stbd)" doesn't clip | const-pixels |
 | Top-view Bezier handle lines: solid → dashed | keel-blue |
 | Scale gizmo on side/top/3D views (Y/X/Z axes, X updates length slider) | scale-gizmo, gizmo-fix |
 | Scale gizmo removed from cross-section view (meaningless in normalised b/n) | section-bezier |

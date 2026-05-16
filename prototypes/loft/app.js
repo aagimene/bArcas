@@ -1708,43 +1708,62 @@ function renderSectionView() {
   }
   applySectionViewBox();
 
-  // Scale factor: divide sizes/offsets by sf so control points stay
-  // constant pixel size regardless of zoom level (same pattern as side/top views).
-  const sf = sectionVP.zoom;
+  // True screen→SVG scale factor.  sectionVP.zoom alone is not enough because
+  // SECTION_SCALE_N (and therefore the viewBox height) also changes when the
+  // H/B aspect ratio or max-b shift — those changes alter the "meet" letterbox
+  // scale independently of zoom.  Read the actual ratio from the DOM instead.
+  //
+  // Inline element styles (style="stroke-width:…") beat CSS class rules, which
+  // beat SVG presentation attributes.  All non-geometric sizes must use style=
+  // (not attribute) to override the CSS; circle r is a geometry attribute in
+  // SVG 1.1 and is NOT overridden by CSS, so r/sf as an attribute works fine.
+  const sVB   = sectionSvg.viewBox.baseVal;   // set synchronously by applySectionViewBox
+  const sBbox = sectionSvg.getBoundingClientRect(); // CSS-determined dimensions (flex layout)
+  const sf = (sBbox.width > 1 && sVB.width > 0)
+    ? Math.min(sBbox.width / sVB.width, sBbox.height / sVB.height)
+    : sectionVP.zoom;
 
   const bOf = (b) => b * SECTION_SCALE_B;
   const nOf = (n) => -n * SECTION_SCALE_N;
+
+  // Helper: inline style string for a stroke-width value in screen-constant pixels.
+  // Must use style= (not attribute) because CSS class rules beat SVG attributes.
+  const sw = (w) => `stroke-width:${w / sf}`;
+  // Helper: inline style for font-size in screen-constant pixels.
+  const fs = (px) => `font-size:${px / sf}px`;
 
   // Centerline (b = 0). Spans the full vertical viewBox extent.
   const clTop = -SECTION_SCALE_N - SECTION_VB_PAD_TOP + 5;
   const clBot =  SECTION_VB_PAD_BOT - 5;
   sectionSvg.appendChild(el('line', {
-    x1: 0, y1: clTop, x2: 0, y2: clBot, class: 'axis', 'stroke-width': 2.2/sf,
+    x1: 0, y1: clTop, x2: 0, y2: clBot, class: 'axis', style: sw(2.2),
   }));
-  sectionSvg.appendChild(el('text', { x: 5/sf, y: clTop + 13/sf, class: 'label' }, 'CL'));
+  sectionSvg.appendChild(el('text', {
+    x: 5/sf, y: clTop + 13/sf, class: 'label', style: fs(11),
+  }, 'CL'));
 
   // Keel reference (n = 0).
   sectionSvg.appendChild(el('line', {
-    x1: -195, y1: nOf(0), x2: 195, y2: nOf(0), class: 'axis', 'stroke-width': 2.2/sf,
+    x1: -195, y1: nOf(0), x2: 195, y2: nOf(0), class: 'axis', style: sw(2.2),
   }));
   sectionSvg.appendChild(el('text', {
-    x: 193, y: nOf(0) + 18/sf, class: 'label', 'text-anchor': 'end',
+    x: 193, y: nOf(0) + 18/sf, class: 'label', 'text-anchor': 'end', style: fs(11),
   }, 'keel'));
 
   // Deck reference (n = 1).
   sectionSvg.appendChild(el('line', {
-    x1: -195, y1: nOf(1), x2: 195, y2: nOf(1), class: 'axis deck-axis', 'stroke-width': 2.2/sf,
+    x1: -195, y1: nOf(1), x2: 195, y2: nOf(1), class: 'axis deck-axis', style: sw(2.2),
   }));
   sectionSvg.appendChild(el('text', {
-    x: 193, y: nOf(1) - 6/sf, class: 'label', 'text-anchor': 'end',
+    x: 193, y: nOf(1) - 6/sf, class: 'label', 'text-anchor': 'end', style: fs(11),
   }, 'deck'));
 
   // Closed-loop section — same Bezier sampler buildLoft uses.
   const dense = sampleSection(station.points, 256);
   const stbdPath = 'M ' + dense.map(p => `${bOf( p.b).toFixed(2)} ${nOf(p.n).toFixed(2)}`).join(' L ');
   const portPath = 'M ' + dense.map(p => `${bOf(-p.b).toFixed(2)} ${nOf(p.n).toFixed(2)}`).join(' L ');
-  sectionSvg.appendChild(el('path', { class: 'section-curve',  d: stbdPath, 'stroke-width': 3.8/sf }));
-  sectionSvg.appendChild(el('path', { class: 'section-mirror', d: portPath, 'stroke-width': 2.8/sf }));
+  sectionSvg.appendChild(el('path', { class: 'section-curve',  d: stbdPath, style: sw(2.5) }));
+  sectionSvg.appendChild(el('path', { class: 'section-mirror', d: portPath, style: sw(1.5) }));
 
   // Tangent handles (drawn first so they sit underneath the knot circles).
   deriveSectionHandles(station.points);
@@ -1753,7 +1772,8 @@ function renderSectionView() {
     if (i > 0) {
       const ax = bOf(h.aft.b), ay = nOf(h.aft.n);
       sectionSvg.appendChild(el('line', {
-        x1: bOf(p.b), y1: nOf(p.n), x2: ax, y2: ay, class: 'section-handle-line', 'stroke-width': 1.4/sf,
+        x1: bOf(p.b), y1: nOf(p.n), x2: ax, y2: ay,
+        class: 'section-handle-line', style: sw(1.4),
       }));
       sectionSvg.appendChild(el('circle', {
         cx: ax, cy: ay, r: 14/sf, class: 'handle-hit',
@@ -1761,13 +1781,15 @@ function renderSectionView() {
       }));
       sectionSvg.appendChild(el('circle', {
         cx: ax, cy: ay, r: 5/sf, class: 'section-handle',
+        style: sw(1.4),
         'data-drag': 'ctrl-aft', 'data-idx': String(i),
       }));
     }
     if (i < lastIdx) {
       const fx = bOf(h.fore.b), fy = nOf(h.fore.n);
       sectionSvg.appendChild(el('line', {
-        x1: bOf(p.b), y1: nOf(p.n), x2: fx, y2: fy, class: 'section-handle-line', 'stroke-width': 1.4/sf,
+        x1: bOf(p.b), y1: nOf(p.n), x2: fx, y2: fy,
+        class: 'section-handle-line', style: sw(1.4),
       }));
       sectionSvg.appendChild(el('circle', {
         cx: fx, cy: fy, r: 14/sf, class: 'handle-hit',
@@ -1775,6 +1797,7 @@ function renderSectionView() {
       }));
       sectionSvg.appendChild(el('circle', {
         cx: fx, cy: fy, r: 5/sf, class: 'section-handle',
+        style: sw(1.4),
         'data-drag': 'ctrl-fore', 'data-idx': String(i),
       }));
     }
@@ -1794,13 +1817,15 @@ function renderSectionView() {
     sectionSvg.appendChild(el('circle', {
       cx: bOf(p.b), cy: nOf(p.n), r: 9/sf,
       class: ('ctrl-pt ' + cls + (p.chine ? 'chine' : '')).trim(),
+      style: sw(2),
       'data-drag': 'ctrl', 'data-idx': String(i),
     }));
   });
 
   if (station.points.length <= 5) {
     sectionSvg.appendChild(el('text', {
-      x: 0, y: SECTION_VB_PAD_BOT - 13/sf, class: 'label', 'text-anchor': 'middle',
+      x: 0, y: SECTION_VB_PAD_BOT - 13/sf, class: 'label',
+      'text-anchor': 'middle', style: fs(10),
     }, 'click · right-click to delete'));
   }
   // Axis badge is a static HTML SVG pinned to the pane corner (see index.html).
