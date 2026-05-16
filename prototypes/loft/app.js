@@ -1708,6 +1708,10 @@ function renderSectionView() {
   }
   applySectionViewBox();
 
+  // Scale factor: divide sizes/offsets by sf so control points stay
+  // constant pixel size regardless of zoom level (same pattern as side/top views).
+  const sf = sectionVP.zoom;
+
   const bOf = (b) => b * SECTION_SCALE_B;
   const nOf = (n) => -n * SECTION_SCALE_N;
 
@@ -1717,14 +1721,14 @@ function renderSectionView() {
   sectionSvg.appendChild(el('line', {
     x1: 0, y1: clTop, x2: 0, y2: clBot, class: 'axis',
   }));
-  sectionSvg.appendChild(el('text', { x: 5, y: clTop + 13, class: 'label' }, 'CL'));
+  sectionSvg.appendChild(el('text', { x: 5/sf, y: clTop + 13/sf, class: 'label' }, 'CL'));
 
   // Keel reference (n = 0).
   sectionSvg.appendChild(el('line', {
     x1: -195, y1: nOf(0), x2: 195, y2: nOf(0), class: 'axis',
   }));
   sectionSvg.appendChild(el('text', {
-    x: 193, y: nOf(0) + 18, class: 'label', 'text-anchor': 'end',
+    x: 193, y: nOf(0) + 18/sf, class: 'label', 'text-anchor': 'end',
   }, 'keel'));
 
   // Deck reference (n = 1).
@@ -1732,7 +1736,7 @@ function renderSectionView() {
     x1: -195, y1: nOf(1), x2: 195, y2: nOf(1), class: 'axis deck-axis',
   }));
   sectionSvg.appendChild(el('text', {
-    x: 193, y: nOf(1) - 6, class: 'label', 'text-anchor': 'end',
+    x: 193, y: nOf(1) - 6/sf, class: 'label', 'text-anchor': 'end',
   }, 'deck'));
 
   // Closed-loop section — same Bezier sampler buildLoft uses.
@@ -1752,11 +1756,11 @@ function renderSectionView() {
         x1: bOf(p.b), y1: nOf(p.n), x2: ax, y2: ay, class: 'section-handle-line',
       }));
       sectionSvg.appendChild(el('circle', {
-        cx: ax, cy: ay, r: 14, class: 'handle-hit',
+        cx: ax, cy: ay, r: 14/sf, class: 'handle-hit',
         'data-drag': 'ctrl-aft', 'data-idx': String(i),
       }));
       sectionSvg.appendChild(el('circle', {
-        cx: ax, cy: ay, r: 5, class: 'section-handle',
+        cx: ax, cy: ay, r: 5/sf, class: 'section-handle',
         'data-drag': 'ctrl-aft', 'data-idx': String(i),
       }));
     }
@@ -1766,11 +1770,11 @@ function renderSectionView() {
         x1: bOf(p.b), y1: nOf(p.n), x2: fx, y2: fy, class: 'section-handle-line',
       }));
       sectionSvg.appendChild(el('circle', {
-        cx: fx, cy: fy, r: 14, class: 'handle-hit',
+        cx: fx, cy: fy, r: 14/sf, class: 'handle-hit',
         'data-drag': 'ctrl-fore', 'data-idx': String(i),
       }));
       sectionSvg.appendChild(el('circle', {
-        cx: fx, cy: fy, r: 5, class: 'section-handle',
+        cx: fx, cy: fy, r: 5/sf, class: 'section-handle',
         'data-drag': 'ctrl-fore', 'data-idx': String(i),
       }));
     }
@@ -1783,12 +1787,12 @@ function renderSectionView() {
     const isCenterline = isKeel || isDeck;
     const cls = (isKeel ? 'keel ' : '') + (isDeck ? 'deck ' : '') + (isCenterline ? 'centerline ' : '');
     sectionSvg.appendChild(el('circle', {
-      cx: bOf(p.b), cy: nOf(p.n), r: 22,
+      cx: bOf(p.b), cy: nOf(p.n), r: 22/sf,
       class: ('ctrl-hit ' + cls).trim(),
       'data-drag': 'ctrl', 'data-idx': String(i),
     }));
     sectionSvg.appendChild(el('circle', {
-      cx: bOf(p.b), cy: nOf(p.n), r: 9,
+      cx: bOf(p.b), cy: nOf(p.n), r: 9/sf,
       class: ('ctrl-pt ' + cls + (p.chine ? 'chine' : '')).trim(),
       'data-drag': 'ctrl', 'data-idx': String(i),
     }));
@@ -1796,19 +1800,10 @@ function renderSectionView() {
 
   if (station.points.length <= 5) {
     sectionSvg.appendChild(el('text', {
-      x: 0, y: SECTION_VB_PAD_BOT - 13, class: 'label', 'text-anchor': 'middle',
+      x: 0, y: SECTION_VB_PAD_BOT - 13/sf, class: 'label', 'text-anchor': 'middle',
     }, 'click · right-click to delete'));
   }
-
-  // Coordinate-system badge (Y-Z plane, looking forward toward bow).
-  // Pinned to the bottom-left of the dynamic viewBox.
-  {
-    const ax = -193, ay = SECTION_VB_PAD_BOT - 5, L = 22;
-    sectionSvg.appendChild(el('line', { x1: ax, y1: ay, x2: ax + L, y2: ay,     class: 'axis-arrow' }));
-    sectionSvg.appendChild(el('line', { x1: ax, y1: ay, x2: ax,     y2: ay - L, class: 'axis-arrow' }));
-    sectionSvg.appendChild(el('text', { x: ax + L + 3, y: ay + 7,     class: 'axis-label' }, '+Y'));
-    sectionSvg.appendChild(el('text', { x: ax - 3,     y: ay - L - 3, class: 'axis-label', 'text-anchor': 'start' }, '+Z'));
-  }
+  // Axis badge is a static HTML SVG pinned to the pane corner (see index.html).
 }
 
 // ── Unit conversion helpers ──────────────────────────────────────────────

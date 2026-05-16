@@ -17,7 +17,7 @@
 <body>
 
 <header>
-  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · keel-blue</span>
+  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · section-scale</span>
   <h1>Loft</h1>
   <p class="subtitle">
     Design a 3D kayak hull from a curved spine (rocker) and a set of cross-sections, lofted live.
@@ -169,6 +169,10 @@
       <button type="button" class="view-reset" id="section-reset" title="Reset zoom/pan">⊙</button>
     </div>
     <svg id="section-view" viewBox="-200 -210 400 295" preserveAspectRatio="xMidYMid meet" aria-label="Cross-section editor"></svg>
+    <svg class="axis-badge" viewBox="0 0 90 56" width="90" height="56" aria-hidden="true">
+      <line x1="10" y1="46" x2="55" y2="46"/><line x1="10" y1="46" x2="10" y2="8"/>
+      <text x="58" y="50">+Y (stbd)</text><text x="13" y="17">+Z (up)</text>
+    </svg>
   </section>
 
   <section class="pane pane-side">
