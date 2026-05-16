@@ -1126,12 +1126,17 @@ function renderTopView() {
     imgEl.setAttribute('height', r.nativeH);
     imgEl.setAttribute('opacity', r.opacity);
     
-    const knots = state.spine.knots;
-    const sternX = knots[0].x;
-    const bowX = knots[knots.length - 1].x;
-    
-    const t1 = { x: xOfT(0), y: yOfT(sternX) };
-    const t2 = { x: xOfT(0), y: yOfT(bowX) };
+    let t1, t2;
+    if (r.worldT1 && r.worldT2) {
+      t1 = { x: xOfT(r.worldT1.x), y: yOfT(r.worldT1.y) };
+      t2 = { x: xOfT(r.worldT2.x), y: yOfT(r.worldT2.y) };
+    } else {
+      const knots = state.spine.knots;
+      const sternX = knots[0].x;
+      const bowX = knots[knots.length - 1].x;
+      t1 = { x: xOfT(0), y: yOfT(sternX) };
+      t2 = { x: xOfT(0), y: yOfT(bowX) };
+    }
     
     imgEl.setAttribute('transform', computeImageTransform(r, t1, t2));
     topSvg.appendChild(imgEl);
@@ -1373,13 +1378,18 @@ function renderSideView() {
     imgEl.setAttribute('height', r.nativeH);
     imgEl.setAttribute('opacity', r.opacity);
     
-    const sK = state.spine.knots;
-    const dK = state.deckLine.knots;
-    const sternZ = (sK[0].z + dK[0].z) / 2;
-    const bowZ = (sK[sK.length - 1].z + dK[dK.length - 1].z) / 2;
-    
-    const t1 = { x: xOf(sK[0].x), y: yOf(sternZ) };
-    const t2 = { x: xOf(sK[sK.length - 1].x), y: yOf(bowZ) };
+    let t1, t2;
+    if (r.worldT1 && r.worldT2) {
+      t1 = { x: xOf(r.worldT1.x), y: yOf(r.worldT1.y) };
+      t2 = { x: xOf(r.worldT2.x), y: yOf(r.worldT2.y) };
+    } else {
+      const sK = state.spine.knots;
+      const dK = state.deckLine.knots;
+      const sternZ = (sK[0].z + dK[0].z) / 2;
+      const bowZ = (sK[sK.length - 1].z + dK[dK.length - 1].z) / 2;
+      t1 = { x: xOf(sK[0].x), y: yOf(sternZ) };
+      t2 = { x: xOf(sK[sK.length - 1].x), y: yOf(bowZ) };
+    }
     
     imgEl.setAttribute('transform', computeImageTransform(r, t1, t2));
     sideSvg.appendChild(imgEl);
@@ -1636,13 +1646,18 @@ function renderSectionView() {
     imgEl.setAttribute('height', r.nativeH);
     imgEl.setAttribute('opacity', r.opacity);
     
-    const spKnots = state.spine.knots;
-    const dkPts = sampledSpine(state.deckLine.knots, 16).pts;
-    const maxZ = Math.max(...dkPts.map(p => p.y));
-    const minZ = Math.min(...spKnots.map(k => k.z));
-    
-    const t1 = { x: 0, y: -((minZ - keelZ) / Hm) * SECTION_SCALE_N };
-    const t2 = { x: 0, y: -((maxZ - keelZ) / Hm) * SECTION_SCALE_N };
+    let t1, t2;
+    if (r.worldT1 && r.worldT2) {
+      t1 = { x: 0, y: -((r.worldT1.y - keelZ) / Hm) * SECTION_SCALE_N };
+      t2 = { x: 0, y: -((r.worldT2.y - keelZ) / Hm) * SECTION_SCALE_N };
+    } else {
+      const spKnots = state.spine.knots;
+      const dkPts = sampledSpine(state.deckLine.knots, 16).pts;
+      const maxZ = Math.max(...dkPts.map(p => p.y));
+      const minZ = Math.min(...spKnots.map(k => k.z));
+      t1 = { x: 0, y: -((minZ - keelZ) / Hm) * SECTION_SCALE_N };
+      t2 = { x: 0, y: -((maxZ - keelZ) / Hm) * SECTION_SCALE_N };
+    }
     
     imgEl.setAttribute('transform', computeImageTransform(r, t1, t2));
     sectionSvg.appendChild(imgEl);
@@ -2624,6 +2639,26 @@ refEditorApply.addEventListener('click', () => {
   r.p1 = { x: refP1_native.x, y: refP1_native.y };
   r.p2 = { x: refP2_native.x, y: refP2_native.y };
   
+  if (refEditorViewKey === 'sideRef') {
+    const sK = state.spine.knots;
+    const dK = state.deckLine.knots;
+    const sternZ = (sK[0].z + dK[0].z) / 2;
+    const bowZ = (sK[sK.length - 1].z + dK[dK.length - 1].z) / 2;
+    r.worldT1 = { x: sK[0].x, y: sternZ };
+    r.worldT2 = { x: sK[sK.length - 1].x, y: bowZ };
+  } else if (refEditorViewKey === 'topRef') {
+    const sK = state.spine.knots;
+    r.worldT1 = { x: 0, y: sK[0].x };
+    r.worldT2 = { x: 0, y: sK[sK.length - 1].x };
+  } else if (refEditorViewKey === 'sectionRef') {
+    const spKnots = state.spine.knots;
+    const dkPts = sampledSpine(state.deckLine.knots, 16).pts;
+    const maxZ = Math.max(...dkPts.map(p => p.y));
+    const minZ = Math.min(...spKnots.map(k => k.z));
+    r.worldT1 = { x: 0, y: minZ };
+    r.worldT2 = { x: 0, y: maxZ };
+  }
+  
   refEditorModal.close();
   if (refEditorRenderFn) refEditorRenderFn();
 });
@@ -2658,12 +2693,16 @@ function wireRefImage(viewKey, fileId, opacityId, opacityOutId, clearId, renderF
             }
         }
         
-        // Update help text
+        // Update labels and help text
         const helpP = document.getElementById('ref-editor-help');
         if (viewKey === 'sectionRef') {
-            helpP.textContent = "Align P1 to the Keel (bottom), and P2 to the Deck (top).";
+            document.getElementById('ref-p1-label').textContent = 'Keel';
+            document.getElementById('ref-p2-label').textContent = 'Deck';
+            helpP.textContent = "Align the Keel (bottom) and Deck (top) points.";
         } else {
-            helpP.textContent = "Align P1 to the Stern (rear), and P2 to the Bow (front).";
+            document.getElementById('ref-p1-label').textContent = 'Stern';
+            document.getElementById('ref-p2-label').textContent = 'Bow';
+            helpP.textContent = "Align the Stern (rear) and Bow (front) points.";
         }
         
         openRefEditor(img, viewKey, renderFn);
