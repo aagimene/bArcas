@@ -2460,13 +2460,52 @@ topSvg.addEventListener('click', (e) => { if (e.metaKey || e.ctrlKey) tryTopDele
 // Scale ratio = (GIZMO_ARM + screen-delta-along-axis) / GIZMO_ARM.
 // GIZMO_ARM is declared near appendScaleGizmo2D above.
 
+// Scale around the hull centre so the gizmo doesn't translate the hull.
+// Also: handles are stored as (angle, aftLen, foreLen) — under a non-uniform
+// scale by r along one world axis only, the handle's component along that
+// axis scales by r while the perpendicular component stays the same.  The
+// equivalent (new angle, new length) is computed below.  C1 continuity is
+// preserved because aft and fore share the same angle/factor transform.
+//
+//   For an X-only scale by r:
+//     handle direction (cos a, sin a) → (cos a · r, sin a)
+//     new angle = atan2(sin a, cos a · r)
+//     length factor = sqrt((cos a · r)² + sin² a)
+//
+//   For a Z-only scale by r:
+//     handle direction (cos a, sin a) → (cos a, sin a · r)
+//     new angle = atan2(sin a · r, cos a)
+//     length factor = sqrt(cos² a + (sin a · r)²)
+//
+function _scaleSpineKnotX(k, r, cx) {
+  k.x = cx + (k.x - cx) * r;
+  const ca = Math.cos(k.angle), sa = Math.sin(k.angle);
+  const f = Math.hypot(ca * r, sa);
+  k.angle  = Math.atan2(sa, ca * r);
+  k.aftLen  *= f;
+  k.foreLen *= f;
+}
+function _scaleSpineKnotZ(k, r, cz) {
+  k.z = cz + (k.z - cz) * r;
+  const ca = Math.cos(k.angle), sa = Math.sin(k.angle);
+  const f = Math.hypot(ca, sa * r);
+  k.angle  = Math.atan2(sa * r, ca);
+  k.aftLen  *= f;
+  k.foreLen *= f;
+}
+
 function applyScaleX(r) {
   if (!(r > 0) || !isFinite(r)) return;
-  state.spine.knots.forEach(k    => { k.x *= r; k.foreLen *= r; k.aftLen *= r; });
-  state.deckLine.knots.forEach(k => { k.x *= r; k.foreLen *= r; k.aftLen *= r; });
+  const knots = state.spine.knots;
+  const cx = (knots[0].x + knots[knots.length - 1].x) / 2;
+  knots.forEach(k => _scaleSpineKnotX(k, r, cx));
+  state.deckLine.knots.forEach(k => _scaleSpineKnotX(k, r, cx));
+  // Beam line — peaks have x positions; sternHandle/bowHandle store dx as
+  // an X offset from the stern/bow knot, so just scale the delta by r.
   const bl = state.beamLine;
-  bl.sternHandle.dx *= r; bl.bowHandle.dx *= r;
-  bl.peaks.forEach(pk => { pk.x *= r; pk.hdx *= r; });
+  bl.sternHandle.dx *= r;
+  bl.bowHandle.dx   *= r;
+  bl.peaks.forEach(pk => { pk.x = cx + (pk.x - cx) * r; pk.hdx *= r; });
   state.length *= r;
   lengthEl.value        = state.length.toFixed(2);
   lengthOut.textContent = fmtLength(state.length);
@@ -2474,15 +2513,22 @@ function applyScaleX(r) {
 
 function applyScaleY(r) {
   if (!(r > 0) || !isFinite(r)) return;
+  // The hull is mirrored across y=0 (port = -stbd), so the hull's Y centre
+  // is literally the world Y=0.  Direct multiplication is the correct
+  // around-centre scale.
   const bl = state.beamLine;
-  bl.sternHandle.dy *= r; bl.bowHandle.dy *= r;
+  bl.sternHandle.dy *= r;
+  bl.bowHandle.dy   *= r;
   bl.peaks.forEach(pk => { pk.y *= r; pk.hdy *= r; });
 }
 
 function applyScaleZ(r) {
   if (!(r > 0) || !isFinite(r)) return;
-  state.spine.knots.forEach(k    => { k.z *= r; });
-  state.deckLine.knots.forEach(k => { k.z *= r; });
+  const sp = state.spine.knots, dk = state.deckLine.knots;
+  const allZ = [...sp.map(k => k.z), ...dk.map(k => k.z)];
+  const cz = (Math.min(...allZ) + Math.max(...allZ)) / 2;
+  sp.forEach(k => _scaleSpineKnotZ(k, r, cz));
+  dk.forEach(k => _scaleSpineKnotZ(k, r, cz));
 }
 
 // scaleDrag: active scale-gizmo drag state.

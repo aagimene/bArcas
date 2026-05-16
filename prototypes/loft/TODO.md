@@ -13,20 +13,19 @@ until it has been chunked, prioritized, and confirmed by the user.
 
 *Raw feedback captured from the user. Not yet scoped or confirmed.*
 
+- **Matcap palette presets.** Current matcap mode has just two colour
+  pickers (base + highlight). Add a "preset" dropdown with named palettes
+  (e.g. clay, chrome, gold, jade, blueprint) plus a "Custom" option that
+  reveals the colour pickers. Possibly extend the procedural generator to
+  support a few palette knobs beyond two flat colours (rim colour, multi-
+  stop gradient, anisotropic highlight). To define more concretely later.
+
 - **Chines.** Chines are numbered. Chine points are cross-section control
   points with a chine index assigned. The loft should produce edge loops that
   follow the chine points longitudinally, making chine lines visible in all
   views. Because chine control points are on the Bezier curve, handle lengths
   naturally control chine sharpness. A chine must span at least two
   neighboring stations but does not need to extend to all stations.
-
-- **Scale gizmo: unexpected translation during scaling.** For example,
-  scaling horizontally (Y axis) in the top view also translates the whole
-  hull in that direction. In the side view, Z-axis scaling appears to be
-  relative to the world origin (0, 0, 0) rather than the hull center, which
-  shifts the hull. Need to decide the correct pivot point (hull geometric
-  center? bounding-box center?) and ensure scaling applies purely as a scale
-  with no net translation.
 
 - **Cross-section aspect-ratio instability during station-point edits.**
   When dragging the widest control point, the aspect scaling can rapidly
@@ -98,7 +97,6 @@ without burning the 5-hour rate-limit on a single big task.*
 
 | # | Order | Item (short) | Model | Effort | Why this rank |
 |---|-------|--------------|-------|--------|---------------|
-| 8 | 1 | Scale gizmo: pivot at hull center, no translation drift | Opus | medium | Math correctness — apply scale around (cx, 0, cz) rather than world origin; subtract pivot, scale, add back, also scale knot/handle handle-lengths uniformly. Wrong approach causes regressions in other gizmo uses. |
 | 9 | 2 | Section aspect-ratio instability when dragging widest point | Opus | medium | Subtle: the `max(b)` factor in `SECTION_SCALE_N` creates a feedback loop — as the dragged point shrinks, scale shrinks, the visible position changes, and the user's drag offset interprets differently. Also fix the "no update when station moves along X" degenerate case. |
 | 10 | 3 | Click-to-add station in top/side view, auto-shape from existing geometry | Opus | medium | Needs to interpolate the lofted shape at an arbitrary X (use the existing `denseRows` pipeline), then convert back to (b, n) control points. Some design choices about how many points to keep. |
 | 13 | 4 | Per-view interactive layer toggles (visibility + editability lock per layer per view) | Opus | high | Biggest UI refactor: every clickable element now consults a per-view per-layer enabled flag. Affects every drag handler, every render function. Do this once the smaller fixes have settled. |
@@ -216,6 +214,7 @@ Needs design before coding:
 | Reference image positioning UX polish (lock-aspect / fit-to-hull) | (user) |
 | Body plan overlay on cross-section view (bow/stern half + opacity controls) | (user) |
 | Textured render modes for curvature: Matcap (procedural sphere texture, base + highlight colour pickers) and Checker (world-space cubic checker via shader injection, configurable size + 2 colours) | matcap-checker |
+| Scale gizmo pivots at hull centre (X-mid / Z-mid); anisotropic correction on knot angles + handle lengths so a one-axis scale stretches only that axis | gizmo-center |
 | Scale gizmo on side/top/3D views (Y/X/Z axes, X updates length slider) | scale-gizmo, gizmo-fix |
 | Scale gizmo removed from cross-section view (meaningless in normalised b/n) | section-bezier |
 | Cross-section points → on-curve Bezier knots with angle/aftLen/foreLen handles (matches rocker / deck-line model) | section-bezier |
