@@ -569,23 +569,23 @@ function buildLoft(state) {
       indices.push(Ad, Cd, Dd);
     }
     // ── Tip end caps ────────────────────────────────────────────────────
-    // When deck.z ≠ keel.z at the tip, the hull doesn't converge to a single
-    // point — there's a vertical edge between starboard and port tip columns.
-    // Close each tip with a strip of triangles from k=0 to k=N-1.
+    // Two triangles per tip, connecting the four spine-edge corners:
+    //   stbd-keel (k=0), stbd-deck (k=N-1), port-keel, port-deck.
+    // The tip row collapses to a flat rectangle of width 2r in world-Y.
+    // A fan of N-1 triangles was used before but caused z-fighting because
+    // intermediate k vertices share the same (x, z) position — all world-Y
+    // is 0 at tips (halfB=0), so only the spine-edge vertices differ.
     const tipFace = (rowI, outwardForward) => {
-      for (let k = 0; k < N - 1; k++) {
-        const sA = rowI * N + k,   sB = rowI * N + k + 1;
-        const pA = stbdVertCount + rowI * N + k,
-              pB = stbdVertCount + rowI * N + k + 1;
-        if (outwardForward) {
-          // Bow tip: outward normal is +x. CCW when viewed from +x.
-          indices.push(sA, pA, pB);
-          indices.push(sA, pB, sB);
-        } else {
-          // Stern tip: outward normal is -x. CCW when viewed from -x.
-          indices.push(pA, sA, sB);
-          indices.push(pA, sB, pB);
-        }
+      const sK = rowI * N,               sD = rowI * N + (N - 1);
+      const pK = stbdVertCount + rowI * N, pD = stbdVertCount + rowI * N + (N - 1);
+      if (outwardForward) {
+        // Bow — outward normal is +x, CCW from +x.
+        indices.push(sK, pK, pD);
+        indices.push(sK, pD, sD);
+      } else {
+        // Stern — outward normal is -x, CCW from -x.
+        indices.push(pK, sK, sD);
+        indices.push(pK, sD, pD);
       }
     };
     tipFace(0, false);             // stern

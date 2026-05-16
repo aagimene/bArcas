@@ -85,11 +85,6 @@ until it has been chunked, prioritized, and confirmed by the user.
   station, described above). The same center line should appear in the
   cross-section view as a non-editable reference point (center of loft).
 
-- **Cross-section view axis labels (+Z/+Y) should be statically positioned
-  and sized.** Currently they move and scale with the viewport. They should
-  be pinned to the lower-left corner at a fixed screen size, like the axis
-  badges in the other views.
-
 - **Deck line in loft should follow the deck control curve exactly.** The
   pink rendered deck perimeter sometimes deviates from the green deck control
   curve. The keel line follows the spine exactly; the deck line should behave
@@ -103,13 +98,6 @@ until it has been chunked, prioritized, and confirmed by the user.
   grid planes (the normals mode currently does not show grids). AO could be
   re-added from scratch later once the depth pass is fixed.
 
-
-- **Tip closure flickering polygons.** The bow and stern closures show
-  flickering/z-fighting polygons. Since the top and bottom tips share the
-  same X value, the closure should simply be two triangles forming a flat
-  rectangle the width of the spine radius — no additional geometry. Future
-  spine-sharpness work will control the full spine cross-section profile
-  including tips.
 
 - **Side view aspect ratio may not always match the shaded 3D mesh.** Under
   certain conditions the 2D side view silhouette does not appear to match
@@ -145,9 +133,7 @@ without burning the 5-hour rate-limit on a single big task.*
 
 | # | Order | Item (short) | Model | Effort | Why this rank |
 |---|-------|--------------|-------|--------|---------------|
-| 1 | 1 | Section axis labels (+Z/+Y) statically positioned in corner | Sonnet | low | Same exact pattern already used in side/top views — copy-paste fix, isolated. |
-| 2 | 2 | Cross-section controls/lines/labels non-scaling | Sonnet | low-med | Mechanical: divide every `r`/`stroke-width`/`font-size` by `sectionVP.zoom` (and respect the new height scaling). Same pattern as side/top. |
-| 3 | 3 | Tip closure: replace with two flat triangles | Sonnet | medium | Localised to `buildLoft()`. Visible quality win, no UI changes. |
+| 3 | 1 | Tip closure: replace with two flat triangles | Sonnet | medium | Localised to `buildLoft()`. Visible quality win, no UI changes. |
 | 4 | 4 | Remove ambient occlusion, simplify render modes (shaded + normals, both with grid) | Sonnet | medium | Pure deletion + small addition. Removes a lot of incidental complexity, makes future render-mode work easier. Do BEFORE the textured-surface mode. |
 | 5 | 5 | Reference image in cross-section view | Sonnet | low | `wireRefImage` already factored — just instantiate a third one. |
 | 6 | 6 | Reference-image positioning UX polish (lock-aspect, fit-to-hull) | Sonnet | low | Small additions next to existing ref-image controls. Bundle with #5. |
@@ -264,6 +250,7 @@ Needs design before coding:
 | Section strokes/fonts/dots truly constant screen-px via inline style= + actual SVG scale factor | const-pixels |
 | Top-view and section-view axis badge viewBox widened (110px) so "+Y (stbd)" doesn't clip | const-pixels |
 | Top-view Bezier handle lines: solid → dashed | keel-blue |
+| Tip closure: N-1 z-fighting triangles → 2 flat triangles per tip | tip-flat |
 | Scale gizmo on side/top/3D views (Y/X/Z axes, X updates length slider) | scale-gizmo, gizmo-fix |
 | Scale gizmo removed from cross-section view (meaningless in normalised b/n) | section-bezier |
 | Cross-section points → on-curve Bezier knots with angle/aftLen/foreLen handles (matches rocker / deck-line model) | section-bezier |
