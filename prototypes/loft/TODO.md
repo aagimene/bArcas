@@ -219,3 +219,4 @@ Needs design before coding:
 | Scale gizmo removed from cross-section view (meaningless in normalised b/n) | section-bezier |
 | Cross-section points → on-curve Bezier knots with angle/aftLen/foreLen handles (matches rocker / deck-line model) | section-bezier |
 | Prevent translation drift (panning) during scale gizmo drag | gizmo-pan-fix |
+| Update starting layout percentages (col 25%, row 75%) | layout-start |
