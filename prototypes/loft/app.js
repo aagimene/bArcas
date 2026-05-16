@@ -3279,22 +3279,30 @@ function nearestSegmentInsertIdx(points, clickB, clickN) {
 syncUIFromState();
 renderStationList();
 
-// Ensure panes are properly laid out before initial render
+// Ensure panes are properly laid out before initial render.
+// A single requestAnimationFrame can fire before the browser finishes layout,
+// so we use a double-rAF (fires after at least one paint) plus a setTimeout
+// safety net to guarantee dimensions are available.
 let initialRenderDone = false;
 function doInitialRender() {
   if (initialRenderDone) return;
-  const bbox = sideSvg.parentElement.getBoundingClientRect();
-  if (bbox.width > 10 && bbox.height > 10) {
+  const allReady = [sideSvg, topSvg, sectionSvg].every(svg => {
+    const r = svg.getBoundingClientRect();
+    return r.width > 10 && r.height > 10;
+  });
+  if (allReady) {
     initialRenderDone = true;
     sideFit = null; topFit = null;
     renderSideView();
     renderTopView();
     renderSectionView();
-  } else {
-    requestAnimationFrame(doInitialRender);
   }
 }
-requestAnimationFrame(doInitialRender);
+// Double-rAF ensures at least one full paint cycle has completed.
+requestAnimationFrame(() => requestAnimationFrame(doInitialRender));
+// Safety-net: if the double-rAF still missed layout (e.g. slow tab), retry.
+setTimeout(doInitialRender, 200);
+setTimeout(doInitialRender, 600);
 
 window.addEventListener('resize', () => { 
   sideFit = null; topFit = null; 
