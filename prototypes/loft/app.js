@@ -2370,7 +2370,7 @@ topSvg.addEventListener('wheel', (e) => {
 // Pan: left-drag on background (no control target), or middle-button anywhere.
 topSvg.addEventListener('pointerdown', (e) => {
   const isMiddle = e.button === 1;
-  const isBackground = e.button === 0 && !e.target.closest('[data-drag]');
+  const isBackground = e.button === 0 && !e.target.closest('[data-drag]') && !e.target.closest('[data-scale-axis]');
   if (!isMiddle && !isBackground) return;
   e.preventDefault();
   e.stopPropagation();
@@ -2379,7 +2379,7 @@ topSvg.addEventListener('pointerdown', (e) => {
 }, true);
 
 topSvg.addEventListener('pointermove', (e) => {
-  if (!topPanDrag) return;
+  if (!topPanDrag || scaleDrag) return;
   const bbox = topSvg.getBoundingClientRect();
   const vb   = topSvg.viewBox.baseVal;
   const scaleX = vb.width  / Math.max(1, bbox.width);
@@ -2707,7 +2707,7 @@ sideSvg.addEventListener('wheel', (e) => {
 
 sideSvg.addEventListener('pointerdown', (e) => {
   const isMiddle = e.button === 1;
-  const isBackground = e.button === 0 && !e.target.closest('[data-drag]');
+  const isBackground = e.button === 0 && !e.target.closest('[data-drag]') && !e.target.closest('[data-scale-axis]');
   if (!isMiddle && !isBackground) return;
   e.preventDefault();
   e.stopPropagation();
@@ -2716,7 +2716,7 @@ sideSvg.addEventListener('pointerdown', (e) => {
 }, true);
 
 sideSvg.addEventListener('pointermove', (e) => {
-  if (!sidePanDrag) return;
+  if (!sidePanDrag || scaleDrag) return;
   const vb = sideSvg.viewBox.baseVal;
   const bbox = sideSvg.getBoundingClientRect();
   const scaleX = vb.width  / Math.max(1, bbox.width);

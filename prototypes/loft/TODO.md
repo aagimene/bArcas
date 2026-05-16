@@ -218,3 +218,4 @@ Needs design before coding:
 | Scale gizmo on side/top/3D views (Y/X/Z axes, X updates length slider) | scale-gizmo, gizmo-fix |
 | Scale gizmo removed from cross-section view (meaningless in normalised b/n) | section-bezier |
 | Cross-section points → on-curve Bezier knots with angle/aftLen/foreLen handles (matches rocker / deck-line model) | section-bezier |
+| Prevent translation drift (panning) during scale gizmo drag | gizmo-pan-fix |
