@@ -2559,6 +2559,11 @@ function drawRefCanvas() {
   const h = refEditorImg.naturalHeight;
   const MAX_SIZE = 600;
   
+  const flipH = document.getElementById('ref-flip-h').checked;
+  const flipV = document.getElementById('ref-flip-v').checked;
+  const sx = flipH ? -1 : 1;
+  const sy = flipV ? -1 : 1;
+  
   if (refEditorViewKey === 'sideRef') {
     refSvg.style.display = 'none';
     refCropBox.style.display = 'block';
@@ -2583,7 +2588,7 @@ function drawRefCanvas() {
     refEditorCtx.save();
     refEditorCtx.translate(refEditorCanvas.width / 2, refEditorCanvas.height / 2);
     refEditorCtx.rotate(rad);
-    refEditorCtx.scale(scale, scale);
+    refEditorCtx.scale(scale * sx, scale * sy);
     refEditorCtx.drawImage(refEditorImg, -w/2, -h/2);
     refEditorCtx.restore();
   } else {
@@ -2602,8 +2607,9 @@ function drawRefCanvas() {
     refCanvasContainer.style.height = refEditorCanvas.height + 'px';
     
     refEditorCtx.save();
-    refEditorCtx.scale(scale, scale);
-    refEditorCtx.drawImage(refEditorImg, 0, 0);
+    refEditorCtx.translate(refEditorCanvas.width / 2, refEditorCanvas.height / 2);
+    refEditorCtx.scale(scale * sx, scale * sy);
+    refEditorCtx.drawImage(refEditorImg, -w/2, -h/2);
     refEditorCtx.restore();
 
     refSvg.setAttribute('viewBox', `0 0 ${w} ${h}`);
@@ -2628,6 +2634,8 @@ refRotSlider.addEventListener('input', () => {
   refRotOut.textContent = refRot.toFixed(1) + '°';
   drawRefCanvas();
 });
+document.getElementById('ref-flip-h').addEventListener('change', drawRefCanvas);
+document.getElementById('ref-flip-v').addEventListener('change', drawRefCanvas);
 
 let cropDrag = null;
 refCropBox.addEventListener('pointerdown', (e) => {
@@ -2750,7 +2758,22 @@ refEditorApply.addEventListener('click', () => {
     r.worldX = sternX;
     r.worldZ = maxZ;
   } else {
-    r.url = refEditorImg.src;
+    const flipH = document.getElementById('ref-flip-h').checked;
+    const flipV = document.getElementById('ref-flip-v').checked;
+    
+    if (flipH || flipV) {
+      const tmp = document.createElement('canvas');
+      tmp.width = refEditorImg.naturalWidth;
+      tmp.height = refEditorImg.naturalHeight;
+      const tctx = tmp.getContext('2d');
+      tctx.translate(flipH ? tmp.width : 0, flipV ? tmp.height : 0);
+      tctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+      tctx.drawImage(refEditorImg, 0, 0);
+      r.url = tmp.toDataURL('image/png');
+    } else {
+      r.url = refEditorImg.src;
+    }
+    
     r.nativeW = refEditorImg.naturalWidth;
     r.nativeH = refEditorImg.naturalHeight;
     r.p1 = { x: refP1_native.x, y: refP1_native.y };
@@ -2789,6 +2812,9 @@ function wireRefImage(viewKey, fileId, opacityId, opacityOutId, clearId, renderF
         const w = img.naturalWidth;
         const h = img.naturalHeight;
         
+        document.getElementById('ref-flip-h').checked = false;
+        document.getElementById('ref-flip-v').checked = false;
+        
         // Load existing points if available, else default
         const r = refState();
         if (r.p1 && r.p2) {
@@ -2798,6 +2824,9 @@ function wireRefImage(viewKey, fileId, opacityId, opacityOutId, clearId, renderF
             if (viewKey === 'sectionRef') {
                 refP1_native = { x: w / 2, y: h * 0.9 }; // Bottom
                 refP2_native = { x: w / 2, y: h * 0.1 }; // Top
+            } else if (viewKey === 'topRef') {
+                refP1_native = { x: w / 2, y: h * 0.9 }; // Stern (bottom)
+                refP2_native = { x: w / 2, y: h * 0.1 }; // Bow (top)
             } else {
                 refP1_native = { x: w * 0.1, y: h / 2 }; // Stern (left)
                 refP2_native = { x: w * 0.9, y: h / 2 }; // Bow (right)
