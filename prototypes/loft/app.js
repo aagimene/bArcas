@@ -1049,6 +1049,33 @@ let topFit = null; // { scale, baseCX, baseCY, paneW, paneH }
 let TOP_SCALE_X = 50;
 let TOP_SCALE_Y = 320;
 
+function computeImageTransform(r, t1, t2) {
+  if (!r.p1 || !r.p2 || !r.nativeW || !r.nativeH) return '';
+  const dx = r.p2.x - r.p1.x;
+  const dy = r.p2.y - r.p1.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 1) return '';
+  
+  const dxT = t2.x - t1.x;
+  const dyT = t2.y - t1.y;
+  const lenT = Math.hypot(dxT, dyT);
+  
+  const s = lenT / len;
+  const a1 = Math.atan2(dy, dx);
+  const a2 = Math.atan2(dyT, dxT);
+  const da = a2 - a1;
+  
+  const a = s * Math.cos(da);
+  const b = s * Math.sin(da);
+  const c = -s * Math.sin(da);
+  const d = s * Math.cos(da);
+  
+  const e = t1.x - (a * r.p1.x + c * r.p1.y);
+  const f = t1.y - (b * r.p1.x + d * r.p1.y);
+  
+  return `matrix(${a.toFixed(5)} ${b.toFixed(5)} ${c.toFixed(5)} ${d.toFixed(5)} ${e.toFixed(5)} ${f.toFixed(5)})`;
+}
+
 function renderTopView() {
   topSvg.innerHTML = '';
   // Scale factor: divide SVG-unit sizes by this so control points stay
@@ -1095,14 +1122,19 @@ function renderTopView() {
     const r = state.topRef;
     const imgEl = document.createElementNS(SVG_NS, 'image');
     imgEl.setAttribute('href', r.url);
-    imgEl.setAttribute('x',      (r.worldY * TOP_SCALE_Y).toFixed(1));
-    imgEl.setAttribute('y',      (-(r.worldX + r.worldW) * TOP_SCALE_X).toFixed(1));
-    imgEl.setAttribute('width',  (r.worldH * TOP_SCALE_Y).toFixed(1));
-    imgEl.setAttribute('height', (r.worldW * TOP_SCALE_X).toFixed(1));
+    imgEl.setAttribute('width', r.nativeW);
+    imgEl.setAttribute('height', r.nativeH);
     imgEl.setAttribute('opacity', r.opacity);
-    imgEl.setAttribute('data-drag', 'ref-top');
+    
+    const knots = state.spine.knots;
+    const sternX = knots[0].x;
+    const bowX = knots[knots.length - 1].x;
+    
+    const t1 = { x: xOfT(0), y: yOfT(sternX) };
+    const t2 = { x: xOfT(0), y: yOfT(bowX) };
+    
+    imgEl.setAttribute('transform', computeImageTransform(r, t1, t2));
     topSvg.appendChild(imgEl);
-
   }
 
   const sternKnot = state.spine.knots[0];
@@ -1337,14 +1369,20 @@ function renderSideView() {
     const r = state.sideRef;
     const imgEl = document.createElementNS(SVG_NS, 'image');
     imgEl.setAttribute('href', r.url);
-    imgEl.setAttribute('x',      (r.worldX * SIDE_SCALE).toFixed(1));
-    imgEl.setAttribute('y',      (-r.worldZ * SIDE_SCALE).toFixed(1));
-    imgEl.setAttribute('width',  (r.worldW * SIDE_SCALE).toFixed(1));
-    imgEl.setAttribute('height', (r.worldH * SIDE_SCALE).toFixed(1));
+    imgEl.setAttribute('width', r.nativeW);
+    imgEl.setAttribute('height', r.nativeH);
     imgEl.setAttribute('opacity', r.opacity);
-    imgEl.setAttribute('data-drag', 'ref-side');
+    
+    const sK = state.spine.knots;
+    const dK = state.deckLine.knots;
+    const sternZ = (sK[0].z + dK[0].z) / 2;
+    const bowZ = (sK[sK.length - 1].z + dK[dK.length - 1].z) / 2;
+    
+    const t1 = { x: xOf(sK[0].x), y: yOf(sternZ) };
+    const t2 = { x: xOf(sK[sK.length - 1].x), y: yOf(bowZ) };
+    
+    imgEl.setAttribute('transform', computeImageTransform(r, t1, t2));
     sideSvg.appendChild(imgEl);
-
   }
   const spSampled   = sampledSpine(state.spine.knots,   64);
   const deckSampled = sampledSpine(state.deckLine.knots, 64);
@@ -1594,18 +1632,19 @@ function renderSectionView() {
     const r = state.sectionRef;
     const imgEl = document.createElementNS(SVG_NS, 'image');
     imgEl.setAttribute('href', r.url);
-    imgEl.setAttribute('preserveAspectRatio', 'none');
-    
-    const svgX = (r.worldX / Bm) * SECTION_SCALE_B;
-    const svgY = -((r.worldZ - keelZ) / Hm) * SECTION_SCALE_N;
-    const svgW = (r.worldW / Bm) * SECTION_SCALE_B;
-    const svgH = (r.worldH / Hm) * SECTION_SCALE_N;
-    
-    imgEl.setAttribute('x', svgX.toFixed(1));
-    imgEl.setAttribute('y', svgY.toFixed(1));
-    imgEl.setAttribute('width', svgW.toFixed(1));
-    imgEl.setAttribute('height', svgH.toFixed(1));
+    imgEl.setAttribute('width', r.nativeW);
+    imgEl.setAttribute('height', r.nativeH);
     imgEl.setAttribute('opacity', r.opacity);
+    
+    const spKnots = state.spine.knots;
+    const dkPts = sampledSpine(state.deckLine.knots, 16).pts;
+    const maxZ = Math.max(...dkPts.map(p => p.y));
+    const minZ = Math.min(...spKnots.map(k => k.z));
+    
+    const t1 = { x: 0, y: -((minZ - keelZ) / Hm) * SECTION_SCALE_N };
+    const t2 = { x: 0, y: -((maxZ - keelZ) / Hm) * SECTION_SCALE_N };
+    
+    imgEl.setAttribute('transform', computeImageTransform(r, t1, t2));
     sectionSvg.appendChild(imgEl);
   }
 
@@ -2496,172 +2535,94 @@ function openRefEditor(img, viewKey, renderFn) {
   refEditorModal.showModal();
 }
 
+const refSvg = document.getElementById('ref-editor-svg');
+const refAlignLine = document.getElementById('ref-align-line');
+
+let refP1_native = { x: 0, y: 0 };
+let refP2_native = { x: 0, y: 0 };
+
+function updateRefOverlay() {
+  document.getElementById('ref-p1-group').setAttribute('transform', `translate(${refP1_native.x}, ${refP1_native.y})`);
+  document.getElementById('ref-p2-group').setAttribute('transform', `translate(${refP2_native.x}, ${refP2_native.y})`);
+  refAlignLine.setAttribute('x1', refP1_native.x);
+  refAlignLine.setAttribute('y1', refP1_native.y);
+  refAlignLine.setAttribute('x2', refP2_native.x);
+  refAlignLine.setAttribute('y2', refP2_native.y);
+}
+
 function drawRefCanvas() {
   if (!refEditorImg) return;
   const w = refEditorImg.naturalWidth;
   const h = refEditorImg.naturalHeight;
   
-  // Calculate bounding box of rotated image to size canvas
-  const rad = refRot * Math.PI / 180;
-  const sin = Math.abs(Math.sin(rad));
-  const cos = Math.abs(Math.cos(rad));
-  const cw = w * cos + h * sin;
-  const ch = w * sin + h * cos;
-  
-  // Max dimension we want to render in the UI
   const MAX_SIZE = 600;
   let scale = 1;
-  if (cw > MAX_SIZE || ch > MAX_SIZE) {
-    scale = MAX_SIZE / Math.max(cw, ch);
+  if (w > MAX_SIZE || h > MAX_SIZE) {
+    scale = MAX_SIZE / Math.max(w, h);
   }
   
-  refEditorCanvas.width = cw * scale;
-  refEditorCanvas.height = ch * scale;
+  refEditorCanvas.width = w * scale;
+  refEditorCanvas.height = h * scale;
   refCanvasContainer.style.width = refEditorCanvas.width + 'px';
   refCanvasContainer.style.height = refEditorCanvas.height + 'px';
   
   refEditorCtx.save();
-  refEditorCtx.translate(refEditorCanvas.width / 2, refEditorCanvas.height / 2);
-  refEditorCtx.rotate(rad);
   refEditorCtx.scale(scale, scale);
-  refEditorCtx.drawImage(refEditorImg, -w/2, -h/2);
+  refEditorCtx.drawImage(refEditorImg, 0, 0);
   refEditorCtx.restore();
-}
 
-refRotSlider.addEventListener('input', () => {
-  refRot = parseFloat(refRotSlider.value);
-  refRotOut.textContent = refRot.toFixed(1) + '°';
-  drawRefCanvas();
-});
+  refSvg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  
+  const isf = 1 / scale;
+  document.getElementById('ref-p1').setAttribute('r', 8 * isf);
+  document.getElementById('ref-p2').setAttribute('r', 8 * isf);
+  document.getElementById('ref-p1').setAttribute('stroke-width', 2 * isf);
+  document.getElementById('ref-p2').setAttribute('stroke-width', 2 * isf);
+  document.getElementById('ref-p1-label').setAttribute('font-size', 14 * isf);
+  document.getElementById('ref-p2-label').setAttribute('font-size', 14 * isf);
+  document.getElementById('ref-p1-label').setAttribute('x', 14 * isf);
+  document.getElementById('ref-p2-label').setAttribute('x', 14 * isf);
+  refAlignLine.setAttribute('stroke-width', 2 * isf);
+
+  updateRefOverlay();
+}
 
 refEditorCancel.addEventListener('click', () => {
   refEditorModal.close();
 });
 
-// Basic crop box interaction
-let cropDrag = null;
-refCropBox.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
-  const dir = e.target.dataset.dir || 'move';
-  const bounds = refCanvasContainer.getBoundingClientRect();
-  const cropBounds = refCropBox.getBoundingClientRect();
-  cropDrag = {
-    dir,
-    startX: e.clientX,
-    startY: e.clientY,
-    origL: cropBounds.left - bounds.left,
-    origT: cropBounds.top - bounds.top,
-    origW: cropBounds.width,
-    origH: cropBounds.height,
-  };
-});
-window.addEventListener('pointermove', (e) => {
-  if (!cropDrag) return;
-  e.preventDefault();
-  const dx = e.clientX - cropDrag.startX;
-  const dy = e.clientY - cropDrag.startY;
-  let { origL: l, origT: t, origW: w, origH: h } = cropDrag;
-  
-  const contW = refEditorCanvas.width;
-  const contH = refEditorCanvas.height;
-
-  if (cropDrag.dir === 'move') {
-    l = Math.max(0, Math.min(contW - w, l + dx));
-    t = Math.max(0, Math.min(contH - h, t + dy));
-  } else {
-    if (cropDrag.dir.includes('e')) { w = Math.min(contW - l, Math.max(20, w + dx)); }
-    if (cropDrag.dir.includes('s')) { h = Math.min(contH - t, Math.max(20, h + dy)); }
-    if (cropDrag.dir.includes('w')) {
-      const maxDx = w - 20;
-      const actDx = Math.min(maxDx, Math.max(-l, dx));
-      l += actDx; w -= actDx;
-    }
-    if (cropDrag.dir.includes('n')) {
-      const maxDy = h - 20;
-      const actDy = Math.min(maxDy, Math.max(-t, dy));
-      t += actDy; h -= actDy;
-    }
+let refDragHandle = null;
+refSvg.addEventListener('pointerdown', (e) => {
+  const g = e.target.closest('g');
+  if (g && g.id === 'ref-p1-group') refDragHandle = 'p1';
+  else if (g && g.id === 'ref-p2-group') refDragHandle = 'p2';
+  if (refDragHandle) {
+    e.preventDefault();
+    refSvg.setPointerCapture(e.pointerId);
   }
-  
-  refCropBox.style.left = (l / contW * 100) + '%';
-  refCropBox.style.top = (t / contH * 100) + '%';
-  refCropBox.style.width = (w / contW * 100) + '%';
-  refCropBox.style.height = (h / contH * 100) + '%';
 });
-window.addEventListener('pointerup', () => { cropDrag = null; });
-window.addEventListener('pointercancel', () => { cropDrag = null; });
+
+refSvg.addEventListener('pointermove', (e) => {
+  if (!refDragHandle) return;
+  e.preventDefault();
+  const pt = refSvg.createSVGPoint();
+  pt.x = e.clientX; pt.y = e.clientY;
+  const loc = pt.matrixTransform(refSvg.getScreenCTM().inverse());
+  if (refDragHandle === 'p1') { refP1_native.x = loc.x; refP1_native.y = loc.y; }
+  if (refDragHandle === 'p2') { refP2_native.x = loc.x; refP2_native.y = loc.y; }
+  updateRefOverlay();
+});
+
+refSvg.addEventListener('pointerup', () => { refDragHandle = null; });
+refSvg.addEventListener('pointercancel', () => { refDragHandle = null; });
 
 refEditorApply.addEventListener('click', () => {
-  // Extract cropped region
-  const cropL = parseFloat(refCropBox.style.left) / 100 || 0.1;
-  const cropT = parseFloat(refCropBox.style.top) / 100 || 0.1;
-  const cropW = parseFloat(refCropBox.style.width) / 100 || 0.8;
-  const cropH = parseFloat(refCropBox.style.height) / 100 || 0.8;
-  
-  const sx = cropL * refEditorCanvas.width;
-  const sy = cropT * refEditorCanvas.height;
-  const sw = cropW * refEditorCanvas.width;
-  const sh = cropH * refEditorCanvas.height;
-  
-  const cropCanvas = document.createElement('canvas');
-  cropCanvas.width = sw;
-  cropCanvas.height = sh;
-  const cropCtx = cropCanvas.getContext('2d');
-  cropCtx.drawImage(refEditorCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
-  
   const r = state[refEditorViewKey];
-  r.url = cropCanvas.toDataURL('image/png');
-  r.nativeAspect = sw / sh;
-  
-  // Fit to hull bounding box
-  const spKnots = state.spine.knots;
-  const sternX = spKnots[0].x, bowX = spKnots[spKnots.length - 1].x;
-  const hullLen = bowX - sternX;
-  
-  if (refEditorViewKey === 'sideRef') {
-    const dkPts = sampledSpine(state.deckLine.knots, 16).pts;
-    const maxZ = Math.max(...dkPts.map(p => p.y));
-    const minZ = Math.min(...spKnots.map(k => k.z));
-    r.worldW = hullLen;
-    r.worldH = maxZ - minZ;
-    // Fix aspect by fitting to longest axis (meaning image completely covers hull)
-    if (hullLen / r.worldH > r.nativeAspect) {
-      r.worldH = hullLen / r.nativeAspect;
-    } else {
-      r.worldW = r.worldH * r.nativeAspect;
-    }
-    r.worldX = sternX;
-    r.worldZ = maxZ; // top edge at highest deck pt
-  } else if (refEditorViewKey === 'topRef') {
-    const beamPts = sampledBeamLine(state);
-    const maxY = Math.max(...beamPts.map(p => Math.abs(p.y)));
-    r.worldW = hullLen;
-    r.worldH = maxY * 2;
-    if (hullLen / r.worldH > r.nativeAspect) {
-      r.worldH = hullLen / r.nativeAspect;
-    } else {
-      r.worldW = r.worldH * r.nativeAspect;
-    }
-    r.worldX = sternX;
-    r.worldY = -r.worldH / 2;
-  } else if (refEditorViewKey === 'sectionRef') {
-    const dkPts = sampledSpine(state.deckLine.knots, 16).pts;
-    const maxZ = Math.max(...dkPts.map(p => p.y));
-    const minZ = Math.min(...spKnots.map(k => k.z));
-    const beamPts = sampledBeamLine(state);
-    const maxY = Math.max(...beamPts.map(p => Math.abs(p.y)));
-    const sectW = maxY * 2;
-    const sectH = maxZ - minZ;
-    r.worldW = sectW;
-    r.worldH = sectH;
-    if (sectW / sectH > r.nativeAspect) {
-      r.worldH = sectW / r.nativeAspect;
-    } else {
-      r.worldW = r.worldH * r.nativeAspect;
-    }
-    r.worldX = -r.worldW / 2; // Y in top view translates to X in section view
-    r.worldZ = maxZ;
-  }
+  r.url = refEditorImg.src;
+  r.nativeW = refEditorImg.naturalWidth;
+  r.nativeH = refEditorImg.naturalHeight;
+  r.p1 = { x: refP1_native.x, y: refP1_native.y };
+  r.p2 = { x: refP2_native.x, y: refP2_native.y };
   
   refEditorModal.close();
   if (refEditorRenderFn) refEditorRenderFn();
@@ -2679,13 +2640,31 @@ function wireRefImage(viewKey, fileId, opacityId, opacityOutId, clearId, renderF
       const url = ev.target.result;
       const img = new Image();
       img.onload = () => {
-        refRotSlider.value = 0;
-        refRot = 0;
-        refRotOut.textContent = '0°';
-        refCropBox.style.left = '10%';
-        refCropBox.style.top = '10%';
-        refCropBox.style.width = '80%';
-        refCropBox.style.height = '80%';
+        const w = img.naturalWidth;
+        const h = img.naturalHeight;
+        
+        // Load existing points if available, else default
+        const r = refState();
+        if (r.p1 && r.p2) {
+            refP1_native = { ...r.p1 };
+            refP2_native = { ...r.p2 };
+        } else {
+            if (viewKey === 'sectionRef') {
+                refP1_native = { x: w / 2, y: h * 0.9 }; // Bottom
+                refP2_native = { x: w / 2, y: h * 0.1 }; // Top
+            } else {
+                refP1_native = { x: w * 0.1, y: h / 2 }; // Stern (left)
+                refP2_native = { x: w * 0.9, y: h / 2 }; // Bow (right)
+            }
+        }
+        
+        // Update help text
+        const helpP = document.getElementById('ref-editor-help');
+        if (viewKey === 'sectionRef') {
+            helpP.textContent = "Align P1 to the Keel (bottom), and P2 to the Deck (top).";
+        } else {
+            helpP.textContent = "Align P1 to the Stern (rear), and P2 to the Bow (front).";
+        }
         
         openRefEditor(img, viewKey, renderFn);
         drawRefCanvas();
@@ -3108,27 +3087,38 @@ function nearestSegmentInsertIdx(points, clickB, clickN) {
 
 // ── Initial render ───────────────────────────────────────────────────────
 
-// Single source of truth: push state into every UI control and Three.js
-// uniform/material. Replaces the scattered "sync .value/.textContent = state.X"
-// calls that lived in this section before.
 syncUIFromState();
 renderStationList();
 
-// Defer first render one frame so the CSS grid has finished laying out and
-// getBoundingClientRect() returns real pane dimensions for sideFit/topFit.
-requestAnimationFrame(() => {
-  renderSideView();
-  renderTopView();
-  renderSectionView();
+// Ensure panes are properly laid out before initial render
+let initialRenderDone = false;
+function doInitialRender() {
+  if (initialRenderDone) return;
+  const bbox = sideSvg.parentElement.getBoundingClientRect();
+  if (bbox.width > 10 && bbox.height > 10) {
+    initialRenderDone = true;
+    sideFit = null; topFit = null;
+    renderSideView();
+    renderTopView();
+    renderSectionView();
+  } else {
+    requestAnimationFrame(doInitialRender);
+  }
+}
+requestAnimationFrame(doInitialRender);
+
+window.addEventListener('resize', () => { 
+  sideFit = null; topFit = null; 
+  if (initialRenderDone) {
+    renderTopView(); renderSideView(); renderSectionView();
+  }
 });
 
-window.addEventListener('resize', () => { sideFit = null; topFit = null; renderTopView(); renderSideView(); });
-
-// Invalidate fit caches whenever the panes change size (e.g. resizer drag,
-// drawer open/close, initial layout settle).
 const paneResizeObserver = new ResizeObserver(() => {
+  if (!initialRenderDone) return;
   sideFit = null; topFit = null;
-  renderSideView(); renderTopView();
+  renderSideView(); renderTopView(); renderSectionView();
 });
 paneResizeObserver.observe(sideSvg.parentElement);
 paneResizeObserver.observe(topSvg.parentElement);
+paneResizeObserver.observe(sectionSvg.parentElement);

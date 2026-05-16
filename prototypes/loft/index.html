@@ -17,7 +17,7 @@
 <body>
 
 <header>
-  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · normals-editor</span>
+  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · two-point-align</span>
   <h1>Loft</h1>
   <p class="subtitle">
     Design a 3D kayak hull from a curved spine (rocker) and a set of cross-sections, lofted live.
@@ -173,22 +173,23 @@
     <div class="ref-editor-content">
       <div class="ref-editor-header">
         <h3>Align Reference Image</h3>
-        <p>Rotate the image and drag the crop box to tightly enclose the hull in this view.</p>
+        <p id="ref-editor-help">Drag Point 1 and Point 2 to match the hull extents.</p>
       </div>
       <div class="ref-editor-body">
         <div class="ref-canvas-container" id="ref-canvas-container">
           <canvas id="ref-editor-canvas"></canvas>
-          <div id="ref-crop-box">
-            <div class="crop-handle nw" data-dir="nw"></div><div class="crop-handle n" data-dir="n"></div><div class="crop-handle ne" data-dir="ne"></div>
-            <div class="crop-handle w" data-dir="w"></div><div class="crop-handle e" data-dir="e"></div>
-            <div class="crop-handle sw" data-dir="sw"></div><div class="crop-handle s" data-dir="s"></div><div class="crop-handle se" data-dir="se"></div>
-          </div>
+          <svg id="ref-editor-svg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible;">
+            <line id="ref-align-line" x1="0" y1="0" x2="0" y2="0" stroke="#2563eb" stroke-width="2" stroke-dasharray="4 4" />
+            <g id="ref-p1-group" style="pointer-events: auto; cursor: grab;">
+              <circle id="ref-p1" cx="0" cy="0" r="8" fill="#ec4899" stroke="white" stroke-width="2" />
+              <text id="ref-p1-label" x="12" y="4" font-size="12" fill="#ec4899" font-family="sans-serif" font-weight="bold" style="user-select: none;">P1</text>
+            </g>
+            <g id="ref-p2-group" style="pointer-events: auto; cursor: grab;">
+              <circle id="ref-p2" cx="0" cy="0" r="8" fill="#14b8a6" stroke="white" stroke-width="2" />
+              <text id="ref-p2-label" x="12" y="4" font-size="12" fill="#14b8a6" font-family="sans-serif" font-weight="bold" style="user-select: none;">P2</text>
+            </g>
+          </svg>
         </div>
-      </div>
-      <div class="ref-editor-controls">
-        <label>Rotation <output id="ref-rot-out">0°</output>
-          <input type="range" id="ref-rot" min="-180" max="180" step="0.1" value="0">
-        </label>
       </div>
       <div class="ref-editor-footer">
         <button type="button" id="ref-editor-cancel">Cancel</button>
