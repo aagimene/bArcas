@@ -525,7 +525,7 @@ main {
   bottom: 8px;
   left: 8px;
   pointer-events: none;
-  z-index: 2;
+  z-index: 10;
 }
 .axis-badge line { stroke: #0f172a; stroke-width: 1.6; }
 .axis-badge text { font: 600 11px -apple-system, sans-serif; fill: #0f172a; }

@@ -37,10 +37,11 @@ until it has been chunked, prioritized, and confirmed by the user.
   needs a reference image background like the side and top views, loaded and
   positioned independently.
 
-- **Cross-section control points, lines, and labels should not scale with
-  zoom.** Stroke widths, point radii, and font sizes should remain constant
-  in screen pixels regardless of how far the section view is zoomed or how
-  the section's size changes due to aspect-ratio scaling.
+- **Cross-section panning triggers accidental control-point insertion.**
+  When panning (middle-button or background left-drag) in the cross-section
+  view, the pointerup sometimes fires a click event which inserts a new
+  control point. Insertion should only happen on a genuine stationary
+  click (no drag movement).
 
 - **Scale gizmo: unexpected translation during scaling.** For example,
   scaling horizontally (Y axis) in the top view also translates the whole

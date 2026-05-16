@@ -1719,13 +1719,13 @@ function renderSectionView() {
   const clTop = -SECTION_SCALE_N - SECTION_VB_PAD_TOP + 5;
   const clBot =  SECTION_VB_PAD_BOT - 5;
   sectionSvg.appendChild(el('line', {
-    x1: 0, y1: clTop, x2: 0, y2: clBot, class: 'axis',
+    x1: 0, y1: clTop, x2: 0, y2: clBot, class: 'axis', 'stroke-width': 2.2/sf,
   }));
   sectionSvg.appendChild(el('text', { x: 5/sf, y: clTop + 13/sf, class: 'label' }, 'CL'));
 
   // Keel reference (n = 0).
   sectionSvg.appendChild(el('line', {
-    x1: -195, y1: nOf(0), x2: 195, y2: nOf(0), class: 'axis',
+    x1: -195, y1: nOf(0), x2: 195, y2: nOf(0), class: 'axis', 'stroke-width': 2.2/sf,
   }));
   sectionSvg.appendChild(el('text', {
     x: 193, y: nOf(0) + 18/sf, class: 'label', 'text-anchor': 'end',
@@ -1733,7 +1733,7 @@ function renderSectionView() {
 
   // Deck reference (n = 1).
   sectionSvg.appendChild(el('line', {
-    x1: -195, y1: nOf(1), x2: 195, y2: nOf(1), class: 'axis deck-axis',
+    x1: -195, y1: nOf(1), x2: 195, y2: nOf(1), class: 'axis deck-axis', 'stroke-width': 2.2/sf,
   }));
   sectionSvg.appendChild(el('text', {
     x: 193, y: nOf(1) - 6/sf, class: 'label', 'text-anchor': 'end',
@@ -1743,8 +1743,8 @@ function renderSectionView() {
   const dense = sampleSection(station.points, 256);
   const stbdPath = 'M ' + dense.map(p => `${bOf( p.b).toFixed(2)} ${nOf(p.n).toFixed(2)}`).join(' L ');
   const portPath = 'M ' + dense.map(p => `${bOf(-p.b).toFixed(2)} ${nOf(p.n).toFixed(2)}`).join(' L ');
-  sectionSvg.appendChild(el('path', { class: 'section-curve',  d: stbdPath }));
-  sectionSvg.appendChild(el('path', { class: 'section-mirror', d: portPath }));
+  sectionSvg.appendChild(el('path', { class: 'section-curve',  d: stbdPath, 'stroke-width': 3.8/sf }));
+  sectionSvg.appendChild(el('path', { class: 'section-mirror', d: portPath, 'stroke-width': 2.8/sf }));
 
   // Tangent handles (drawn first so they sit underneath the knot circles).
   deriveSectionHandles(station.points);
@@ -1753,7 +1753,7 @@ function renderSectionView() {
     if (i > 0) {
       const ax = bOf(h.aft.b), ay = nOf(h.aft.n);
       sectionSvg.appendChild(el('line', {
-        x1: bOf(p.b), y1: nOf(p.n), x2: ax, y2: ay, class: 'section-handle-line',
+        x1: bOf(p.b), y1: nOf(p.n), x2: ax, y2: ay, class: 'section-handle-line', 'stroke-width': 1.4/sf,
       }));
       sectionSvg.appendChild(el('circle', {
         cx: ax, cy: ay, r: 14/sf, class: 'handle-hit',
@@ -1767,7 +1767,7 @@ function renderSectionView() {
     if (i < lastIdx) {
       const fx = bOf(h.fore.b), fy = nOf(h.fore.n);
       sectionSvg.appendChild(el('line', {
-        x1: bOf(p.b), y1: nOf(p.n), x2: fx, y2: fy, class: 'section-handle-line',
+        x1: bOf(p.b), y1: nOf(p.n), x2: fx, y2: fy, class: 'section-handle-line', 'stroke-width': 1.4/sf,
       }));
       sectionSvg.appendChild(el('circle', {
         cx: fx, cy: fy, r: 14/sf, class: 'handle-hit',
@@ -3018,6 +3018,7 @@ sectionSvg.addEventListener('pointercancel', endSectionDrag);
 sectionSvg.addEventListener('click', (e) => {
   if (e.target.closest('[data-drag]')) return;
   if (sectionDrag && sectionDrag.moved) return;
+  if (sectionPanMoved) { sectionPanMoved = false; return; }
   const sel = selectedStationObj();
   if (!sel) return;
   const station = sel.ref;
@@ -3072,11 +3073,13 @@ sectionSvg.addEventListener('wheel', (e) => {
 }, { passive: false });
 
 let sectionPanDrag = null;
+let sectionPanMoved = false; // suppresses click-to-add after a pan drag
 sectionSvg.addEventListener('pointerdown', (e) => {
   const isMiddle = e.button === 1;
-  const isBackground = e.button === 0 && !e.target.closest('[data-drag]');
+  const isBackground = e.button === 0 && !e.target.closest('[data-drag]') && !e.target.closest('[data-scale-axis]');
   if (!isMiddle && !isBackground) return;
   e.preventDefault(); e.stopPropagation();
+  sectionPanMoved = false;
   sectionPanDrag = { startX: e.clientX, startY: e.clientY, startOffX: sectionVP.offX, startOffY: sectionVP.offY };
   sectionSvg.setPointerCapture(e.pointerId);
 }, true);
@@ -3088,10 +3091,11 @@ sectionSvg.addEventListener('pointermove', (e) => {
   const scaleY = vb.height / Math.max(1, bbox.height);
   sectionVP.offX = sectionPanDrag.startOffX - (e.clientX - sectionPanDrag.startX) * scaleX;
   sectionVP.offY = sectionPanDrag.startOffY - (e.clientY - sectionPanDrag.startY) * scaleY;
+  sectionPanMoved = true;
   renderSectionView();
 }, true);
 sectionSvg.addEventListener('pointerup',     () => { sectionPanDrag = null; }, true);
-sectionSvg.addEventListener('pointercancel', () => { sectionPanDrag = null; }, true);
+sectionSvg.addEventListener('pointercancel', () => { sectionPanDrag = null; sectionPanMoved = false; }, true);
 
 document.getElementById('section-reset').addEventListener('click', () => {
   sectionVP.zoom = 1; sectionVP.offX = 0; sectionVP.offY = 0;
