@@ -681,3 +681,95 @@ main {
 }
 .ref-editor-footer button.primary:hover { background: #1d4ed8; }
 
+
+/* ── Layer toggles (per-view chip + popover) ─────────────────── */
+.layers-btn {
+  margin-left: auto;
+  padding: 0 0.3rem;
+  font-size: 1rem;
+  line-height: 1.1;
+  color: #64748b;
+  background: none;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  cursor: pointer;
+  font-weight: 700;
+}
+.layers-btn:hover { color: #0f172a; border-color: #94a3b8; }
+.layers-btn.open  { background: #1f2937; color: white; border-color: #1f2937; }
+
+/* The popover lives in document.body so it can escape the pane's overflow.
+   Positioned in JS based on the button location. */
+.layers-popover {
+  position: fixed;
+  z-index: 200;
+  min-width: 175px;
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 0.4rem 0.5rem;
+  font-size: 0.82rem;
+  display: none;
+}
+.layers-popover.open { display: block; }
+.layers-popover .layer-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.35rem;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 3px;
+}
+.layers-popover .layer-row:hover { background: #f1f5f9; }
+.layers-popover .layer-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  border: 1.5px solid white;
+  box-shadow: 0 0 0 1px #cbd5e1;
+}
+.layers-popover .layer-name { flex: 1; color: #1f2937; }
+.layers-popover .layer-row.off .layer-name { color: #94a3b8; }
+.layers-popover .layer-row.off .layer-dot { background: #cbd5e1!important; }
+.layers-popover input[type="checkbox"] { margin: 0; cursor: pointer; }
+
+/* ── Grey-out + lock when a layer is off ─────────────────────── */
+/* Common neutral for all "off" states. */
+:where(
+  #side-view[data-layer-keel="off"]     [class*="spine"],
+  #side-view[data-layer-keel="off"]     [data-drag^="knot"],
+  #side-view[data-layer-deck="off"]     [class*="deck"],
+  #side-view[data-layer-deck="off"]     [data-drag^="deck"],
+  #side-view[data-layer-stations="off"] [class*="station"],
+  #side-view[data-layer-stations="off"] [data-drag="station"],
+  #top-view[data-layer-beam="off"]      [class*="beam"],
+  #top-view[data-layer-beam="off"]      [class*="spine"],
+  #top-view[data-layer-beam="off"]      [class*="handle"],
+  #top-view[data-layer-beam="off"]      [data-drag^="beam"],
+  #top-view[data-layer-stations="off"]  [class*="station"],
+  #top-view[data-layer-stations="off"]  [data-drag="station"],
+  #section-view[data-layer-controls="off"] [class*="section"],
+  #section-view[data-layer-controls="off"] [class*="ctrl"],
+  #section-view[data-layer-controls="off"] [data-drag^="ctrl"]
+) {
+  fill: #cbd5e1!important;
+  stroke: #cbd5e1!important;
+  pointer-events: none;
+}
+
+/* Reference image off → grey overlay + locked (no drag/resize). */
+[data-layer-refImage="off"] [data-drag^="ref-"],
+[data-layer-refImage="off"] .ref-corner {
+  pointer-events: none;
+  filter: grayscale(0.7) opacity(0.5);
+}
+
+/* Scale gizmo off → faded, non-interactive. */
+[data-layer-gizmo="off"] .scale-gizmo {
+  opacity: 0.25;
+}
+[data-layer-gizmo="off"] [data-scale-axis] {
+  pointer-events: none;
+}

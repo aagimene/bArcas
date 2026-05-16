@@ -31,7 +31,8 @@ until it has been chunked, prioritized, and confirmed by the user.
   When dragging the widest control point, the aspect scaling can rapidly
   increase/decrease uncontrollably. Also, moving a station along X sometimes
   does not update the section's displayed height even though the actual H/B
-  ratio has changed — possibly a degenerate state.
+  ratio has changed — possibly a degenerate state. **NOTE 2026-05-16:** user
+  reports this may no longer be an issue; re-verify before scheduling.
 
 - **Adding a new station is awkward.** The only path is the controls panel,
   and the new station gets an unpredictable starting shape. Desired behavior:
@@ -39,20 +40,6 @@ until it has been chunked, prioritized, and confirmed by the user.
   position; the new station should automatically assume the interpolated
   cross-section shape of the existing lofted geometry at that point, so the
   hull shape does not change at all upon insertion.
-
-- **Per-view interactive layer toggles (visibility + editability).** Too
-  many things are simultaneously interactive. Each view (side, top, section)
-  should have a small collapsible legend/control widget in a corner that
-  lists the available layers — e.g., "stations", "deck line", "keel line",
-  "reference image", "scale gizmo" — with a toggle for each. Layers are
-  always rendered but are dark-grey and non-interactive when deactivated;
-  they become colored and editable when activated. Colors should be
-  consistent throughout: e.g., stations as purple lines/dots in the top
-  view, with the currently selected station darker than the others. Reference
-  image toggle should lock position/scale so the image cannot be accidentally
-  moved while panning. Gizmo should also be toggleable this way. Layer
-  toggles are per-view (side view has its own set, top view has its own set,
-  etc.).
 
 - **Drawing new stations from the top or side view when the station layer is
   active.** When the stations layer is active in the top or side view, a
@@ -97,9 +84,7 @@ without burning the 5-hour rate-limit on a single big task.*
 
 | # | Order | Item (short) | Model | Effort | Why this rank |
 |---|-------|--------------|-------|--------|---------------|
-| 9 | 2 | Section aspect-ratio instability when dragging widest point | Opus | medium | Subtle: the `max(b)` factor in `SECTION_SCALE_N` creates a feedback loop — as the dragged point shrinks, scale shrinks, the visible position changes, and the user's drag offset interprets differently. Also fix the "no update when station moves along X" degenerate case. |
 | 10 | 3 | Click-to-add station in top/side view, auto-shape from existing geometry | Opus | medium | Needs to interpolate the lofted shape at an arbitrary X (use the existing `denseRows` pipeline), then convert back to (b, n) control points. Some design choices about how many points to keep. |
-| 13 | 4 | Per-view interactive layer toggles (visibility + editability lock per layer per view) | Opus | high | Biggest UI refactor: every clickable element now consults a per-view per-layer enabled flag. Affects every drag handler, every render function. Do this once the smaller fixes have settled. |
 | 14 | 5 | Station spine line in top/side; uneditable center point in section | Sonnet | low | Trivial after #13 lands (depends on the "stations layer is active" trigger from #13). |
 | 15 | 6 | **Chines** (numbered chine indices on section points; chine edge loops in loft; visualisation in all views) | Opus | high | Largest architectural change: data-model addition, loft change, three new render layers. Do last so other items don't conflict and so the codebase is in its simplest state when we tackle it. Plan a design pass first (separate session, no code) before implementing. |
 | 16 | — | Side view aspect ratio may not match 3D mesh (vague) | — | — | Defer until user can reproduce concretely. Spending Opus on a vague spec is wasteful. |
@@ -215,6 +200,7 @@ Needs design before coding:
 | Body plan overlay on cross-section view (bow/stern half + opacity controls) | (user) |
 | Textured render modes for curvature: Matcap (procedural sphere texture, base + highlight colour pickers) and Checker (world-space cubic checker via shader injection, configurable size + 2 colours) | matcap-checker |
 | Scale gizmo pivots at hull centre (X-mid / Z-mid); anisotropic correction on knot angles + handle lengths so a one-axis scale stretches only that axis | gizmo-center |
+| Per-view layer toggles (≡ chip per pane → popover with coloured dots + checkboxes): side {keel/deck/stations/refImage/gizmo}, top {beam/stations/refImage/gizmo}, section {controls/refImage}.  CSS-driven grey-out + pointer-events lock via [class*] selectors keyed off data-layer-* attrs; click-to-add suppressed via state check.  Bold consistent colours: blue=keel, green=deck, teal=beam, purple=stations, neutral=refImage, amber=gizmo, dark=section curve.  Persisted via JSON. | layer-toggles |
 | Scale gizmo on side/top/3D views (Y/X/Z axes, X updates length slider) | scale-gizmo, gizmo-fix |
 | Scale gizmo removed from cross-section view (meaningless in normalised b/n) | section-bezier |
 | Cross-section points → on-curve Bezier knots with angle/aftLen/foreLen handles (matches rocker / deck-line model) | section-bezier |

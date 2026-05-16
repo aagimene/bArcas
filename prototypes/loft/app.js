@@ -87,6 +87,14 @@ const state = {
     section: { zoom: 1, offX: 0, offY: 0 },
   },
   layout: { colPct: 25, rowPct: 66, drawerHidden: false },
+  // Per-view layer toggles.  When off, layer elements grey out (CSS) and
+  // become non-interactive (pointer-events: none).  Click-to-add suppressed
+  // by JS checking the relevant flag.  Persisted via JSON export.
+  layers: {
+    side:    { keel: true, deck: true, stations: true, refImage: true, gizmo: true },
+    top:     { beam: true, stations: true, refImage: true, gizmo: true },
+    section: { controls: true, refImage: true },
+  },
 };
 
 // Deep-merge `src` into `dst` in place. Objects are recursed (preserving
@@ -2407,6 +2415,7 @@ document.getElementById('top-reset').addEventListener('click', () => {
 topSvg.addEventListener('click', (e) => {
   if (e.target.closest('[data-drag]')) return;
   if (topDrag?.moved) return;
+  if (!state.layers.top.beam) return; // beam layer off → no click-to-add
   const { wx, wy } = svgToLocalTop(e);
   const beamPts = sampledBeamLine(state);
   let best = Infinity;
@@ -3120,6 +3129,112 @@ function applyLayoutFromState() {
   pane.classList.toggle('hidden', !!state.layout.drawerHidden);
   btn.textContent = state.layout.drawerHidden ? '◀' : '▶';
 }
+
+// ── Per-view layer toggles ──────────────────────────────────────────────
+//
+// One small ≡ chip per view (in the pane title) opens a popover with a
+// checkbox per layer.  Each layer carries a small coloured dot keyed to
+// the layer's identity (consistent across all views: blue=keel/rocker,
+// green=deck, teal=beam, purple=stations, neutral=ref-image, amber=gizmo,
+// dark=section curve).  Toggling a layer:
+//   - Sets data-layer-X="off|on" on the corresponding SVG (CSS does the
+//     greying + pointer-events lock automatically).
+//   - Persists to state.layers.
+//   - Suppresses click-to-add via state-check in the click handlers.
+
+const LAYER_DEFS = {
+  side: [
+    { id: 'keel',     label: 'Rocker (keel)', color: '#2563eb' },
+    { id: 'deck',     label: 'Deck line',     color: '#16a34a' },
+    { id: 'stations', label: 'Stations',      color: '#7c3aed' },
+    { id: 'refImage', label: 'Reference image', color: '#94a3b8' },
+    { id: 'gizmo',    label: 'Scale gizmo',   color: '#f59e0b' },
+  ],
+  top: [
+    { id: 'beam',     label: 'Beam line',     color: '#0891b2' },
+    { id: 'stations', label: 'Stations',      color: '#7c3aed' },
+    { id: 'refImage', label: 'Reference image', color: '#94a3b8' },
+    { id: 'gizmo',    label: 'Scale gizmo',   color: '#f59e0b' },
+  ],
+  section: [
+    { id: 'controls', label: 'Section curve', color: '#1f2937' },
+    { id: 'refImage', label: 'Reference image', color: '#94a3b8' },
+  ],
+};
+
+const VIEW_SVG_ID = { side: 'side-view', top: 'top-view', section: 'section-view' };
+
+function applyLayerStateToSVG(view) {
+  const svg = document.getElementById(VIEW_SVG_ID[view]);
+  if (!svg) return;
+  const layers = state.layers[view] || {};
+  for (const def of LAYER_DEFS[view]) {
+    svg.dataset['layer' + def.id[0].toUpperCase() + def.id.slice(1)] = layers[def.id] ? 'on' : 'off';
+  }
+}
+function applyAllLayerStates() {
+  Object.keys(LAYER_DEFS).forEach(applyLayerStateToSVG);
+}
+
+// Build (or rebuild) the popover for a view.
+function buildLayerPopover(view) {
+  let pop = document.getElementById('layers-pop-' + view);
+  if (!pop) {
+    pop = document.createElement('div');
+    pop.id = 'layers-pop-' + view;
+    pop.className = 'layers-popover';
+    document.body.appendChild(pop);
+  }
+  pop.innerHTML = '';
+  for (const def of LAYER_DEFS[view]) {
+    const on = !!state.layers[view][def.id];
+    const row = document.createElement('label');
+    row.className = 'layer-row' + (on ? '' : ' off');
+    row.innerHTML =
+      `<span class="layer-dot" style="background:${def.color}"></span>` +
+      `<span class="layer-name">${def.label}</span>` +
+      `<input type="checkbox" ${on ? 'checked' : ''}>`;
+    const cb = row.querySelector('input');
+    cb.addEventListener('change', () => {
+      state.layers[view][def.id] = cb.checked;
+      row.classList.toggle('off', !cb.checked);
+      applyLayerStateToSVG(view);
+    });
+    pop.appendChild(row);
+  }
+  return pop;
+}
+
+// Wire up the ≡ button on each pane.  Click toggles its popover; clicks
+// outside any popover close all of them.
+function positionPopover(pop, btn) {
+  const r = btn.getBoundingClientRect();
+  pop.style.top  = (r.bottom + 4) + 'px';
+  pop.style.left = Math.max(8, r.right - 175) + 'px';
+}
+document.querySelectorAll('.layers-btn').forEach(btn => {
+  const view = btn.dataset.layersView;
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const pop = buildLayerPopover(view);
+    const isOpen = pop.classList.contains('open');
+    document.querySelectorAll('.layers-popover.open').forEach(p => p.classList.remove('open'));
+    document.querySelectorAll('.layers-btn.open').forEach(b => b.classList.remove('open'));
+    if (!isOpen) {
+      positionPopover(pop, btn);
+      pop.classList.add('open');
+      btn.classList.add('open');
+    }
+  });
+});
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.layers-btn') || e.target.closest('.layers-popover')) return;
+  document.querySelectorAll('.layers-popover.open').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.layers-btn.open').forEach(b => b.classList.remove('open'));
+});
+
+// Initial: apply state to all SVGs.  (Re-applied by syncUIFromState too.)
+applyAllLayerStates();
 {
   const initResizer = (el, axis) => {
     el.addEventListener('pointerdown', (e) => {
@@ -3235,6 +3350,8 @@ function syncUIFromState() {
   applyKeyLightPosition();
   // Pane resizer percentages + drawer state
   applyLayoutFromState();
+  // Per-view layer toggles
+  if (typeof applyAllLayerStates === 'function') applyAllLayerStates();
   // Station label/count display
   stationLabel.textContent = stationLabelFor(state.selectedStation);
 }
@@ -3284,10 +3401,13 @@ sideSvg.addEventListener('click', (e) => {
   }
 
   const THRESH = 0.12;
-  if (rDist <= THRESH && rDist <= dDist) {
+  // Suppress click-to-add when the relevant layer is off.
+  const keelOn = !!state.layers.side.keel;
+  const deckOn = !!state.layers.side.deck;
+  if (keelOn && rDist <= THRESH && rDist <= dDist) {
     insertKnot(state.spine.knots, rSeg, rT);
     rebuildHull(); renderSideView(); renderTopView(); renderSectionView();
-  } else if (dDist <= THRESH && dDist < rDist) {
+  } else if (deckOn && dDist <= THRESH && dDist < rDist) {
     insertKnot(state.deckLine.knots, dSeg, dT);
     rebuildHull(); renderSideView(); renderSectionView();
   }
@@ -3395,6 +3515,7 @@ sectionSvg.addEventListener('click', (e) => {
   if (e.target.closest('[data-drag]')) return;
   if (sectionDrag && sectionDrag.moved) return;
   if (sectionPanMoved) { sectionPanMoved = false; return; }
+  if (!state.layers.section.controls) return; // section curve layer off
   const sel = selectedStationObj();
   if (!sel) return;
   const station = sel.ref;

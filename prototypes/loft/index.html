@@ -17,7 +17,7 @@
 <body>
 
 <header>
-  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · layout-66</span>
+  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · layer-toggles</span>
   <h1>Loft</h1>
   <p class="subtitle">
     Design a 3D kayak hull from a curved spine (rocker) and a set of cross-sections, lofted live.
@@ -30,7 +30,7 @@
 
 <main>
   <section class="pane pane-top">
-    <div class="pane-title">Top view <span class="ref">— X-Y, beam editor</span><button type="button" class="view-reset" id="top-reset" title="Reset zoom/pan">⊙</button></div>
+    <div class="pane-title">Top view <span class="ref">— X-Y, beam editor</span><button type="button" class="layers-btn" data-layers-view="top" title="Toggle layers">≡</button><button type="button" class="view-reset" id="top-reset" title="Reset zoom/pan">⊙</button></div>
     <div class="svg-wrap">
       <svg id="top-view" preserveAspectRatio="xMidYMid meet" aria-label="Top view"></svg>
     </div>
@@ -175,7 +175,7 @@
         <button type="button" id="prev-station" aria-label="Previous station">◀</button>
         <button type="button" id="next-station" aria-label="Next station">▶</button>
       </span>
-      <button type="button" class="view-reset" id="section-reset" title="Reset zoom/pan">⊙</button>
+      <button type="button" class="layers-btn" data-layers-view="section" title="Toggle layers">≡</button><button type="button" class="view-reset" id="section-reset" title="Reset zoom/pan">⊙</button>
     </div>
     <div class="svg-wrap">
       <svg id="section-view" viewBox="-200 -210 400 295" preserveAspectRatio="xMidYMid meet" aria-label="Cross-section editor"></svg>
@@ -187,7 +187,7 @@
   </section>
 
   <section class="pane pane-side">
-    <div class="pane-title">Side view <span class="ref">— X-Z, rocker editor</span><button type="button" class="view-reset" id="side-reset" title="Reset zoom/pan">⊙</button></div>
+    <div class="pane-title">Side view <span class="ref">— X-Z, rocker editor</span><button type="button" class="layers-btn" data-layers-view="side" title="Toggle layers">≡</button><button type="button" class="view-reset" id="side-reset" title="Reset zoom/pan">⊙</button></div>
     <div class="svg-wrap">
       <svg id="side-view" preserveAspectRatio="xMidYMid meet" aria-label="Side view"></svg>
     </div>
@@ -251,6 +251,6 @@
   Source: <a href="https://github.com/aagimene/bArcas/tree/main/prototypes/loft" target="_blank" rel="noopener">github.com/aagimene/bArcas</a>.
 </p>
 
-<script type="module" src="app.js?v=gizmo-center"></script>
+<script type="module" src="app.js?v=layer-toggles"></script>
 </body>
 </html>
