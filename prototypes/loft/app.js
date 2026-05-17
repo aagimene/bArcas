@@ -3422,17 +3422,10 @@ topSvg.addEventListener('click', (e) => {
   if (e.target.closest('[data-drag]')) return;
   if (topDrag?.moved) return;
   const { wx, wy } = svgToLocalTop(e);
-  // Click on the station-add line (only when stations layer is active)?
-  if (e.target.closest('[data-drag-action="add-station"]')) {
-    if (!state.layers.top.stations) return;
-    const spS = sampledSpine(state.spine.knots, 64);
-    addStationAtS(spineXToS(spS, wx));
-    return;
-  }
 
-  // Chine editor: click in top view → snap to nearest station, route to
-  // the start-or-continue draw flow. b derived from |y|/halfB, n from the
-  // bottom-half intersection of the section curve at that b.
+  // Chine editor takes priority — same reason as the side view: clicks on
+  // the dashed station-add line shouldn't add a whole new station when
+  // the editor is on.
   if (state.chineEditor?.enabled && state.layers.top.chines) {
     const sIdx = nearestStationIdxByX(state, wx);
     if (sIdx == null) return;
@@ -3442,6 +3435,14 @@ topSvg.addEventListener('click', (e) => {
     const bFrac   = Math.max(0, Math.min(frame.maxB, (bWorld / frame.halfB) * frame.maxB));
     const n = sectionNAtB(station.points, bFrac, true);
     startOrContinueChineDraw('top', sIdx, bFrac, n);
+    return;
+  }
+
+  // Click on the station-add line (only when stations layer is active)?
+  if (e.target.closest('[data-drag-action="add-station"]')) {
+    if (!state.layers.top.stations) return;
+    const spS = sampledSpine(state.spine.knots, 64);
+    addStationAtS(spineXToS(spS, wx));
     return;
   }
 
@@ -4512,16 +4513,11 @@ sideSvg.addEventListener('click', (e) => {
   if (drag && drag.moved) return;
   const { x, y } = svgToLocal(sideSvg, e);
   const wx = x / SIDE_SCALE, wz = -y / SIDE_SCALE;
-  // Click on the station-add line (only when stations layer is active)?
-  if (e.target.closest('[data-drag-action="add-station"]')) {
-    if (!state.layers.side.stations) return;
-    const spS = sampledSpine(state.spine.knots, 64);
-    addStationAtS(spineXToS(spS, wx));
-    return;
-  }
-
-  // Chine editor: click in side view → snap to nearest station, route to
-  // the start-or-continue draw flow.
+  // Chine editor takes priority — clicks anywhere in the view (including on
+  // the dashed station-add centerline) become chine-add actions when the
+  // editor is on, so we don't accidentally insert a whole new station with
+  // its full set of seed control points just because the click landed near
+  // the centerline.
   if (state.chineEditor?.enabled && state.layers.side.chines) {
     const sIdx = nearestStationIdxByX(state, wx);
     if (sIdx == null) return;
@@ -4530,6 +4526,14 @@ sideSvg.addEventListener('click', (e) => {
     const n = Math.max(0, Math.min(1, (wz - frame.keelZ) / frame.height));
     const b = sectionBAtN(station.points, n);
     startOrContinueChineDraw('side', sIdx, b, n);
+    return;
+  }
+
+  // Click on the station-add line (only when stations layer is active)?
+  if (e.target.closest('[data-drag-action="add-station"]')) {
+    if (!state.layers.side.stations) return;
+    const spS = sampledSpine(state.spine.knots, 64);
+    addStationAtS(spineXToS(spS, wx));
     return;
   }
 
