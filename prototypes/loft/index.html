@@ -17,7 +17,7 @@
 <body>
 
 <header>
-  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · chine-draw-flow</span>
+  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · matcap-palettes</span>
   <h1>Loft</h1>
   <p class="subtitle">
     Design a 3D kayak hull from a curved spine (rocker) and a set of cross-sections, lofted live.
@@ -92,12 +92,29 @@
         </select>
       </label>
       <div class="render-mode-opts" data-render-mode="matcap" style="display:none">
+        <label>Matcap palette
+          <select id="matcap-preset">
+            <option value="blueprint">Blueprint</option>
+            <option value="clay">Clay</option>
+            <option value="chrome">Chrome</option>
+            <option value="gold">Gold</option>
+            <option value="jade">Jade</option>
+            <option value="copper">Copper</option>
+            <option value="pewter">Pewter</option>
+            <option value="jet">Jet</option>
+            <option value="rose">Rose</option>
+            <option value="custom">Custom</option>
+          </select>
+        </label>
         <div class="color-row">
-          <label class="color-label">Matcap base
+          <label class="color-label">Highlight
+            <input type="color" id="matcap-highlight" value="#dceaff">
+          </label>
+          <label class="color-label">Base
             <input type="color" id="matcap-base" value="#3a5a8a">
           </label>
-          <label class="color-label">Matcap highlight
-            <input type="color" id="matcap-highlight" value="#dceaff">
+          <label class="color-label">Shadow
+            <input type="color" id="matcap-shadow" value="#0a1228">
           </label>
         </div>
       </div>
@@ -273,6 +290,6 @@
   Source: <a href="https://github.com/aagimene/bArcas/tree/main/prototypes/loft" target="_blank" rel="noopener">github.com/aagimene/bArcas</a>.
 </p>
 
-<script type="module" src="app.js?v=chine-draw-flow"></script>
+<script type="module" src="app.js?v=matcap-palettes"></script>
 </body>
 </html>

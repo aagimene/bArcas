@@ -13,12 +13,16 @@ until it has been chunked, prioritized, and confirmed by the user.
 
 *Raw feedback captured from the user. Not yet scoped or confirmed.*
 
-- **Matcap palette presets.** Current matcap mode has just two colour
-  pickers (base + highlight). Add a "preset" dropdown with named palettes
-  (e.g. clay, chrome, gold, jade, blueprint) plus a "Custom" option that
-  reveals the colour pickers. Possibly extend the procedural generator to
-  support a few palette knobs beyond two flat colours (rim colour, multi-
-  stop gradient, anisotropic highlight). To define more concretely later.
+- **Matcap palette presets.** Initial MVP shipped under build tag
+  `matcap-palettes`: dropdown with named palettes (blueprint, clay,
+  chrome, gold, jade, copper, pewter, jet, rose) plus a "Custom" option;
+  procedural generator extended from 2 → 3 colour stops (highlight, base,
+  shadow). Any manual change to a colour picker auto-flips the dropdown
+  to "Custom" and any preset selection writes all three stops into the
+  pickers. Follow-up ideas: rim colour as a separate radial gradient
+  layer, anisotropic specular for brushed-metal looks, support importing
+  PNG matcaps from the nidorx/matcaps library so the user isn't limited
+  to procedural sphere generation.
 
 - **Chines.** Chines are numbered. Chine points are cross-section control
   points with a chine index assigned. The loft should produce edge loops that
@@ -235,6 +239,7 @@ Needs design before coding:
 | Chines MVP: numbered chines, chine editor mode toggle, chine point editing in section/side/top views (side/top snap to nearest station; top uses bottom-half intersection), per-chine-point 3D Bezier handles edited via 2-axis projection in each 2D view, longitudinal chine line rendered in side/top/3D, per-view chines layer toggle. | chine-mvp |
 | Chines polish: reject duplicate chineIdx on the same station (each chine ≤ 1 anchor per section); render `#N` label in chine colour next to every chine anchor in side, top, and section views; default starting state now has 2 stations so a chine can be made immediately. | chine-id-everywhere |
 | Chine draw flow: clicks start/extend a single chine; subsequent points must be on a station immediately neighbouring the chine's current range. Curved dashed ghost line + ghost anchor in side & top views tracks the cursor and previews where the chine will sweep. Floating hint near cursor shows "Add another chine point on a neighboring cross section" after the first point and "Right-click to complete chine" after the second. Right-click in any view finishes the chine (and removes lone single-anchor drafts); on a successful finish the chine number auto-increments. Toggling the editor off mid-draw discards the in-progress chine. | chine-draw-flow |
+| Matcap palette presets: dropdown (Blueprint / Clay / Chrome / Gold / Jade / Copper / Pewter / Jet / Rose / Custom) drives a 3-stop procedural gradient (highlight, base, shadow). Picking a preset writes all three pickers; tweaking any picker auto-flips the dropdown to "Custom". | matcap-palettes |
 
 
 

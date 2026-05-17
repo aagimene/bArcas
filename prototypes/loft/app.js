@@ -85,7 +85,7 @@ const state = {
   // Render mode + per-mode parameters (persisted via JSON export).
   render: {
     mode: 'shaded', // shaded | normals | matcap | checker
-    matcap:  { base: '#3a5a8a', highlight: '#dceaff' },
+    matcap:  { preset: 'blueprint', base: '#3a5a8a', highlight: '#dceaff', shadow: '#0a1228' },
     checker: { size: 0.10, light: '#f1f5f9', dark: '#1f2937' },
   },
   ao:     { enabled: true, kernelRadius: 0.35, minDistance: 0.0001, maxDistance: 0.6, contrast: 12.0, output: 0 },
@@ -144,6 +144,40 @@ function migrateChineFields(state) {
   if (!state.layers.section.chines) state.layers.section.chines = true;
 }
 migrateChineFields(state);
+
+// ── Matcap palette presets ───────────────────────────────────────────────
+//
+// Each preset gives a (highlight, base, shadow) triple — top → middle →
+// bottom stop of the procedural sphere's vertical gradient. Names and
+// colours loosely modelled after the popular nidorx/matcaps reference
+// library (clay/chrome/gold/jade/etc.) but adapted to our 3-stop
+// procedural — exact matches require photographic spheres which is out
+// of scope for the prototype.
+const MATCAP_PRESETS = {
+  blueprint: { highlight: '#dceaff', base: '#3a5a8a', shadow: '#0a1228' },
+  clay:      { highlight: '#f4dcc4', base: '#a0764e', shadow: '#1a0f08' },
+  chrome:    { highlight: '#ffffff', base: '#7c8794', shadow: '#0a0e14' },
+  gold:      { highlight: '#fff2b3', base: '#9c7b1f', shadow: '#1a0f00' },
+  jade:      { highlight: '#c4f0e0', base: '#2a8f6f', shadow: '#04140e' },
+  copper:    { highlight: '#f6c79c', base: '#8a3e1a', shadow: '#1a0800' },
+  pewter:    { highlight: '#e8edf5', base: '#6a7280', shadow: '#0c1018' },
+  jet:       { highlight: '#9aa6b5', base: '#1f2937', shadow: '#000000' },
+  rose:      { highlight: '#fdd9d4', base: '#a05e6a', shadow: '#1a050a' },
+};
+
+function migrateMatcapFields(state) {
+  const m = state.render?.matcap;
+  if (!m) return;
+  if (!m.shadow) m.shadow = '#0a0a0a';
+  if (!m.preset) {
+    const match = Object.entries(MATCAP_PRESETS).find(([_, p]) =>
+      p.base.toLowerCase()      === m.base.toLowerCase() &&
+      p.highlight.toLowerCase() === m.highlight.toLowerCase() &&
+      p.shadow.toLowerCase()    === m.shadow.toLowerCase());
+    m.preset = match ? match[0] : 'custom';
+  }
+}
+migrateMatcapFields(state);
 
 // Deep-merge `src` into `dst` in place. Objects are recursed (preserving
 // reference identity on `dst`); arrays and primitives are replaced wholesale.
@@ -2785,8 +2819,10 @@ meshOpacityEl.addEventListener('input', () => {
 // reveals deformation/curvature.
 
 const renderModeSel    = document.getElementById('render-mode');
+const matcapPresetEl   = document.getElementById('matcap-preset');
 const matcapBaseEl     = document.getElementById('matcap-base');
 const matcapHiEl       = document.getElementById('matcap-highlight');
+const matcapShadowEl   = document.getElementById('matcap-shadow');
 const checkerSizeEl    = document.getElementById('checker-size');
 const checkerSizeOut   = document.getElementById('checker-size-out');
 const checkerLightEl   = document.getElementById('checker-light');
@@ -2811,7 +2847,7 @@ function rebuildMatcapTexture() {
   const grad = ctx.createLinearGradient(0, 0, 0, size);
   grad.addColorStop(0.0, state.render.matcap.highlight);
   grad.addColorStop(0.55, state.render.matcap.base);
-  grad.addColorStop(1.0, '#0a0a0a');
+  grad.addColorStop(1.0, state.render.matcap.shadow || '#0a0a0a');
   ctx.fillStyle = grad;
   ctx.beginPath();
   ctx.arc(size / 2, size / 2, size / 2 - 1, 0, Math.PI * 2);
@@ -2890,22 +2926,59 @@ function applyChecker() {
 }
 function syncRenderInputsFromState() {
   renderModeSel.value   = state.render.mode;
+  matcapPresetEl.value  = state.render.matcap.preset || 'custom';
   matcapBaseEl.value    = state.render.matcap.base;
   matcapHiEl.value      = state.render.matcap.highlight;
+  matcapShadowEl.value  = state.render.matcap.shadow || '#0a0a0a';
   checkerSizeEl.value   = String(state.render.checker.size);
   checkerLightEl.value  = state.render.checker.light;
   checkerDarkEl.value   = state.render.checker.dark;
+}
+
+// Re-derive the preset slot from the current colours: returns the matching
+// preset name, or 'custom' if no preset matches all three stops exactly.
+function detectMatcapPreset(m) {
+  const eq = (a, b) => a.toLowerCase() === b.toLowerCase();
+  const entry = Object.entries(MATCAP_PRESETS).find(([, p]) =>
+    eq(p.highlight, m.highlight) && eq(p.base, m.base) && eq(p.shadow, m.shadow));
+  return entry ? entry[0] : 'custom';
 }
 
 renderModeSel.addEventListener('change', () => {
   state.render.mode = renderModeSel.value;
   applyRenderMode();
 });
+matcapPresetEl.addEventListener('change', () => {
+  const name = matcapPresetEl.value;
+  state.render.matcap.preset = name;
+  const p = MATCAP_PRESETS[name];
+  if (p) {
+    state.render.matcap.highlight = p.highlight;
+    state.render.matcap.base      = p.base;
+    state.render.matcap.shadow    = p.shadow;
+    matcapHiEl.value     = p.highlight;
+    matcapBaseEl.value   = p.base;
+    matcapShadowEl.value = p.shadow;
+  }
+  applyMatcap();
+});
 matcapBaseEl.addEventListener('input', () => {
-  state.render.matcap.base = matcapBaseEl.value; applyMatcap();
+  state.render.matcap.base = matcapBaseEl.value;
+  state.render.matcap.preset = detectMatcapPreset(state.render.matcap);
+  matcapPresetEl.value = state.render.matcap.preset;
+  applyMatcap();
 });
 matcapHiEl.addEventListener('input', () => {
-  state.render.matcap.highlight = matcapHiEl.value; applyMatcap();
+  state.render.matcap.highlight = matcapHiEl.value;
+  state.render.matcap.preset = detectMatcapPreset(state.render.matcap);
+  matcapPresetEl.value = state.render.matcap.preset;
+  applyMatcap();
+});
+matcapShadowEl.addEventListener('input', () => {
+  state.render.matcap.shadow = matcapShadowEl.value;
+  state.render.matcap.preset = detectMatcapPreset(state.render.matcap);
+  matcapPresetEl.value = state.render.matcap.preset;
+  applyMatcap();
 });
 checkerSizeEl.addEventListener('input', () => {
   state.render.checker.size = parseFloat(checkerSizeEl.value); applyChecker();
