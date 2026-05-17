@@ -1565,6 +1565,28 @@ function renderTopView() {
   {
     const byIdx = collectChinesByIdx(state);
     const editor = state.chineEditor && state.chineEditor.enabled;
+    // Curved ghost preview while drawing.
+    if (chineDraw) {
+      const ghost3D = ghostChineLine();
+      if (ghost3D.length > 1) {
+        const col = chineColor(chineDraw.chineIdx);
+        for (const sign of [1, -1]) {
+          const d = 'M ' + ghost3D.map(p => `${xOfT(sign * p.y).toFixed(2)} ${yOfT(p.x).toFixed(2)}`).join(' L ');
+          topSvg.appendChild(el('path', {
+            d, class: 'chine-ghost-line', stroke: col, fill: 'none',
+            style: `stroke-width:${2.2/tf}`, opacity: sign > 0 ? 1 : 0.4,
+          }));
+        }
+      }
+      const g = ghostChineAnchor();
+      if (g) {
+        topSvg.appendChild(el('circle', {
+          cx: xOfT(g.world.y), cy: yOfT(g.world.x), r: 5/tf,
+          class: 'chine-ghost-anchor',
+          fill: chineColor(chineDraw.chineIdx), stroke: 'white', 'stroke-width': 1.2/tf,
+        }));
+      }
+    }
     for (const [idx, anchors] of byIdx.entries()) {
       const col = chineColor(idx);
       const drawCurve = (sign) => {
@@ -1937,6 +1959,27 @@ function renderSideView() {
   {
     const byIdx = collectChinesByIdx(state);
     const editor = state.chineEditor && state.chineEditor.enabled;
+    // Curved ghost preview while drawing — sampled bezier through existing
+    // anchors + cursor, so the user sees where the chine will sweep.
+    if (chineDraw) {
+      const ghost3D = ghostChineLine();
+      if (ghost3D.length > 1) {
+        const col = chineColor(chineDraw.chineIdx);
+        const d = 'M ' + ghost3D.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.z).toFixed(2)}`).join(' L ');
+        sideSvg.appendChild(el('path', {
+          d, class: 'chine-ghost-line', stroke: col, fill: 'none',
+          style: `stroke-width:${2.2/sf}`,
+        }));
+      }
+      const g = ghostChineAnchor();
+      if (g) {
+        sideSvg.appendChild(el('circle', {
+          cx: xOf(g.world.x), cy: yOf(g.world.z), r: 5/sf,
+          class: 'chine-ghost-anchor',
+          fill: chineColor(chineDraw.chineIdx), stroke: 'white', 'stroke-width': 1.2/sf,
+        }));
+      }
+    }
     for (const [idx, anchors] of byIdx.entries()) {
       const col = chineColor(idx);
       if (anchors.length >= 2) {
@@ -2530,7 +2573,9 @@ function syncChineEditorUI() {
 chineToggleEl.addEventListener('change', () => {
   state.chineEditor.enabled = chineToggleEl.checked;
   document.body.classList.toggle('chine-editor-active', state.chineEditor.enabled);
+  if (!state.chineEditor.enabled) finishChineDraw(true);
   renderSideView(); renderTopView(); renderSectionView();
+  updateChineDrawHint();
 });
 chineCurrentEl.addEventListener('input', () => {
   const v = Math.max(1, Math.min(99, parseInt(chineCurrentEl.value, 10) || 1));
@@ -2538,6 +2583,149 @@ chineCurrentEl.addEventListener('input', () => {
   applyChineSwatch();
 });
 syncChineEditorUI();
+
+// ── Chine draw flow ──────────────────────────────────────────────────────
+//
+// Click in chine-editor mode = start drawing (1st point) or extend (2nd+).
+// Each subsequent click must be on a station immediately neighbouring the
+// chine's current range — chines are contiguous longitudinal edges, so a
+// chine's stations form a single uninterrupted run in s-sorted order.
+// Right-click anywhere finishes the draw. A chine with only one anchor
+// when finished gets removed (single-station chines are invalid). On a
+// successful finish, the current chine # auto-increments so the next
+// drawing flow starts a fresh chine number.
+//
+// The cursor's snapped station gives a tentative anchor while drawing —
+// rendered as a dashed "ghost" line in side and top views so the user
+// sees where the chine will sweep before clicking.
+let chineDraw = null;  // { chineIdx, stationIdxs:[], cursor:{view,stationIdx,b,n}|null }
+
+// Set of station indices that are valid extensions of the current chine
+// draw range — i.e. the stations immediately before the lowest-s and after
+// the highest-s anchor in the current draw. Returns null if not drawing.
+function chineDrawNeighbors() {
+  if (!chineDraw || chineDraw.stationIdxs.length === 0) return null;
+  const sortedByS = state.stations
+    .map((st, i) => ({ st, i }))
+    .sort((a, b) => a.st.s - b.st.s);
+  const ordOf = new Map(sortedByS.map((entry, ord) => [entry.i, ord]));
+  const ords = chineDraw.stationIdxs.map(i => ordOf.get(i)).sort((a, b) => a - b);
+  const minOrd = ords[0], maxOrd = ords[ords.length - 1];
+  const valid = new Set();
+  if (minOrd - 1 >= 0)                  valid.add(sortedByS[minOrd - 1].i);
+  if (maxOrd + 1 < sortedByS.length)    valid.add(sortedByS[maxOrd + 1].i);
+  return valid;
+}
+
+// Returns true if the click was consumed as a chine-draw action.
+function startOrContinueChineDraw(view, stationIdx, b, n) {
+  if (!state.chineEditor?.enabled) return false;
+  if (stationIdx == null || !state.stations[stationIdx]) return false;
+  if (chineDraw) {
+    if (chineDraw.stationIdxs.includes(stationIdx)) return true; // ignore re-click on same station
+    const valid = chineDrawNeighbors();
+    if (!valid || !valid.has(stationIdx)) return true; // reject non-neighbor (consume click)
+    const st = state.stations[stationIdx];
+    if (insertSectionPoint(st, b, n, chineDraw.chineIdx) < 0) return true;
+    chineDraw.stationIdxs.push(stationIdx);
+  } else {
+    const chineIdx = state.chineEditor.currentChine;
+    const st = state.stations[stationIdx];
+    if (insertSectionPoint(st, b, n, chineIdx) < 0) return true;
+    chineDraw = { chineIdx, stationIdxs: [stationIdx], cursor: null };
+  }
+  // Auto-select the station whose section we just edited so the user sees it.
+  state.selectedStation = listAllStations(state).findIndex(u => u.ref === state.stations[stationIdx]);
+  if (state.selectedStation < 0) state.selectedStation = 0;
+  stationLabel.textContent = stationLabelFor(state.selectedStation);
+  renderStationList();
+  rebuildHull();
+  renderSideView(); renderTopView(); renderSectionView();
+  updateChineDrawHint();
+  return true;
+}
+
+// Finish the active draw. `discard=true` removes ALL anchors of the draw
+// (used when the user toggles the editor off mid-draw). Otherwise: keep
+// the chine if it has ≥ 2 anchors, increment the chine # for next time;
+// remove the lone anchor if only 1 was placed (single-station chines
+// are invalid).
+function finishChineDraw(discard = false) {
+  if (!chineDraw) return;
+  const removeAnchor = (stIdx) => {
+    const st = state.stations[stIdx];
+    if (!st) return;
+    const i = st.points.findIndex(p => p.chineIdx === chineDraw.chineIdx);
+    if (i > 0 && i < st.points.length - 1) st.points.splice(i, 1);
+  };
+  if (discard || chineDraw.stationIdxs.length < 2) {
+    for (const stIdx of chineDraw.stationIdxs) removeAnchor(stIdx);
+  } else {
+    state.chineEditor.currentChine = Math.min(99, state.chineEditor.currentChine + 1);
+    syncChineEditorUI();
+  }
+  chineDraw = null;
+  rebuildHull();
+  renderSideView(); renderTopView(); renderSectionView();
+  updateChineDrawHint();
+}
+
+// Position + content of the floating hint near the cursor.
+const chineHintEl = document.getElementById('chine-draw-hint');
+let lastChineHintMouse = { x: 0, y: 0 };
+function updateChineDrawHint(event) {
+  if (!chineHintEl) return;
+  if (!state.chineEditor?.enabled || !chineDraw) {
+    chineHintEl.style.display = 'none';
+    return;
+  }
+  const msg = chineDraw.stationIdxs.length === 1
+    ? 'Add another chine point on a neighboring cross section'
+    : 'Right-click to complete chine';
+  const col = chineColor(chineDraw.chineIdx);
+  chineHintEl.innerHTML =
+    `<span class="chine-color-dot" style="background:${col}"></span>` +
+    `<span class="chine-num" style="color:${col}">#${chineDraw.chineIdx}</span> ` + msg;
+  chineHintEl.style.display = 'block';
+  if (event) { lastChineHintMouse = { x: event.clientX, y: event.clientY }; }
+  chineHintEl.style.left = (lastChineHintMouse.x + 14) + 'px';
+  chineHintEl.style.top  = (lastChineHintMouse.y + 14) + 'px';
+}
+document.addEventListener('pointermove', updateChineDrawHint);
+
+// Compute the tentative ghost anchor at the current cursor — returns null
+// if the cursor is over a station already in the draw or not a valid
+// neighbour. Called by the side/top renderers.
+function ghostChineAnchor() {
+  if (!chineDraw || !chineDraw.cursor) return null;
+  const { stationIdx, b, n } = chineDraw.cursor;
+  if (chineDraw.stationIdxs.includes(stationIdx)) return null;
+  if (chineDraw.stationIdxs.length > 0) {
+    const valid = chineDrawNeighbors();
+    if (!valid || !valid.has(stationIdx)) return null;
+  }
+  const st = state.stations[stationIdx];
+  if (!st) return null;
+  const frame = stationFrame(state, st);
+  const world = chineBNToWorld(frame, b, n);
+  return {
+    stationIdx, pointIdx: -1,
+    p: { b, n, chineIdx: chineDraw.chineIdx, chineHandles: defaultChineHandles() },
+    frame, world,
+  };
+}
+
+// Sample the tentative chine line (existing anchors + ghost) as a 3D
+// polyline. Returns [] if the ghost is invalid or there are < 2 anchors.
+function ghostChineLine() {
+  const ghost = ghostChineAnchor();
+  if (!ghost) return [];
+  const byIdx = collectChinesByIdx(state);
+  const existing = byIdx.get(chineDraw.chineIdx) || [];
+  const merged = [...existing, ghost]
+    .sort((a, b) => state.stations[a.stationIdx].s - state.stations[b.stationIdx].s);
+  return sampleChineLine(merged, 20);
+}
 
 // Hull colors — outside is the material's .color (used on front-facing
 // fragments); inside is the insideColor uniform injected into the shader.
@@ -2949,8 +3137,9 @@ topSvg.addEventListener('click', (e) => {
     return;
   }
 
-  // Chine editor: click in top view → snap to nearest station, add a chine
-  // control point on its section at b = |y|/halfB, n = bottom-half value.
+  // Chine editor: click in top view → snap to nearest station, route to
+  // the start-or-continue draw flow. b derived from |y|/halfB, n from the
+  // bottom-half intersection of the section curve at that b.
   if (state.chineEditor?.enabled && state.layers.top.chines) {
     const sIdx = nearestStationIdxByX(state, wx);
     if (sIdx == null) return;
@@ -2958,14 +3147,8 @@ topSvg.addEventListener('click', (e) => {
     const frame   = stationFrame(state, station);
     const bWorld  = Math.abs(wy);
     const bFrac   = Math.max(0, Math.min(frame.maxB, (bWorld / frame.halfB) * frame.maxB));
-    const n = sectionNAtB(station.points, bFrac, true); // bottom intersection
-    insertSectionPoint(station, bFrac, n, state.chineEditor.currentChine);
-    state.selectedStation = listAllStations(state).findIndex(u => u.ref === station);
-    if (state.selectedStation < 0) state.selectedStation = 0;
-    stationLabel.textContent = stationLabelFor(state.selectedStation);
-    renderStationList();
-    rebuildHull();
-    renderSideView(); renderTopView(); renderSectionView();
+    const n = sectionNAtB(station.points, bFrac, true);
+    startOrContinueChineDraw('top', sIdx, bFrac, n);
     return;
   }
 
@@ -2997,6 +3180,7 @@ topSvg.addEventListener('click', (e) => {
 
 // Right-click handler: delete a beam peak OR a station, depending on the target.
 function tryTopDelete(e) {
+  if (chineDraw) { e.preventDefault(); finishChineDraw(); return; }
   const peak = e.target.closest('[data-drag="beam-peak"]');
   if (peak) {
     e.preventDefault();
@@ -3959,6 +4143,27 @@ sideSvg.addEventListener('pointermove', (e) => {
 sideSvg.addEventListener('pointerleave', () => {
   const preview = document.getElementById('side-station-preview');
   if (preview) preview.style.display = 'none';
+  if (chineDraw && chineDraw.cursor) {
+    chineDraw.cursor = null;
+    renderSideView(); renderTopView();
+  }
+});
+
+// Chine draw: track cursor in side view to drive the ghost-line preview.
+sideSvg.addEventListener('pointermove', (e) => {
+  if (!chineDraw || !state.chineEditor?.enabled) return;
+  const { x, y } = svgToLocal(sideSvg, e);
+  const wx = x / SIDE_SCALE, wz = -y / SIDE_SCALE;
+  const sIdx = nearestStationIdxByX(state, wx);
+  if (sIdx == null) return;
+  const st = state.stations[sIdx];
+  const frame = stationFrame(state, st);
+  const n = Math.max(0, Math.min(1, (wz - frame.keelZ) / frame.height));
+  const b = sectionBAtN(st.points, n);
+  const c = chineDraw.cursor;
+  if (c && c.stationIdx === sIdx && Math.abs(c.b - b) < 1e-4 && Math.abs(c.n - n) < 1e-4) return;
+  chineDraw.cursor = { view: 'side', stationIdx: sIdx, b, n };
+  renderSideView(); renderTopView();
 });
 
 topSvg.addEventListener('pointermove', (e) => {
@@ -3983,6 +4188,27 @@ topSvg.addEventListener('pointermove', (e) => {
 topSvg.addEventListener('pointerleave', () => {
   const preview = document.getElementById('top-station-preview');
   if (preview) preview.style.display = 'none';
+  if (chineDraw && chineDraw.cursor) {
+    chineDraw.cursor = null;
+    renderSideView(); renderTopView();
+  }
+});
+
+// Chine draw: track cursor in top view for the ghost-line preview.
+topSvg.addEventListener('pointermove', (e) => {
+  if (!chineDraw || !state.chineEditor?.enabled) return;
+  const { wx, wy } = svgToLocalTop(e);
+  const sIdx = nearestStationIdxByX(state, wx);
+  if (sIdx == null) return;
+  const st = state.stations[sIdx];
+  const frame = stationFrame(state, st);
+  const bWorld = Math.abs(wy);
+  const bFrac  = Math.max(0, Math.min(frame.maxB, (bWorld / frame.halfB) * frame.maxB));
+  const n = sectionNAtB(st.points, bFrac, true);
+  const c = chineDraw.cursor;
+  if (c && c.stationIdx === sIdx && Math.abs(c.b - bFrac) < 1e-4 && Math.abs(c.n - n) < 1e-4) return;
+  chineDraw.cursor = { view: 'top', stationIdx: sIdx, b: bFrac, n };
+  renderSideView(); renderTopView();
 });
 
 // Click near rocker → insert on-curve knot; click near deck curve → insert handle.
@@ -4000,8 +4226,8 @@ sideSvg.addEventListener('click', (e) => {
     return;
   }
 
-  // Chine editor: click in side view → snap to nearest station, add a chine
-  // control point on its section at (b derived from section curve at this n).
+  // Chine editor: click in side view → snap to nearest station, route to
+  // the start-or-continue draw flow.
   if (state.chineEditor?.enabled && state.layers.side.chines) {
     const sIdx = nearestStationIdxByX(state, wx);
     if (sIdx == null) return;
@@ -4009,13 +4235,7 @@ sideSvg.addEventListener('click', (e) => {
     const frame   = stationFrame(state, station);
     const n = Math.max(0, Math.min(1, (wz - frame.keelZ) / frame.height));
     const b = sectionBAtN(station.points, n);
-    insertSectionPoint(station, b, n, state.chineEditor.currentChine);
-    state.selectedStation = listAllStations(state).findIndex(u => u.ref === station);
-    if (state.selectedStation < 0) state.selectedStation = 0;
-    stationLabel.textContent = stationLabelFor(state.selectedStation);
-    renderStationList();
-    rebuildHull();
-    renderSideView(); renderTopView(); renderSectionView();
+    startOrContinueChineDraw('side', sIdx, b, n);
     return;
   }
 
@@ -4070,6 +4290,7 @@ sideSvg.addEventListener('click', (e) => {
 
 // Right-click: delete interior knot on rocker or deck line (endpoints protected).
 function trySideDelete(e) {
+  if (chineDraw) { e.preventDefault(); finishChineDraw(); return; }
   const t = e.target.closest('[data-drag]');
   if (!t) return;
   const idx = +t.dataset.idx;
@@ -4191,8 +4412,12 @@ sectionSvg.addEventListener('click', (e) => {
   const b = x / SECTION_SCALE_B;
   const n = -y / SECTION_SCALE_N;
   if (b < 0) return;
-  const chineIdx = state.chineEditor?.enabled ? state.chineEditor.currentChine : null;
-  insertSectionPoint(station, b, n, chineIdx);
+  if (state.chineEditor?.enabled) {
+    if (state.layers.section.chines)
+      startOrContinueChineDraw('section', sel.stationIdx, b, n);
+    return;
+  }
+  insertSectionPoint(station, b, n, null);
   renderStationList();
   renderSectionView();
   rebuildHull();
@@ -4206,6 +4431,7 @@ sectionSvg.addEventListener('click', (e) => {
 // fully protected. Sections must keep at least 3 points so the natural
 // cubic spline still resolves.
 sectionSvg.addEventListener('contextmenu', (e) => {
+  if (chineDraw) { e.preventDefault(); finishChineDraw(); return; }
   const target = e.target.closest('[data-drag="ctrl"]');
   if (!target) return;
   e.preventDefault();

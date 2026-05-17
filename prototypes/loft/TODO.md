@@ -234,6 +234,7 @@ Needs design before coding:
 | Add a dynamic, semitransparent purple dashed station preview line that tracks the pointer along the centerline in Top and Side views before clicking to add. | station-preview-hover |
 | Chines MVP: numbered chines, chine editor mode toggle, chine point editing in section/side/top views (side/top snap to nearest station; top uses bottom-half intersection), per-chine-point 3D Bezier handles edited via 2-axis projection in each 2D view, longitudinal chine line rendered in side/top/3D, per-view chines layer toggle. | chine-mvp |
 | Chines polish: reject duplicate chineIdx on the same station (each chine ≤ 1 anchor per section); render `#N` label in chine colour next to every chine anchor in side, top, and section views; default starting state now has 2 stations so a chine can be made immediately. | chine-id-everywhere |
+| Chine draw flow: clicks start/extend a single chine; subsequent points must be on a station immediately neighbouring the chine's current range. Curved dashed ghost line + ghost anchor in side & top views tracks the cursor and previews where the chine will sweep. Floating hint near cursor shows "Add another chine point on a neighboring cross section" after the first point and "Right-click to complete chine" after the second. Right-click in any view finishes the chine (and removes lone single-anchor drafts); on a successful finish the chine number auto-increments. Toggling the editor off mid-draw discards the in-progress chine. | chine-draw-flow |
 
 
 
