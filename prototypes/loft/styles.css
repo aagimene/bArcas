@@ -44,11 +44,11 @@ main {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: var(--col-pct, 50%) 1fr;
-  grid-template-rows: var(--row-pct, 55%) 1fr;
+  grid-template-columns: var(--col-pct, 25%) 1fr auto;
+  grid-template-rows: var(--row-pct, 66%) 1fr;
   grid-template-areas:
-    "top    three"
-    "section side";
+    "top    three   controls"
+    "section side   controls";
   gap: 0.75rem;
   padding: 0.75rem;
   width: 100%;
@@ -81,19 +81,28 @@ main {
    Uses .pane.pane-controls compound selector so it wins over the generic
    `.pane { position: relative }` declared later in this file. */
 .pane.pane-controls {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  right: 0;
+  grid-area: controls;
   width: 300px;
-  z-index: 100;
-  border-radius: 6px 0 0 6px;
-  border-right: none;
-  box-shadow: -4px 0 16px rgba(0,0,0,0.12);
+  min-width: 0;
+  height: 100%;
+  margin-right: 0;
+  border-radius: 6px;
+  box-shadow: none;
+  border: 1px solid #e2e8f0;
+  z-index: 10;
+  position: relative;
   overflow: visible; /* drawer-toggle sticks out on the left */
-  transition: transform 0.2s ease;
+  transition: width 0.2s ease, margin-right 0.2s ease, padding 0.2s ease, border-color 0.2s ease;
 }
-.pane.pane-controls.hidden { transform: translateX(100%); }
+.pane.pane-controls.hidden {
+  width: 0px;
+  padding: 0;
+  border-color: transparent;
+  margin-right: -0.75rem; /* collapse grid gap */
+}
+.pane.pane-controls.hidden > *:not(#drawer-toggle) {
+  display: none !important;
+}
 .pane.pane-controls .controls { overflow-y: auto; flex: 1; padding-right: 4px; min-height: 0; }
 .drawer-toggle {
   position: absolute;
@@ -125,6 +134,30 @@ main {
     grid-template-rows: 220px 280px auto auto;
     grid-template-areas:
       "top" "three" "section" "side";
+  }
+  .pane.pane-controls {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 300px;
+    z-index: 100;
+    border-radius: 6px 0 0 6px;
+    border-right: none;
+    box-shadow: -4px 0 16px rgba(0,0,0,0.12);
+    height: auto !important;
+    margin-right: 0 !important;
+    transition: transform 0.2s ease !important;
+  }
+  .pane.pane-controls.hidden {
+    transform: translateX(100%) !important;
+    width: 300px !important;
+    padding: 0.5rem 0.65rem !important;
+    border: 1px solid #e2e8f0 !important;
+    margin-right: 0 !important;
+  }
+  .pane.pane-controls.hidden > *:not(#drawer-toggle) {
+    display: none !important;
   }
 }
 
