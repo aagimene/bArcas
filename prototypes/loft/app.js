@@ -1144,6 +1144,88 @@ function sampleChineLine(anchors, stepsPerSeg = 24) {
   return out;
 }
 
+// Compute the chine "area of influence" ellipse for a single chine anchor.
+//
+// Major axis: along the chine's 3D bezier handle line (collinear under C1).
+//   The major-axis tips touch the aft and fore handle endpoints, so the
+//   ellipse passes through both. With asymmetric aft/fore lengths, the
+//   ellipse centre slides along the handle line to keep both tips on the
+//   perimeter (centre = midpoint of the two endpoints).
+// Minor axis: along the section-knot's tangent direction (the YZ section-
+//   handle line that defines chine sharpness). Length comes from the avg
+//   of the section knot's aftLen/foreLen, converted from (b, n) section
+//   space to 3D world units via the station frame.
+//   Short section handles → narrow minor axis → sharp crease.
+//   Long  section handles → wide minor axis  → soft crease.
+// Returns an array of `numSamples + 1` 3D points tracing the closed loop.
+function chineInfluenceSamples(state, station, point, frame, numSamples = 32) {
+  frame = frame || stationFrame(state, station);
+  const anchor = chineBNToWorld(frame, point.b, point.n);
+
+  const fore = point.chineHandles?.fore || { dx: 0, dy: 0, dz: 0 };
+  const aft  = point.chineHandles?.aft  || { dx: 0, dy: 0, dz: 0 };
+  // Major-axis centre: midpoint of fore and aft handle endpoints.
+  // Major-axis semi-vector: half the (foreEndpoint − aftEndpoint) vector.
+  const center = {
+    x: anchor.x + (fore.dx + aft.dx) / 2,
+    y: anchor.y + (fore.dy + aft.dy) / 2,
+    z: anchor.z + (fore.dz + aft.dz) / 2,
+  };
+  const uVec = {
+    x: (fore.dx - aft.dx) / 2,
+    y: (fore.dy - aft.dy) / 2,
+    z: (fore.dz - aft.dz) / 2,
+  };
+
+  // Section-handle minor axis in 3D (within the section's YZ plane).
+  const angle = point.angle ?? 0;
+  const sAft  = point.aftLen ?? 0;
+  const sFore = point.foreLen ?? 0;
+  const sectAvg = (sAft + sFore) / 2;
+  const ca = Math.cos(angle), sa = Math.sin(angle);
+  const dyPerB = frame.halfB / frame.maxB;
+  const minorRawY = ca * dyPerB;
+  const minorRawZ = sa * frame.height;
+  const minorRawLen = Math.hypot(minorRawY, minorRawZ);
+  let vVec;
+  if (minorRawLen < 1e-9 || sectAvg < 1e-9) {
+    vVec = { x: 0, y: 0, z: 0 };
+  } else {
+    const worldLen = minorRawLen * sectAvg;
+    vVec = { x: 0, y: (minorRawY / minorRawLen) * worldLen, z: (minorRawZ / minorRawLen) * worldLen };
+  }
+
+  const out = new Array(numSamples + 1);
+  for (let i = 0; i <= numSamples; i++) {
+    const t = (i / numSamples) * Math.PI * 2;
+    const c = Math.cos(t), s = Math.sin(t);
+    out[i] = {
+      x: center.x + uVec.x * c + vVec.x * s,
+      y: center.y + uVec.y * c + vVec.y * s,
+      z: center.z + uVec.z * c + vVec.z * s,
+    };
+  }
+  return out;
+}
+
+// Walk every chine anchor and produce influence-ellipse samples grouped by
+// chineIdx so the rendering loop can colour them all consistently.
+function collectChineInfluenceShapes(state) {
+  const out = [];
+  state.stations.forEach((st, si) => {
+    const frame = stationFrame(state, st);
+    st.points.forEach((p, pi) => {
+      if (p.chineIdx == null) return;
+      out.push({
+        chineIdx: p.chineIdx,
+        stationIdx: si, pointIdx: pi,
+        samples: chineInfluenceSamples(state, st, p, frame),
+      });
+    });
+  });
+  return out;
+}
+
 // Nearest existing station index to a given world X (returns null if none).
 function nearestStationIdxByX(state, wx) {
   if (state.stations.length === 0) return null;
@@ -1409,7 +1491,8 @@ function rebuildHull() {
 }
 
 // Rebuild the 3D chine line overlay — one starboard + one mirrored port copy
-// per chineIdx, plus small spheres at each anchor for visibility in 3D.
+// per chineIdx, plus an influence-ellipse loop at each anchor (also mirrored)
+// so the chine's sharpness is visible in 3D.
 function rebuildChineLines3D() {
   while (chineGroup.children.length) {
     const c = chineGroup.children.pop();
@@ -1424,12 +1507,24 @@ function rebuildChineLines3D() {
     const mat = new THREE.LineBasicMaterial({ color, linewidth: 2, depthTest: true });
     const mkLine = (sign) => {
       const g = new THREE.BufferGeometry();
-      // THREE space: (THREE_X=our X, THREE_Y=our Z, THREE_Z=our Y)
       g.setFromPoints(pts3D.map(p => new THREE.Vector3(p.x, p.z, sign * p.y)));
       return new THREE.Line(g, mat);
     };
     chineGroup.add(mkLine( 1));
     chineGroup.add(mkLine(-1));
+  }
+  // Influence ellipses (one closed loop per anchor, both sides).
+  const shapes = collectChineInfluenceShapes(state);
+  for (const sh of shapes) {
+    const color = new THREE.Color(chineColor(sh.chineIdx));
+    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.55, depthTest: true });
+    const mkLoop = (sign) => {
+      const g = new THREE.BufferGeometry();
+      g.setFromPoints(sh.samples.map(p => new THREE.Vector3(p.x, p.z, sign * p.y)));
+      return new THREE.Line(g, mat);
+    };
+    chineGroup.add(mkLoop( 1));
+    chineGroup.add(mkLoop(-1));
   }
 }
 
@@ -1842,6 +1937,22 @@ function renderTopView() {
   topSvg.appendChild(el('text', { x: 0, y: yOfT(bowKnot.x)   - 8/tf,  class: 'label', 'text-anchor': 'middle', 'font-size': 9/tf }, 'bow'));
   topSvg.appendChild(el('text', { x: 0, y: yOfT(sternKnot.x) + 16/tf, class: 'label', 'text-anchor': 'middle', 'font-size': 9/tf }, 'stern'));
 
+  // ── Chine influence ellipses (top view, with port mirror) ─────────────
+  {
+    const shapes = collectChineInfluenceShapes(state);
+    for (const sh of shapes) {
+      const col = chineColor(sh.chineIdx);
+      for (const sign of [1, -1]) {
+        const d = 'M ' + sh.samples.map(p => `${xOfT(sign * p.y).toFixed(2)} ${yOfT(p.x).toFixed(2)}`).join(' L ');
+        topSvg.appendChild(el('path', {
+          d, class: 'chine-influence',
+          stroke: col, fill: col,
+          style: `stroke-width:${1/tf}; fill-opacity:${sign > 0 ? 0.07 : 0.03}; stroke-opacity:${sign > 0 ? 0.55 : 0.25}`,
+        }));
+      }
+    }
+  }
+
   // ── Chine lines (top view: x-y plane) ─────────────────────────────────
   {
     const byIdx = collectChinesByIdx(state);
@@ -2233,6 +2344,21 @@ function renderSideView() {
       }
     }
     sideSvg.appendChild(group);
+  }
+
+  // ── Chine influence ellipses (sharpness × handle-length area of effect) ─
+  // Drawn BEFORE chine anchors / line so labels and dots sit on top.
+  {
+    const shapes = collectChineInfluenceShapes(state);
+    for (const sh of shapes) {
+      const col = chineColor(sh.chineIdx);
+      const d = 'M ' + sh.samples.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.z).toFixed(2)}`).join(' L ');
+      sideSvg.appendChild(el('path', {
+        d, class: 'chine-influence',
+        stroke: col, fill: col,
+        style: `stroke-width:${1/sf}; fill-opacity:0.07; stroke-opacity:0.55`,
+      }));
+    }
   }
 
   // ── Chine lines (longitudinal 3D bezier through chine points) ─────────
