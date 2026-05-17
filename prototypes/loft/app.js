@@ -1144,85 +1144,132 @@ function sampleChineLine(anchors, stepsPerSeg = 24) {
   return out;
 }
 
-// Compute the chine "area of influence" ellipse for a single chine anchor.
+// Compute "tube" samples along the chine line — one continuous tube per
+// chine, not per anchor. At each sample we carry the chine's 3D position,
+// the section-tangent unit direction in 3D (YZ plane only — the section is
+// at constant X for any given anchor station, but between anchors we lerp),
+// and the half-width `w` (in 3D world units) derived ENTIRELY from the
+// section-knot bezier handles: longer aftLen/foreLen → softer chine →
+// wider tube. The chine's longitudinal 3D handles only affect the chine
+// line's *shape*; the tube's transverse width is purely sharpness.
 //
-// Major axis: along the chine's 3D bezier handle line (collinear under C1).
-//   The major-axis tips touch the aft and fore handle endpoints, so the
-//   ellipse passes through both. With asymmetric aft/fore lengths, the
-//   ellipse centre slides along the handle line to keep both tips on the
-//   perimeter (centre = midpoint of the two endpoints).
-// Minor axis: along the section-knot's tangent direction (the YZ section-
-//   handle line that defines chine sharpness). Length comes from the avg
-//   of the section knot's aftLen/foreLen, converted from (b, n) section
-//   space to 3D world units via the station frame.
-//   Short section handles → narrow minor axis → sharp crease.
-//   Long  section handles → wide minor axis  → soft crease.
-// Returns an array of `numSamples + 1` 3D points tracing the closed loop.
-function chineInfluenceSamples(state, station, point, frame, numSamples = 32) {
-  frame = frame || stationFrame(state, station);
-  const anchor = chineBNToWorld(frame, point.b, point.n);
+// Returns [] when the chine has fewer than 2 anchors.
+function chineInfluenceTubeSamples(state, anchors, stepsPerSeg = 20) {
+  if (anchors.length < 2) return [];
+  // Per-anchor section-tangent unit YZ + scale factor `mag` (so that
+  // multiplying a section-knot handle length L by mag gives the matching
+  // 3D world length of that handle).
+  const tan = anchors.map(a => {
+    const angle = a.p.angle ?? 0;
+    const dyPerB = a.frame.halfB / a.frame.maxB;
+    const dy = Math.cos(angle) * dyPerB;
+    const dz = Math.sin(angle) * a.frame.height;
+    const mag = Math.hypot(dy, dz);
+    return mag < 1e-9 ? { y: 0, z: 0, mag: 0 } : { y: dy / mag, z: dz / mag, mag };
+  });
+  // Per-anchor half-width = avg(aftLen, foreLen) in (b, n) space × `mag`.
+  const widths = anchors.map((a, i) => {
+    const sAvg = ((a.p.aftLen ?? 0) + (a.p.foreLen ?? 0)) / 2;
+    return sAvg * tan[i].mag;
+  });
 
-  const fore = point.chineHandles?.fore || { dx: 0, dy: 0, dz: 0 };
-  const aft  = point.chineHandles?.aft  || { dx: 0, dy: 0, dz: 0 };
-  // Major-axis centre: midpoint of fore and aft handle endpoints.
-  // Major-axis semi-vector: half the (foreEndpoint − aftEndpoint) vector.
-  const center = {
-    x: anchor.x + (fore.dx + aft.dx) / 2,
-    y: anchor.y + (fore.dy + aft.dy) / 2,
-    z: anchor.z + (fore.dz + aft.dz) / 2,
-  };
-  const uVec = {
-    x: (fore.dx - aft.dx) / 2,
-    y: (fore.dy - aft.dy) / 2,
-    z: (fore.dz - aft.dz) / 2,
-  };
-
-  // Section-handle minor axis in 3D (within the section's YZ plane).
-  const angle = point.angle ?? 0;
-  const sAft  = point.aftLen ?? 0;
-  const sFore = point.foreLen ?? 0;
-  const sectAvg = (sAft + sFore) / 2;
-  const ca = Math.cos(angle), sa = Math.sin(angle);
-  const dyPerB = frame.halfB / frame.maxB;
-  const minorRawY = ca * dyPerB;
-  const minorRawZ = sa * frame.height;
-  const minorRawLen = Math.hypot(minorRawY, minorRawZ);
-  let vVec;
-  if (minorRawLen < 1e-9 || sectAvg < 1e-9) {
-    vVec = { x: 0, y: 0, z: 0 };
-  } else {
-    const worldLen = minorRawLen * sectAvg;
-    vVec = { x: 0, y: (minorRawY / minorRawLen) * worldLen, z: (minorRawZ / minorRawLen) * worldLen };
-  }
-
-  const out = new Array(numSamples + 1);
-  for (let i = 0; i <= numSamples; i++) {
-    const t = (i / numSamples) * Math.PI * 2;
-    const c = Math.cos(t), s = Math.sin(t);
-    out[i] = {
-      x: center.x + uVec.x * c + vVec.x * s,
-      y: center.y + uVec.y * c + vVec.y * s,
-      z: center.z + uVec.z * c + vVec.z * s,
-    };
+  const out = [];
+  for (let i = 0; i < anchors.length - 1; i++) {
+    const a = anchors[i], b = anchors[i + 1];
+    const ah = a.p.chineHandles?.fore || { dx: 0, dy: 0, dz: 0 };
+    const bh = b.p.chineHandles?.aft  || { dx: 0, dy: 0, dz: 0 };
+    const P0 = a.world, P3 = b.world;
+    const P1 = { x: P0.x + ah.dx, y: P0.y + ah.dy, z: P0.z + ah.dz };
+    const P2 = { x: P3.x + bh.dx, y: P3.y + bh.dy, z: P3.z + bh.dz };
+    const ta = tan[i], tb = tan[i + 1];
+    const wa = widths[i], wb = widths[i + 1];
+    const jStart = (i === 0) ? 0 : 1;
+    for (let j = jStart; j <= stepsPerSeg; j++) {
+      const t = j / stepsPerSeg, u = 1 - t;
+      const pos = {
+        x: u*u*u*P0.x + 3*u*u*t*P1.x + 3*u*t*t*P2.x + t*t*t*P3.x,
+        y: u*u*u*P0.y + 3*u*u*t*P1.y + 3*u*t*t*P2.y + t*t*t*P3.y,
+        z: u*u*u*P0.z + 3*u*u*t*P1.z + 3*u*t*t*P2.z + t*t*t*P3.z,
+      };
+      let tY = ta.y + t * (tb.y - ta.y);
+      let tZ = ta.z + t * (tb.z - ta.z);
+      const tLen = Math.hypot(tY, tZ);
+      if (tLen > 1e-9) { tY /= tLen; tZ /= tLen; }
+      const w = wa + t * (wb - wa);
+      out.push({ pos, tanY: tY, tanZ: tZ, w });
+    }
   }
   return out;
 }
 
-// Walk every chine anchor and produce influence-ellipse samples grouped by
-// chineIdx so the rendering loop can colour them all consistently.
-function collectChineInfluenceShapes(state) {
-  const out = [];
-  state.stations.forEach((st, si) => {
-    const frame = stationFrame(state, st);
-    st.points.forEach((p, pi) => {
-      if (p.chineIdx == null) return;
-      out.push({
-        chineIdx: p.chineIdx,
-        stationIdx: si, pointIdx: pi,
-        samples: chineInfluenceSamples(state, st, p, frame),
-      });
-    });
+// Build a closed 2D polygon (list of {x,y}) for the chine influence tube,
+// projected onto a view's plane and with half-circle end caps. The polygon
+// is a stadium-like shape that curves along the chine line:
+//   forward edge (anchor +tan*w)  ->  end-cap arc (180° in view plane)
+//   backward edge (anchor −tan*w, reversed)  ->  start-cap arc
+// `view` is 'side' (X-Z) or 'top' (X-Y). `ySign` flips coords for the port
+// mirror in top view. Output coordinates are world units in the chosen plane
+// (the caller applies xOf/yOf or xOfT/yOfT to project to screen).
+function chineInfluenceLoop2D(samples3D, view, ySign = 1, capSteps = 14) {
+  if (samples3D.length < 2) return [];
+  const proj = samples3D.map(s => {
+    if (view === 'side') {
+      return { px: s.pos.x, py: s.pos.z, oy: s.tanZ * s.w };
+    } else {
+      return { px: s.pos.x, py: ySign * s.pos.y, oy: ySign * s.tanY * s.w };
+    }
   });
+  const N = proj.length;
+  const fwd = proj.map(p => ({ x: p.px,           y: p.py + p.oy }));
+  const bwd = proj.map(p => ({ x: p.px,           y: p.py - p.oy }));
+
+  // Chine direction (along curve) at end-points — used to know which way
+  // the cap arc should bulge.
+  const chineDir = (i) => {
+    const a = i === 0 ? proj[0] : proj[i - 1];
+    const b = i === N - 1 ? proj[N - 1] : proj[i + 1];
+    return { x: b.px - a.px, y: b.py - a.py };
+  };
+  const buildCap = (idx, startOffSign, capDirSign) => {
+    const center = { x: proj[idx].px, y: proj[idx].py };
+    const ox = 0, oy = startOffSign * proj[idx].oy;
+    const radius = Math.hypot(ox, oy);
+    if (radius < 1e-6) return [];
+    const startAng = Math.atan2(oy, ox);
+    const dir = chineDir(idx);
+    const dx = capDirSign * dir.x, dy = capDirSign * dir.y;
+    const dirLen = Math.hypot(dx, dy);
+    if (dirLen < 1e-9) return [];
+    let delta = Math.atan2(dy, dx) - startAng;
+    while (delta > Math.PI)  delta -= 2 * Math.PI;
+    while (delta < -Math.PI) delta += 2 * Math.PI;
+    const sweepSign = delta >= 0 ? 1 : -1;
+    const arc = [];
+    for (let k = 1; k < capSteps; k++) {
+      const a = startAng + sweepSign * (k / capSteps) * Math.PI;
+      arc.push({ x: center.x + radius * Math.cos(a), y: center.y + radius * Math.sin(a) });
+    }
+    return arc;
+  };
+  const endCap   = buildCap(N - 1, +1, +1); // fwd[end] → sweep ahead of chine → bwd[end]
+  const startCap = buildCap(0,     -1, -1); // bwd[0]   → sweep behind chine  → fwd[0]
+  return [
+    ...fwd,
+    ...endCap,
+    ...bwd.slice().reverse(),
+    ...startCap,
+  ];
+}
+
+// Walk every chine and produce its full-length influence-tube samples
+// (one entry per chineIdx so the rendering loop can colour them).
+function collectChineInfluenceShapes(state) {
+  const byIdx = collectChinesByIdx(state);
+  const out = [];
+  for (const [chineIdx, anchors] of byIdx.entries()) {
+    if (anchors.length < 2) continue;
+    out.push({ chineIdx, samples: chineInfluenceTubeSamples(state, anchors) });
+  }
   return out;
 }
 
@@ -1513,18 +1560,29 @@ function rebuildChineLines3D() {
     chineGroup.add(mkLine( 1));
     chineGroup.add(mkLine(-1));
   }
-  // Influence ellipses (one closed loop per anchor, both sides).
+  // Influence tube — one continuous edge pair per chine (fwd / bwd along
+  // the section-tangent direction). Drawn as two THREE.Lines per side,
+  // mirrored for port. End-cap arcs are not added in 3D for now — the
+  // chine line itself anchors the tube's "centerline".
   const shapes = collectChineInfluenceShapes(state);
   for (const sh of shapes) {
     const color = new THREE.Color(chineColor(sh.chineIdx));
     const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.55, depthTest: true });
-    const mkLoop = (sign) => {
+    const fwdPts = sh.samples.map(s => ({
+      x: s.pos.x, y: s.pos.y + s.tanY * s.w, z: s.pos.z + s.tanZ * s.w,
+    }));
+    const bwdPts = sh.samples.map(s => ({
+      x: s.pos.x, y: s.pos.y - s.tanY * s.w, z: s.pos.z - s.tanZ * s.w,
+    }));
+    const mkEdge = (pts, sign) => {
       const g = new THREE.BufferGeometry();
-      g.setFromPoints(sh.samples.map(p => new THREE.Vector3(p.x, p.z, sign * p.y)));
+      g.setFromPoints(pts.map(p => new THREE.Vector3(p.x, p.z, sign * p.y)));
       return new THREE.Line(g, mat);
     };
-    chineGroup.add(mkLoop( 1));
-    chineGroup.add(mkLoop(-1));
+    chineGroup.add(mkEdge(fwdPts,  1));
+    chineGroup.add(mkEdge(bwdPts,  1));
+    chineGroup.add(mkEdge(fwdPts, -1));
+    chineGroup.add(mkEdge(bwdPts, -1));
   }
 }
 
@@ -1937,17 +1995,19 @@ function renderTopView() {
   topSvg.appendChild(el('text', { x: 0, y: yOfT(bowKnot.x)   - 8/tf,  class: 'label', 'text-anchor': 'middle', 'font-size': 9/tf }, 'bow'));
   topSvg.appendChild(el('text', { x: 0, y: yOfT(sternKnot.x) + 16/tf, class: 'label', 'text-anchor': 'middle', 'font-size': 9/tf }, 'stern'));
 
-  // ── Chine influence ellipses (top view, with port mirror) ─────────────
+  // ── Chine influence tubes (top view, stbd + port mirror) ─────────────
   {
     const shapes = collectChineInfluenceShapes(state);
     for (const sh of shapes) {
       const col = chineColor(sh.chineIdx);
       for (const sign of [1, -1]) {
-        const d = 'M ' + sh.samples.map(p => `${xOfT(sign * p.y).toFixed(2)} ${yOfT(p.x).toFixed(2)}`).join(' L ');
+        const loop = chineInfluenceLoop2D(sh.samples, 'top', sign);
+        if (loop.length < 3) continue;
+        const d = 'M ' + loop.map(p => `${xOfT(p.y).toFixed(2)} ${yOfT(p.x).toFixed(2)}`).join(' L ') + ' Z';
         topSvg.appendChild(el('path', {
           d, class: 'chine-influence',
           stroke: col, fill: col,
-          style: `stroke-width:${1/tf}; fill-opacity:${sign > 0 ? 0.07 : 0.03}; stroke-opacity:${sign > 0 ? 0.55 : 0.25}`,
+          style: `stroke-width:${1/tf}; fill-opacity:${sign > 0 ? 0.10 : 0.05}; stroke-opacity:${sign > 0 ? 0.55 : 0.30}`,
         }));
       }
     }
@@ -2346,17 +2406,19 @@ function renderSideView() {
     sideSvg.appendChild(group);
   }
 
-  // ── Chine influence ellipses (sharpness × handle-length area of effect) ─
+  // ── Chine influence tubes (one per chine, follows the chine curve) ────
   // Drawn BEFORE chine anchors / line so labels and dots sit on top.
   {
     const shapes = collectChineInfluenceShapes(state);
     for (const sh of shapes) {
+      const loop = chineInfluenceLoop2D(sh.samples, 'side');
+      if (loop.length < 3) continue;
       const col = chineColor(sh.chineIdx);
-      const d = 'M ' + sh.samples.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.z).toFixed(2)}`).join(' L ');
+      const d = 'M ' + loop.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.y).toFixed(2)}`).join(' L ') + ' Z';
       sideSvg.appendChild(el('path', {
         d, class: 'chine-influence',
         stroke: col, fill: col,
-        style: `stroke-width:${1/sf}; fill-opacity:0.07; stroke-opacity:0.55`,
+        style: `stroke-width:${1/sf}; fill-opacity:0.10; stroke-opacity:0.55`,
       }));
     }
   }
