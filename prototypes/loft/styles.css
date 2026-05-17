@@ -909,6 +909,66 @@ main {
   opacity: 1;
 }
 
+/* ── Chines ─────────────────────────────────────────────────────────── */
+.chine-line {
+  fill: none;
+  pointer-events: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.chine-anchor {
+  cursor: not-allowed;
+}
+/* Hide chine overlays when the per-view layer toggle is off. */
+[data-layer-chines="off"] .chine-line,
+[data-layer-chines="off"] .chine-anchor,
+[data-layer-chines="off"] [data-drag^="chine-"] {
+  display: none;
+}
+/* Chine editor mode — bump click targets so a single station click is easy */
+body.chine-editor-active #side-view,
+body.chine-editor-active #top-view,
+body.chine-editor-active #section-view {
+  cursor: crosshair;
+}
+/* Section view: chine-flagged ctrl-pt already filled via inline style override */
+
+/* Chine editor controls in the side panel */
+.controls .chine-editor {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.4rem 0.55rem;
+  margin: 0.35rem 0;
+  background: #f8fafc;
+}
+.controls .chine-editor legend {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #b91c1c;
+  padding: 0 0.3rem;
+}
+.controls .chine-editor .chine-toggle {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  font-size: 0.78rem;
+}
+.controls .chine-editor .chine-hint {
+  font-size: 0.7rem;
+  color: #64748b;
+  margin-top: 0.35rem;
+  line-height: 1.35;
+}
+.chine-swatch {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid white;
+  box-shadow: 0 0 0 1px #cbd5e1;
+  vertical-align: middle;
+  margin-left: 0.25rem;
+}
+
 /* Semi-transparent cursor preview line for station placement */
 .station-preview-line {
   stroke: #7c3aed;

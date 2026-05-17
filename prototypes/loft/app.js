@@ -54,10 +54,15 @@ const state = {
   },
   stations: [
     { s: 0.5, points: [
-      {b:0,n:0,chine:false}, {b:0.55,n:0.13,chine:false},
-      {b:1,n:0.53,chine:false}, {b:0.55,n:0.9,chine:false}, {b:0,n:1,chine:false},
+      {b:0,n:0,chineIdx:null}, {b:0.55,n:0.13,chineIdx:null},
+      {b:1,n:0.53,chineIdx:null}, {b:0.55,n:0.9,chineIdx:null}, {b:0,n:1,chineIdx:null},
     ]},
   ],
+  // Chine editor: when enabled, clicks in side/top/section views place chine
+  // points (instead of plain section control points), tagged with the
+  // currently-selected chine index. Each chine point owns 3D Bezier handles
+  // (aft + fore) used to draw the longitudinal chine line through space.
+  chineEditor: { enabled: false, currentChine: 1 },
   beamLine: {
     sternHandle: {dx: 1.0, dy: 0.1},
     bowHandle:   {dx: -1.0, dy: 0.1},
@@ -91,11 +96,50 @@ const state = {
   // become non-interactive (pointer-events: none).  Click-to-add suppressed
   // by JS checking the relevant flag.  Persisted via JSON export.
   layers: {
-    side:    { keel: true, deck: true, stations: true, refImage: true, gizmo: true },
-    top:     { beam: true, stations: true, refImage: true, gizmo: true },
-    section: { controls: true, refImage: true },
+    side:    { keel: true, deck: true, stations: true, chines: true, refImage: true, gizmo: true },
+    top:     { beam: true, stations: true, chines: true, refImage: true, gizmo: true },
+    section: { controls: true, chines: true, refImage: true },
   },
 };
+
+// Chine palette — distinct colour per chineIdx (1, 2, 3, …). Cycled mod length.
+const CHINE_COLORS = ['#b91c1c', '#c2410c', '#a16207', '#15803d', '#0f766e', '#1d4ed8', '#7c2d92'];
+function chineColor(idx) {
+  if (idx == null) return '#475569';
+  return CHINE_COLORS[((idx - 1) % CHINE_COLORS.length + CHINE_COLORS.length) % CHINE_COLORS.length];
+}
+
+// Default 3D handle vector for a freshly-created chine point. The fore handle
+// points toward +X (bow), aft toward −X (stern). Lengths picked to be small
+// fractions of the hull so the longitudinal Bezier is smooth and visible.
+function defaultChineHandles() {
+  return {
+    aft:  { dx: -0.25, dy: 0, dz: 0 },
+    fore: { dx:  0.25, dy: 0, dz: 0 },
+  };
+}
+
+// Migrate older saved states: section points may have boolean `chine` (legacy)
+// or be missing the new `chineIdx`/`chineHandles` fields. Mutates in place.
+function migrateChineFields(state) {
+  for (const st of state.stations || []) {
+    for (const p of st.points || []) {
+      if (p.chineIdx === undefined) {
+        if (p.chine === true) p.chineIdx = 1;
+        else                  p.chineIdx = null;
+      }
+      delete p.chine;
+      if (p.chineIdx != null && !p.chineHandles) {
+        p.chineHandles = defaultChineHandles();
+      }
+    }
+  }
+  if (!state.chineEditor) state.chineEditor = { enabled: false, currentChine: 1 };
+  if (!state.layers.side.chines)    state.layers.side.chines    = true;
+  if (!state.layers.top.chines)     state.layers.top.chines     = true;
+  if (!state.layers.section.chines) state.layers.section.chines = true;
+}
+migrateChineFields(state);
 
 // Deep-merge `src` into `dst` in place. Objects are recursed (preserving
 // reference identity on `dst`); arrays and primitives are replaced wholesale.
@@ -234,11 +278,11 @@ function insertKnot(knots, segIdx, t) {
 // Default cross-section shape (b=beam fraction, n=height fraction).
 function defaultSection() {
   return [
-    { b: 0,    n: 0,    chine: false },
-    { b: 0.55, n: 0.13, chine: false },
-    { b: 1.0,  n: 0.53, chine: false },
-    { b: 0.55, n: 0.90, chine: false },
-    { b: 0,    n: 1.0,  chine: false },
+    { b: 0,    n: 0,    chineIdx: null },
+    { b: 0.55, n: 0.13, chineIdx: null },
+    { b: 1.0,  n: 0.53, chineIdx: null },
+    { b: 0.55, n: 0.90, chineIdx: null },
+    { b: 0,    n: 1.0,  chineIdx: null },
   ];
 }
 
@@ -699,14 +743,187 @@ function sectionAtS(state, targetS, numPoints = 7) {
     points[i] = {
       b: Math.max(0, dense[lo].b + t * (dense[hi].b - dense[lo].b)),
       n: dense[lo].n + t * (dense[hi].n - dense[lo].n),
-      chine: false,
+      chineIdx: null,
     };
   }
   // Anchor: keel point at (0, 0) (locked to the spine, model-wide rule);
   // deck-end at b = 0 (centerline closure on top).
-  points[0] = { b: 0, n: 0,   chine: false }; // keel
-  points[numPoints - 1] = { b: 0, n: 1.0, chine: false }; // deck
+  points[0] = { b: 0, n: 0,   chineIdx: null }; // keel
+  points[numPoints - 1] = { b: 0, n: 1.0, chineIdx: null }; // deck
   return points;
+}
+
+// ── Chine helpers ────────────────────────────────────────────────────────
+//
+// A chine is a numbered longitudinal edge. It is materialised on the hull as
+// the polyline-through-stations that joins all section control points sharing
+// the same `chineIdx`. Each such control point also stores 3D Bezier handles
+// (relative offsets aft/fore in world units) so the chine line through space
+// is a piecewise cubic Bezier rather than a polyline.
+//
+// The (b, n) coordinates of a chine point live on the station's section curve,
+// so chine sharpness is naturally tuned by the section's own per-point
+// angle/aftLen/foreLen tangent handles — the 3D handles here govern only the
+// longitudinal sweep of the chine line itself.
+
+// Compute the per-station projection frame: world X, keel Z, section height,
+// half-beam at the station, and the section's max-b (for b normalisation).
+function stationFrame(state, st, spS, dkS, beamPts) {
+  spS    = spS    || sampledSpine(state.spine.knots,    64);
+  dkS    = dkS    || sampledSpine(state.deckLine.knots, 64);
+  beamPts = beamPts || sampledBeamLine(state);
+  const { p: keel } = spineAt(spS, st.s);
+  const deckZ = curveYAtX(dkS, keel.x);
+  const height = Math.max(0.001, deckZ - keel.z);
+  const halfB  = Math.max(0.001, beamEvalAt(beamPts, keel.x));
+  const maxB   = Math.max(1e-9, ...st.points.map(p => p.b));
+  return { x: keel.x, keelZ: keel.z, height, halfB, maxB };
+}
+
+// Map a section-space (b, n) point on a station to 3D world coordinates.
+// Mirrors the loft's `(b / maxB) * halfB` Y mapping exactly so a chine point's
+// 3D position matches where the lofted surface sits at that station.
+function chineBNToWorld(frame, b, n) {
+  return {
+    x: frame.x,
+    y: (b / frame.maxB) * frame.halfB,
+    z: frame.keelZ + n * frame.height,
+  };
+}
+
+// Inverse of chineBNToWorld for (Δy, Δz) deltas — used by handle editors to
+// translate section-plane drags back into world-Y / world-Z components.
+function chineSectionDeltaToWorld(frame, db, dn) {
+  return {
+    dy: db * (frame.halfB / frame.maxB),
+    dz: dn * frame.height,
+  };
+}
+function chineWorldDeltaToSection(frame, dy, dz) {
+  return {
+    db: dy * (frame.maxB / frame.halfB),
+    dn: dz / frame.height,
+  };
+}
+
+// Walk all stations and collect chine points grouped by chineIdx, sorted by
+// arc-length s so the longitudinal sweep is consistent. Each entry is:
+//   { stationIdx (in state.stations[]), pointIdx, p (the section ctrl pt),
+//     frame, world: {x,y,z} }
+function collectChinesByIdx(state) {
+  const spS     = sampledSpine(state.spine.knots, 64);
+  const dkS     = sampledSpine(state.deckLine.knots, 64);
+  const beamPts = sampledBeamLine(state);
+  const byIdx = new Map();
+  state.stations.forEach((st, stationIdx) => {
+    const frame = stationFrame(state, st, spS, dkS, beamPts);
+    st.points.forEach((p, pointIdx) => {
+      if (p.chineIdx == null) return;
+      if (!p.chineHandles) p.chineHandles = defaultChineHandles();
+      const w = chineBNToWorld(frame, p.b, p.n);
+      const arr = byIdx.get(p.chineIdx) || [];
+      arr.push({ stationIdx, pointIdx, p, frame, world: w });
+      byIdx.set(p.chineIdx, arr);
+    });
+  });
+  for (const arr of byIdx.values()) {
+    arr.sort((a, b) => state.stations[a.stationIdx].s - state.stations[b.stationIdx].s);
+  }
+  return byIdx;
+}
+
+// Sample a single chine's 3D line as a polyline through cubic Bezier segments
+// between consecutive anchors. Uses each anchor's 3D handles
+// (fore at point i, aft at point i+1) as the segment's Bezier controls.
+function sampleChineLine(anchors, stepsPerSeg = 24) {
+  if (anchors.length < 1) return [];
+  if (anchors.length === 1) return [anchors[0].world];
+  const out = [anchors[0].world];
+  for (let i = 0; i < anchors.length - 1; i++) {
+    const a = anchors[i], b = anchors[i + 1];
+    const ah = a.p.chineHandles?.fore || { dx: 0, dy: 0, dz: 0 };
+    const bh = b.p.chineHandles?.aft  || { dx: 0, dy: 0, dz: 0 };
+    const P0 = a.world;
+    const P3 = b.world;
+    const P1 = { x: P0.x + ah.dx, y: P0.y + ah.dy, z: P0.z + ah.dz };
+    const P2 = { x: P3.x + bh.dx, y: P3.y + bh.dy, z: P3.z + bh.dz };
+    for (let j = 1; j <= stepsPerSeg; j++) {
+      const t = j / stepsPerSeg, u = 1 - t;
+      out.push({
+        x: u*u*u*P0.x + 3*u*u*t*P1.x + 3*u*t*t*P2.x + t*t*t*P3.x,
+        y: u*u*u*P0.y + 3*u*u*t*P1.y + 3*u*t*t*P2.y + t*t*t*P3.y,
+        z: u*u*u*P0.z + 3*u*u*t*P1.z + 3*u*t*t*P2.z + t*t*t*P3.z,
+      });
+    }
+  }
+  return out;
+}
+
+// Nearest existing station index to a given world X (returns null if none).
+function nearestStationIdxByX(state, wx) {
+  if (state.stations.length === 0) return null;
+  const spS = sampledSpine(state.spine.knots, 64);
+  let best = -1, bestD = Infinity;
+  state.stations.forEach((st, i) => {
+    const x = spineAt(spS, st.s).p.x;
+    const d = Math.abs(x - wx);
+    if (d < bestD) { bestD = d; best = i; }
+  });
+  return best;
+}
+
+// Given a station and a target n (height fraction), find the corresponding b
+// on the section curve (the starboard side, b > 0). Section curve goes
+// (0,0) → (max-b, ~mid) → (0,1); for each n in [0,1] there is generally one
+// b on the path. Returns clamped b ≥ 0.
+function sectionBAtN(stationPoints, nTarget) {
+  const dense = sampleSection(stationPoints, 256);
+  let best = 0, bestD = Infinity;
+  for (const p of dense) {
+    const d = Math.abs(p.n - nTarget);
+    if (d < bestD) { bestD = d; best = p.b; }
+  }
+  return Math.max(0, best);
+}
+
+// Top-view click: at a given b (≥ 0), there are typically TWO n's on the
+// section curve (a lower one near the keel, an upper one near the deck).
+// `wantBottom = true` picks the smaller n (keel side); `false` the upper.
+function sectionNAtB(stationPoints, bTarget, wantBottom = true) {
+  const dense = sampleSection(stationPoints, 256);
+  // Find samples that bracket bTarget (any pair where one has b ≥ target and
+  // the other has b ≤ target). Collect their n's; split by upper/lower half.
+  // Use the index of max b as the half boundary.
+  let maxIdx = 0;
+  for (let i = 1; i < dense.length; i++) if (dense[i].b > dense[maxIdx].b) maxIdx = i;
+  const half1 = dense.slice(0, maxIdx + 1);          // keel → max-b (b ascending)
+  const half2 = dense.slice(maxIdx);                  // max-b → deck (b descending)
+  const interp = (arr, target) => {
+    let best = arr[0].n, bestD = Math.abs(arr[0].b - target);
+    for (let i = 1; i < arr.length; i++) {
+      const d = Math.abs(arr[i].b - target);
+      if (d < bestD) { bestD = d; best = arr[i].n; }
+    }
+    return best;
+  };
+  const nLow = interp(half1, bTarget);
+  const nHigh = interp(half2, bTarget);
+  return wantBottom ? Math.min(nLow, nHigh) : Math.max(nLow, nHigh);
+}
+
+// Insert a new section control point on a station at (b, n), placing it in
+// the segment of the section polyline nearest to the click and seeding its
+// 2D bezier tangent via deriveSectionHandles. Returns the inserted index.
+function insertSectionPoint(station, b, n, chineIdx) {
+  const idx = nearestSegmentInsertIdx(station.points, b, n);
+  const pt = { b, n, chineIdx: chineIdx ?? null };
+  if (pt.chineIdx != null) pt.chineHandles = defaultChineHandles();
+  station.points.splice(idx, 0, pt);
+  // Clear handle cache on neighbours so deriveSectionHandles refreshes them.
+  delete station.points[idx].angle;
+  delete station.points[idx].aftLen;
+  delete station.points[idx].foreLen;
+  return idx;
 }
 
 // ── Three.js setup ───────────────────────────────────────────────────────
@@ -835,6 +1052,10 @@ const hullWireMaterial = new THREE.LineBasicMaterial({ color: 0x475569, transpar
 const bandGroup = new THREE.Group();
 scene.add(bandGroup);
 
+// Chine line group — one THREE.Line per chineIdx, stbd + port mirrored copies.
+const chineGroup = new THREE.Group();
+scene.add(chineGroup);
+
 let lastLoft = null; // updated by rebuildHull(); read by renderSideView()
 
 function rebuildHull() {
@@ -892,7 +1113,33 @@ function rebuildHull() {
   // Re-apply the current render mode so freshly-created meshes pick up the
   // correct material (matcap/checker/normals instead of the default hullMaterial).
   if (typeof applyRenderMode === 'function') applyRenderMode();
+  rebuildChineLines3D();
   return loft;
+}
+
+// Rebuild the 3D chine line overlay — one starboard + one mirrored port copy
+// per chineIdx, plus small spheres at each anchor for visibility in 3D.
+function rebuildChineLines3D() {
+  while (chineGroup.children.length) {
+    const c = chineGroup.children.pop();
+    c.geometry?.dispose();
+    c.material?.dispose?.();
+  }
+  const byIdx = collectChinesByIdx(state);
+  for (const [idx, anchors] of byIdx.entries()) {
+    if (anchors.length < 2) continue;
+    const pts3D = sampleChineLine(anchors, 24);
+    const color = new THREE.Color(chineColor(idx));
+    const mat = new THREE.LineBasicMaterial({ color, linewidth: 2, depthTest: true });
+    const mkLine = (sign) => {
+      const g = new THREE.BufferGeometry();
+      // THREE space: (THREE_X=our X, THREE_Y=our Z, THREE_Z=our Y)
+      g.setFromPoints(pts3D.map(p => new THREE.Vector3(p.x, p.z, sign * p.y)));
+      return new THREE.Line(g, mat);
+    };
+    chineGroup.add(mkLine( 1));
+    chineGroup.add(mkLine(-1));
+  }
 }
 
 rebuildHull(); // populates lastLoft
@@ -1304,6 +1551,55 @@ function renderTopView() {
   topSvg.appendChild(el('text', { x: 0, y: yOfT(bowKnot.x)   - 8/tf,  class: 'label', 'text-anchor': 'middle', 'font-size': 9/tf }, 'bow'));
   topSvg.appendChild(el('text', { x: 0, y: yOfT(sternKnot.x) + 16/tf, class: 'label', 'text-anchor': 'middle', 'font-size': 9/tf }, 'stern'));
 
+  // ── Chine lines (top view: x-y plane) ─────────────────────────────────
+  {
+    const byIdx = collectChinesByIdx(state);
+    const editor = state.chineEditor && state.chineEditor.enabled;
+    for (const [idx, anchors] of byIdx.entries()) {
+      const col = chineColor(idx);
+      const drawCurve = (sign) => {
+        if (anchors.length < 2) return;
+        const pts3D = sampleChineLine(anchors, 20);
+        const d = 'M ' + pts3D.map(p => `${xOfT(sign * p.y).toFixed(2)} ${yOfT(p.x).toFixed(2)}`).join(' L ');
+        topSvg.appendChild(el('path', { d, class: 'chine-line', stroke: col, fill: 'none', style: `stroke-width:${1.8/tf}`, opacity: sign > 0 ? 1 : 0.4 }));
+      };
+      drawCurve( 1);
+      drawCurve(-1);
+      // Anchors (starboard only; port mirror is read-only) + handles.
+      anchors.forEach((a, ai) => {
+        const cx = xOfT(a.world.y), cy = yOfT(a.world.x);
+        topSvg.appendChild(el('circle', { cx, cy, r: 4.5/tf, class: 'chine-anchor', fill: col, stroke: 'white', 'stroke-width': 1.2/tf }));
+        if (!editor) return;
+        const drawHandle = (which) => {
+          const h = a.p.chineHandles?.[which];
+          if (!h) return;
+          const isUsed = (which === 'fore' && ai < anchors.length - 1) ||
+                         (which === 'aft'  && ai > 0);
+          const hx = xOfT(a.world.y + h.dy);
+          const hy = yOfT(a.world.x + h.dx);
+          topSvg.appendChild(el('line', { x1: cx, y1: cy, x2: hx, y2: hy,
+            stroke: col, 'stroke-width': 0.9/tf, 'stroke-dasharray': '3 2',
+            opacity: isUsed ? 0.85 : 0.3, style: 'pointer-events:none' }));
+          topSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 12/tf,
+            fill: 'transparent', class: 'handle-hit',
+            'data-drag': `chine-${which}-top`,
+            'data-station-idx': String(a.stationIdx),
+            'data-point-idx': String(a.pointIdx),
+          }));
+          topSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 3.5/tf,
+            fill: col, stroke: 'white', 'stroke-width': 1/tf,
+            opacity: isUsed ? 1 : 0.4,
+            'data-drag': `chine-${which}-top`,
+            'data-station-idx': String(a.stationIdx),
+            'data-point-idx': String(a.pointIdx),
+          }));
+        };
+        drawHandle('aft');
+        drawHandle('fore');
+      });
+    }
+  }
+
   // ── Coordinate-system badge (X-Y plane, top-down) ──────────────────────
   // Bottom-left corner of the viewBox.
 
@@ -1621,6 +1917,55 @@ function renderSideView() {
     sideSvg.appendChild(group);
   }
 
+  // ── Chine lines (longitudinal 3D bezier through chine points) ─────────
+  // Drawn AFTER stations so the chine line appears on top of station chords.
+  {
+    const byIdx = collectChinesByIdx(state);
+    const editor = state.chineEditor && state.chineEditor.enabled;
+    for (const [idx, anchors] of byIdx.entries()) {
+      const col = chineColor(idx);
+      if (anchors.length >= 2) {
+        const pts3D = sampleChineLine(anchors, 20);
+        const d = 'M ' + pts3D.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.z).toFixed(2)}`).join(' L ');
+        sideSvg.appendChild(el('path', { d, class: 'chine-line', stroke: col, fill: 'none', style: `stroke-width:${1.8/sf}` }));
+      }
+      // Anchors + handle gizmos (only when editor mode is on).
+      anchors.forEach((a, ai) => {
+        const cx = xOf(a.world.x), cy = yOf(a.world.z);
+        sideSvg.appendChild(el('circle', { cx, cy, r: 4.5/sf, class: 'chine-anchor', fill: col, stroke: 'white', 'stroke-width': 1.2/sf }));
+        if (!editor) return;
+        const drawHandle = (which) => {
+          const h = a.p.chineHandles?.[which];
+          if (!h) return;
+          // Only draw fore for non-last and aft for non-first as they have
+          // no effect at terminal anchors; show both faded so user knows.
+          const isUsed = (which === 'fore' && ai < anchors.length - 1) ||
+                         (which === 'aft'  && ai > 0);
+          const hx = xOf(a.world.x + h.dx);
+          const hy = yOf(a.world.z + h.dz);
+          sideSvg.appendChild(el('line', { x1: cx, y1: cy, x2: hx, y2: hy,
+            stroke: col, 'stroke-width': 0.9/sf, 'stroke-dasharray': '3 2',
+            opacity: isUsed ? 0.85 : 0.3, style: 'pointer-events:none' }));
+          sideSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 12/sf,
+            fill: 'transparent', class: 'handle-hit',
+            'data-drag': `chine-${which}-side`,
+            'data-station-idx': String(a.stationIdx),
+            'data-point-idx': String(a.pointIdx),
+          }));
+          sideSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 3.5/sf,
+            fill: col, stroke: 'white', 'stroke-width': 1/sf,
+            opacity: isUsed ? 1 : 0.4,
+            'data-drag': `chine-${which}-side`,
+            'data-station-idx': String(a.stationIdx),
+            'data-point-idx': String(a.pointIdx),
+          }));
+        };
+        drawHandle('aft');
+        drawHandle('fore');
+      });
+    }
+  }
+
   // Scale gizmo — X (longitudinal) and Z (height) axes at hull centre.
   {
     const spKnots = state.spine.knots;
@@ -1841,6 +2186,10 @@ function renderSectionView() {
     const isDeck       = i === lastIdx;
     const isCenterline = isKeel || isDeck;
     const cls = (isKeel ? 'keel ' : '') + (isDeck ? 'deck ' : '') + (isCenterline ? 'centerline ' : '');
+    const chineCls = p.chineIdx != null ? ' chine' : '';
+    const fillStyle = p.chineIdx != null
+      ? `fill:${chineColor(p.chineIdx)};stroke:white;stroke-width:${2/sf}`
+      : sw(2);
     sectionSvg.appendChild(el('circle', {
       cx: bOf(p.b), cy: nOf(p.n), r: 22/sf,
       class: ('ctrl-hit ' + cls).trim(),
@@ -1848,11 +2197,58 @@ function renderSectionView() {
     }));
     sectionSvg.appendChild(el('circle', {
       cx: bOf(p.b), cy: nOf(p.n), r: 9/sf,
-      class: ('ctrl-pt ' + cls + (p.chine ? 'chine' : '')).trim(),
-      style: sw(2),
+      class: ('ctrl-pt ' + cls + chineCls).trim(),
+      style: fillStyle,
       'data-drag': 'ctrl', 'data-idx': String(i),
     }));
+    // Chine index label tucked beside the dot.
+    if (p.chineIdx != null) {
+      sectionSvg.appendChild(el('text', {
+        x: bOf(p.b) + 13/sf, y: nOf(p.n) + 4/sf,
+        fill: chineColor(p.chineIdx), style: fs(10),
+        'font-weight': 'bold', 'pointer-events': 'none',
+      }, '#' + p.chineIdx));
+    }
   });
+
+  // ── Chine 3D handles projected onto the section plane (Y-Z) ───────────
+  // When the chine editor is on, each chine point gets aft/fore handles
+  // edited in section space: drag updates (dy, dz) components of the 3D
+  // handle vector while dx stays put.
+  if (state.chineEditor?.enabled && state.layers.section.chines) {
+    // Compute the station's frame to translate world (Δy, Δz) into section
+    // space deltas (Δb, Δn). The selected station's frame is what we need
+    // because the section view shows only this station.
+    const frame = stationFrame(state, station);
+    station.points.forEach((p, i) => {
+      if (p.chineIdx == null) return;
+      if (!p.chineHandles) p.chineHandles = defaultChineHandles();
+      const col = chineColor(p.chineIdx);
+      const drawHandle = (which) => {
+        const h = p.chineHandles[which];
+        const { db, dn } = chineWorldDeltaToSection(frame, h.dy, h.dz);
+        const cx = bOf(p.b), cy = nOf(p.n);
+        const hx = bOf(p.b + db), hy = nOf(p.n + dn);
+        sectionSvg.appendChild(el('line', { x1: cx, y1: cy, x2: hx, y2: hy,
+          stroke: col, 'stroke-dasharray': '4 3', style: sw(1.2),
+          opacity: 0.8, 'pointer-events': 'none' }));
+        sectionSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 14/sf,
+          class: 'handle-hit',
+          'data-drag': `chine-${which}-section`,
+          'data-station-idx': String(sel.stationIdx),
+          'data-point-idx': String(i),
+        }));
+        sectionSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 5/sf,
+          fill: col, stroke: 'white', style: sw(1.4),
+          'data-drag': `chine-${which}-section`,
+          'data-station-idx': String(sel.stationIdx),
+          'data-point-idx': String(i),
+        }));
+      };
+      drawHandle('aft');
+      drawHandle('fore');
+    });
+  }
 
   if (station.points.length <= 5) {
     sectionSvg.appendChild(el('text', {
@@ -2097,6 +2493,31 @@ spineRadiusEl.addEventListener('input', () => {
   spineRadiusOut.textContent = fmtR(state.spineRadius);
   rebuildHull();
 });
+
+// ── Chine editor controls ────────────────────────────────────────────────
+const chineToggleEl   = document.getElementById('chine-editor-enabled');
+const chineCurrentEl  = document.getElementById('chine-current');
+const chineSwatchEl   = document.getElementById('chine-current-swatch');
+function applyChineSwatch() {
+  if (chineSwatchEl) chineSwatchEl.style.background = chineColor(state.chineEditor.currentChine);
+}
+function syncChineEditorUI() {
+  chineToggleEl.checked = !!state.chineEditor.enabled;
+  chineCurrentEl.value  = String(state.chineEditor.currentChine);
+  document.body.classList.toggle('chine-editor-active', !!state.chineEditor.enabled);
+  applyChineSwatch();
+}
+chineToggleEl.addEventListener('change', () => {
+  state.chineEditor.enabled = chineToggleEl.checked;
+  document.body.classList.toggle('chine-editor-active', state.chineEditor.enabled);
+  renderSideView(); renderTopView(); renderSectionView();
+});
+chineCurrentEl.addEventListener('input', () => {
+  const v = Math.max(1, Math.min(99, parseInt(chineCurrentEl.value, 10) || 1));
+  state.chineEditor.currentChine = v;
+  applyChineSwatch();
+});
+syncChineEditorUI();
 
 // Hull colors — outside is the material's .color (used on front-facing
 // fragments); inside is the insideColor uniform injected into the shader.
@@ -2367,6 +2788,8 @@ topSvg.addEventListener('pointerdown', (e) => {
     kind: target.dataset.drag, id: target.dataset.idx, moved: false, pointerId: e.pointerId,
     xi: target.dataset.xi !== undefined ? +target.dataset.xi : undefined,
     zi: target.dataset.zi !== undefined ? +target.dataset.zi : undefined,
+    stationIdx: target.dataset.stationIdx !== undefined ? +target.dataset.stationIdx : undefined,
+    pointIdx:   target.dataset.pointIdx   !== undefined ? +target.dataset.pointIdx   : undefined,
   };
   if (topDrag.kind === 'station') selectStation(+topDrag.id);
   topSvg.setPointerCapture(e.pointerId);
@@ -2418,6 +2841,15 @@ topSvg.addEventListener('pointermove', (e) => {
     const maxS = idx === sortedSt.length-1 ? 0.99 : sortedSt[idx+1].s - 0.01;
     st.s = Math.max(minS, Math.min(maxS, sRaw));
     renderStationList();
+  } else if (topDrag.kind === 'chine-aft-top' || topDrag.kind === 'chine-fore-top') {
+    const which = topDrag.kind === 'chine-aft-top' ? 'aft' : 'fore';
+    const st = state.stations[topDrag.stationIdx];
+    const p  = st?.points[topDrag.pointIdx];
+    if (!p || !p.chineHandles) return;
+    const frame = stationFrame(state, st);
+    // Update dx, dy components of the 3D handle; dz stays.
+    p.chineHandles[which].dx = wx - frame.x;
+    p.chineHandles[which].dy = wy - ((p.b / frame.maxB) * frame.halfB);
   }
   const currentBeam = 2 * Math.max(...bl.peaks.map(p => p.y));
   beamEl.value = currentBeam.toFixed(2);
@@ -2496,6 +2928,27 @@ topSvg.addEventListener('click', (e) => {
     addStationAtS(spineXToS(spS, wx));
     return;
   }
+
+  // Chine editor: click in top view → snap to nearest station, add a chine
+  // control point on its section at b = |y|/halfB, n = bottom-half value.
+  if (state.chineEditor?.enabled && state.layers.top.chines) {
+    const sIdx = nearestStationIdxByX(state, wx);
+    if (sIdx == null) return;
+    const station = state.stations[sIdx];
+    const frame   = stationFrame(state, station);
+    const bWorld  = Math.abs(wy);
+    const bFrac   = Math.max(0, Math.min(frame.maxB, (bWorld / frame.halfB) * frame.maxB));
+    const n = sectionNAtB(station.points, bFrac, true); // bottom intersection
+    insertSectionPoint(station, bFrac, n, state.chineEditor.currentChine);
+    state.selectedStation = listAllStations(state).findIndex(u => u.ref === station);
+    if (state.selectedStation < 0) state.selectedStation = 0;
+    stationLabel.textContent = stationLabelFor(state.selectedStation);
+    renderStationList();
+    rebuildHull();
+    renderSideView(); renderTopView(); renderSectionView();
+    return;
+  }
+
   if (!state.layers.top.beam) return; // beam layer off → no click-to-add
   const beamPts = sampledBeamLine(state);
   let best = Infinity;
@@ -2691,6 +3144,8 @@ sideSvg.addEventListener('pointerdown', (e) => {
     startWx: x / SIDE_SCALE, startWz: -y / SIDE_SCALE,
     xi: target.dataset.xi !== undefined ? +target.dataset.xi : undefined,
     zi: target.dataset.zi !== undefined ? +target.dataset.zi : undefined,
+    stationIdx: target.dataset.stationIdx !== undefined ? +target.dataset.stationIdx : undefined,
+    pointIdx:   target.dataset.pointIdx   !== undefined ? +target.dataset.pointIdx   : undefined,
   };
   if (kind === 'station') selectStation(idx);
   sideSvg.setPointerCapture(e.pointerId);
@@ -2772,6 +3227,16 @@ sideSvg.addEventListener('pointermove', (e) => {
     const hi = drag.idx === sortedSt.length-1 ? 0.99 : sortedSt[drag.idx+1].s - 0.01;
     st.s = Math.max(lo, Math.min(hi, s));
     renderStationList(); rebuildHull(); renderSideView(); renderTopView();
+  } else if (drag.kind === 'chine-aft-side' || drag.kind === 'chine-fore-side') {
+    // Side view edits the (dx, dz) components of the 3D chine handle; dy stays.
+    const which = drag.kind === 'chine-aft-side' ? 'aft' : 'fore';
+    const st = state.stations[drag.stationIdx];
+    const p  = st?.points[drag.pointIdx];
+    if (!p || !p.chineHandles) return;
+    const frame = stationFrame(state, st);
+    p.chineHandles[which].dx = wx - frame.x;
+    p.chineHandles[which].dz = wz - (frame.keelZ + p.n * frame.height);
+    rebuildHull(); renderSideView(); renderTopView();
   }
   // Section view depends on the live H/B aspect at the selected station —
   // re-render so the cross-section's apparent height tracks Z/beam edits.
@@ -3233,17 +3698,20 @@ const LAYER_DEFS = {
     { id: 'keel',     label: 'Rocker (keel)', color: '#2563eb' },
     { id: 'deck',     label: 'Deck line',     color: '#16a34a' },
     { id: 'stations', label: 'Stations',      color: '#7c3aed' },
+    { id: 'chines',   label: 'Chines',        color: '#b91c1c' },
     { id: 'refImage', label: 'Reference image', color: '#94a3b8' },
     { id: 'gizmo',    label: 'Scale gizmo',   color: '#f59e0b' },
   ],
   top: [
     { id: 'beam',     label: 'Beam line',     color: '#0891b2' },
     { id: 'stations', label: 'Stations',      color: '#7c3aed' },
+    { id: 'chines',   label: 'Chines',        color: '#b91c1c' },
     { id: 'refImage', label: 'Reference image', color: '#94a3b8' },
     { id: 'gizmo',    label: 'Scale gizmo',   color: '#f59e0b' },
   ],
   section: [
     { id: 'controls', label: 'Section curve', color: '#1f2937' },
+    { id: 'chines',   label: 'Chines',        color: '#b91c1c' },
     { id: 'refImage', label: 'Reference image', color: '#94a3b8' },
   ],
 };
@@ -3512,6 +3980,25 @@ sideSvg.addEventListener('click', (e) => {
     return;
   }
 
+  // Chine editor: click in side view → snap to nearest station, add a chine
+  // control point on its section at (b derived from section curve at this n).
+  if (state.chineEditor?.enabled && state.layers.side.chines) {
+    const sIdx = nearestStationIdxByX(state, wx);
+    if (sIdx == null) return;
+    const station = state.stations[sIdx];
+    const frame   = stationFrame(state, station);
+    const n = Math.max(0, Math.min(1, (wz - frame.keelZ) / frame.height));
+    const b = sectionBAtN(station.points, n);
+    insertSectionPoint(station, b, n, state.chineEditor.currentChine);
+    state.selectedStation = listAllStations(state).findIndex(u => u.ref === station);
+    if (state.selectedStation < 0) state.selectedStation = 0;
+    stationLabel.textContent = stationLabelFor(state.selectedStation);
+    renderStationList();
+    rebuildHull();
+    renderSideView(); renderTopView(); renderSectionView();
+    return;
+  }
+
   // Check rocker proximity first.
   const knots = state.spine.knots;
   let rDist = Infinity, rSeg = -1, rT = 0;
@@ -3600,6 +4087,8 @@ sectionSvg.addEventListener('pointerdown', (e) => {
   sectionDrag = {
     kind: target.dataset.drag,
     idx: +target.dataset.idx,
+    stationIdx: target.dataset.stationIdx !== undefined ? +target.dataset.stationIdx : undefined,
+    pointIdx:   target.dataset.pointIdx   !== undefined ? +target.dataset.pointIdx   : undefined,
     pointerId: e.pointerId,
     moved: false,
   };
@@ -3636,6 +4125,17 @@ sectionSvg.addEventListener('pointermove', (e) => {
     const db = b - k.b, dn = n - k.n;
     const len = Math.hypot(db, dn);
     if (len > 0.005) { k.angle = Math.atan2(-dn, -db); k.aftLen = len; }
+  } else if (sectionDrag.kind === 'chine-aft-section' || sectionDrag.kind === 'chine-fore-section') {
+    // Section view edits (dy, dz) components of the 3D chine handle; dx stays.
+    const which = sectionDrag.kind === 'chine-aft-section' ? 'aft' : 'fore';
+    const st = state.stations[sectionDrag.stationIdx];
+    const p  = st?.points[sectionDrag.pointIdx];
+    if (!p || !p.chineHandles) return;
+    const frame = stationFrame(state, st);
+    const db = b - p.b, dn = n - p.n;
+    const { dy, dz } = chineSectionDeltaToWorld(frame, db, dn);
+    p.chineHandles[which].dy = dy;
+    p.chineHandles[which].dz = dz;
   } else {
     return;
   }
@@ -3671,8 +4171,8 @@ sectionSvg.addEventListener('click', (e) => {
   const b = x / SECTION_SCALE_B;
   const n = -y / SECTION_SCALE_N;
   if (b < 0) return;
-  const insertIdx = nearestSegmentInsertIdx(station.points, b, n);
-  station.points.splice(insertIdx, 0, { b, n, chine: false });
+  const chineIdx = state.chineEditor?.enabled ? state.chineEditor.currentChine : null;
+  insertSectionPoint(station, b, n, chineIdx);
   renderStationList();
   renderSectionView();
   rebuildHull();

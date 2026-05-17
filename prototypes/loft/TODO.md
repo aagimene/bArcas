@@ -26,6 +26,23 @@ until it has been chunked, prioritized, and confirmed by the user.
   views. Because chine control points are on the Bezier curve, handle lengths
   naturally control chine sharpness. A chine must span at least two
   neighboring stations but does not need to extend to all stations.
+  **NOTE 2026-05-16:** initial MVP implemented under build tag `chine-mvp`.
+  Additional behaviour requested in same prompt:
+  - Chine points can be *drawn* in the side and top views (in addition to
+    the section view). Click in chine-editor mode snaps to the nearest
+    station and inserts a chine control point on that station's section.
+  - Top-view click snaps to the bottom intersection (smaller n) since the
+    section curve crosses any vertical (b = const) line twice.
+  - Chine-editor mode is a toggle (default off); when off chine lines still
+    render but no editing handles show.
+  - Each chine point owns 3D Bezier handles (aft + fore), edited in all
+    three 2D views via the appropriate axis-pair projection. The 3D handles
+    drive the chine *line* (longitudinal Bezier through space); the section
+    Bezier still uses its own per-point angle/aftLen/foreLen.
+  - Remaining for follow-up: align the loft's transverse subdivision so
+    actual mesh edge loops snap to chine points (current MVP draws the
+    chine line as an overlay only — surface is unchanged); 3D-view handle
+    gizmos; chine numbering UI for re-assigning index of existing points.
 
 - **Cross-section aspect-ratio instability during station-point edits.**
   When dragging the widest control point, the aspect scaling can rapidly
@@ -215,6 +232,7 @@ Needs design before coding:
 | Correct scale gizmo cursors: dynamically assign vertical ns-resize or horizontal ew-resize cursors based on coordinate layout, and set the 3D overlay scale gizmo cursor to grab. | cursor-resize-fix |
 | Add a dynamic Beam width slider (under Hull length) that proportionally scales all Y coordinates of the beam curve, styled with a real-time unit readout in metric and imperial. | beam-slider-addon |
 | Add a dynamic, semitransparent purple dashed station preview line that tracks the pointer along the centerline in Top and Side views before clicking to add. | station-preview-hover |
+| Chines MVP: numbered chines, chine editor mode toggle, chine point editing in section/side/top views (side/top snap to nearest station; top uses bottom-half intersection), per-chine-point 3D Bezier handles edited via 2-axis projection in each 2D view, longitudinal chine line rendered in side/top/3D, per-view chines layer toggle. | chine-mvp |
 
 
 
