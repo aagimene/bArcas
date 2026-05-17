@@ -922,8 +922,13 @@ main {
 /* Hide chine overlays when the per-view layer toggle is off. */
 [data-layer-chines="off"] .chine-line,
 [data-layer-chines="off"] .chine-anchor,
+[data-layer-chines="off"] .chine-id-label,
 [data-layer-chines="off"] [data-drag^="chine-"] {
   display: none;
+}
+.chine-id-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  user-select: none;
 }
 /* Chine editor mode — bump click targets so a single station click is easy */
 body.chine-editor-active #side-view,

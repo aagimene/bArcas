@@ -53,7 +53,11 @@ const state = {
     ],
   },
   stations: [
-    { s: 0.5, points: [
+    { s: 0.35, points: [
+      {b:0,n:0,chineIdx:null}, {b:0.55,n:0.13,chineIdx:null},
+      {b:1,n:0.53,chineIdx:null}, {b:0.55,n:0.9,chineIdx:null}, {b:0,n:1,chineIdx:null},
+    ]},
+    { s: 0.65, points: [
       {b:0,n:0,chineIdx:null}, {b:0.55,n:0.13,chineIdx:null},
       {b:1,n:0.53,chineIdx:null}, {b:0.55,n:0.9,chineIdx:null}, {b:0,n:1,chineIdx:null},
     ]},
@@ -913,8 +917,14 @@ function sectionNAtB(stationPoints, bTarget, wantBottom = true) {
 
 // Insert a new section control point on a station at (b, n), placing it in
 // the segment of the section polyline nearest to the click and seeding its
-// 2D bezier tangent via deriveSectionHandles. Returns the inserted index.
+// 2D bezier tangent via deriveSectionHandles. Returns the inserted index, or
+// -1 if rejected (e.g. duplicate chineIdx on the same station — a chine can
+// only have one anchor per station by definition, otherwise the longitudinal
+// edge loop would self-intersect at that section).
 function insertSectionPoint(station, b, n, chineIdx) {
+  if (chineIdx != null && station.points.some(p => p.chineIdx === chineIdx)) {
+    return -1;
+  }
   const idx = nearestSegmentInsertIdx(station.points, b, n);
   const pt = { b, n, chineIdx: chineIdx ?? null };
   if (pt.chineIdx != null) pt.chineHandles = defaultChineHandles();
@@ -1569,6 +1579,11 @@ function renderTopView() {
       anchors.forEach((a, ai) => {
         const cx = xOfT(a.world.y), cy = yOfT(a.world.x);
         topSvg.appendChild(el('circle', { cx, cy, r: 4.5/tf, class: 'chine-anchor', fill: col, stroke: 'white', 'stroke-width': 1.2/tf }));
+        topSvg.appendChild(el('text', {
+          x: cx + 7/tf, y: cy + 4/tf,
+          fill: col, class: 'chine-id-label',
+          'font-size': 9/tf, 'font-weight': 'bold', 'pointer-events': 'none',
+        }, '#' + idx));
         if (!editor) return;
         const drawHandle = (which) => {
           const h = a.p.chineHandles?.[which];
@@ -1933,6 +1948,11 @@ function renderSideView() {
       anchors.forEach((a, ai) => {
         const cx = xOf(a.world.x), cy = yOf(a.world.z);
         sideSvg.appendChild(el('circle', { cx, cy, r: 4.5/sf, class: 'chine-anchor', fill: col, stroke: 'white', 'stroke-width': 1.2/sf }));
+        sideSvg.appendChild(el('text', {
+          x: cx + 7/sf, y: cy - 6/sf,
+          fill: col, class: 'chine-id-label',
+          'font-size': 9/sf, 'font-weight': 'bold', 'pointer-events': 'none',
+        }, '#' + idx));
         if (!editor) return;
         const drawHandle = (which) => {
           const h = a.p.chineHandles?.[which];
@@ -2205,7 +2225,7 @@ function renderSectionView() {
     if (p.chineIdx != null) {
       sectionSvg.appendChild(el('text', {
         x: bOf(p.b) + 13/sf, y: nOf(p.n) + 4/sf,
-        fill: chineColor(p.chineIdx), style: fs(10),
+        fill: chineColor(p.chineIdx), class: 'chine-id-label', style: fs(10),
         'font-weight': 'bold', 'pointer-events': 'none',
       }, '#' + p.chineIdx));
     }

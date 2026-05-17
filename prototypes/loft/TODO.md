@@ -233,6 +233,7 @@ Needs design before coding:
 | Add a dynamic Beam width slider (under Hull length) that proportionally scales all Y coordinates of the beam curve, styled with a real-time unit readout in metric and imperial. | beam-slider-addon |
 | Add a dynamic, semitransparent purple dashed station preview line that tracks the pointer along the centerline in Top and Side views before clicking to add. | station-preview-hover |
 | Chines MVP: numbered chines, chine editor mode toggle, chine point editing in section/side/top views (side/top snap to nearest station; top uses bottom-half intersection), per-chine-point 3D Bezier handles edited via 2-axis projection in each 2D view, longitudinal chine line rendered in side/top/3D, per-view chines layer toggle. | chine-mvp |
+| Chines polish: reject duplicate chineIdx on the same station (each chine ≤ 1 anchor per section); render `#N` label in chine colour next to every chine anchor in side, top, and section views; default starting state now has 2 stations so a chine can be made immediately. | chine-id-everywhere |
 
 
 
