@@ -736,7 +736,7 @@ main {
 .layers-popover input[type="checkbox"] { margin: 0; cursor: pointer; }
 
 /* ── Grey-out + lock when a layer is off ─────────────────────── */
-/* Common neutral for all "off" states. */
+/* Common neutral for all "off" states to disable interactions. */
 :where(
   #side-view[data-layer-keel="off"]     [class*="spine"],
   #side-view[data-layer-keel="off"]     [data-drag^="knot"],
@@ -754,10 +754,81 @@ main {
   #section-view[data-layer-controls="off"] [class*="ctrl"],
   #section-view[data-layer-controls="off"] [data-drag^="ctrl"]
 ) {
-  fill: #cbd5e1!important;
-  stroke: #cbd5e1!important;
   pointer-events: none;
 }
+
+/* Hide hit target areas when inactive so they don't render or get styled */
+:where(
+  #side-view[data-layer-keel="off"]     [class*="-hit"],
+  #side-view[data-layer-deck="off"]     [class*="-hit"],
+  #side-view[data-layer-stations="off"] [class*="-hit"],
+  #top-view[data-layer-beam="off"]      [class*="-hit"],
+  #top-view[data-layer-stations="off"]  [class*="-hit"],
+  #section-view[data-layer-controls="off"] [class*="-hit"]
+) {
+  display: none!important;
+}
+
+/* Base lines / curves / paths get a thin light-grey stroke when off */
+:where(
+  #side-view[data-layer-keel="off"]     [class*="spine-line"],
+  #side-view[data-layer-keel="off"]     [class*="keel"],
+  #side-view[data-layer-deck="off"]     [class*="deck-bezier"],
+  #side-view[data-layer-stations="off"] [class*="station-line"],
+  #top-view[data-layer-beam="off"]      [class*="beam-curve"],
+  #top-view[data-layer-stations="off"]  [class*="station-chord"],
+  #section-view[data-layer-controls="off"] [class*="section-curve"],
+  #section-view[data-layer-controls="off"] [class*="section-mirror"]
+) {
+  stroke: #e2e8f0!important;
+  fill: none!important;
+}
+
+/* Hollow control anchors (knots, main points) when off */
+:where(
+  #side-view[data-layer-keel="off"]     .spine-anchor,
+  #side-view[data-layer-deck="off"]     .deck-knot,
+  #side-view[data-layer-stations="off"] .station-tick,
+  #side-view[data-layer-stations="off"] .station-keel,
+  #side-view[data-layer-stations="off"] .station-deck-top,
+  #top-view[data-layer-beam="off"]      .spine-anchor,
+  #top-view[data-layer-stations="off"]  .station-keel,
+  #section-view[data-layer-controls="off"] .ctrl-pt
+) {
+  fill: white!important;
+  stroke: #cbd5e1!important;
+}
+
+/* Solid control handles when off */
+:where(
+  #side-view[data-layer-keel="off"]     .spine-handle,
+  #side-view[data-layer-deck="off"]     .deck-handle,
+  #top-view[data-layer-beam="off"]      .spine-handle,
+  #section-view[data-layer-controls="off"] .section-handle
+) {
+  fill: #e2e8f0!important;
+  stroke: #cbd5e1!important;
+}
+
+/* Connecting handle lines (dashed helper lines) when off */
+:where(
+  #side-view[data-layer-keel="off"]     .handle-line,
+  #side-view[data-layer-deck="off"]     .deck-handle-line,
+  #top-view[data-layer-beam="off"]      .handle-line,
+  #section-view[data-layer-controls="off"] .section-handle-line
+) {
+  stroke: #cbd5e1!important;
+  stroke-width: 0.5!important;
+}
+
+/* Text labels when off */
+:where(
+  #side-view[data-layer-stations="off"] .station-label,
+  #top-view[data-layer-stations="off"]  .station-label
+) {
+  fill: #cbd5e1!important;
+}
+
 
 /* Reference image off → grey overlay + locked (no drag/resize). */
 [data-layer-refImage="off"] [data-drag^="ref-"],

@@ -203,3 +203,5 @@ Needs design before coding:
 | Cross-section points → on-curve Bezier knots with angle/aftLen/foreLen handles (matches rocker / deck-line model) | section-bezier |
 | Prevent translation drift (panning) during scale gizmo drag | gizmo-pan-fix |
 | Update starting layout percentages (col 25%, row 66%) | layout-66 |
+| Fix inactive layer styling: hide large transparent hit targets entirely, style solid handles and hollow anchors elegantly instead of generating thick solid grey circles. | layer-toggles-fix |
+
