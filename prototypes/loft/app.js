@@ -1880,6 +1880,8 @@ function fmtMM(m) {
 
 const lengthEl   = document.getElementById('length');
 const lengthOut  = document.getElementById('length-out');
+const beamEl     = document.getElementById('beam');
+const beamOut    = document.getElementById('beam-out');
 const loftResEl  = document.getElementById('loft-res');
 const stationsOl = document.getElementById('stations');
 const stationLabel = document.getElementById('station-label');
@@ -2044,6 +2046,20 @@ lengthEl.addEventListener('input', () => {
   renderSideView();
   renderTopView();
   renderSectionView();
+});
+
+// Beam slider — proportionally rescales all Y coordinates (overall beam width).
+beamEl.addEventListener('input', () => {
+  const newBeam = parseFloat(beamEl.value);
+  const currentBeam = 2 * Math.max(...state.beamLine.peaks.map(p => p.y));
+  if (currentBeam > 0) {
+    const r = newBeam / currentBeam;
+    applyScaleY(r);
+    rebuildHull();
+    renderSideView();
+    renderTopView();
+    renderSectionView();
+  }
 });
 
 loftResEl.addEventListener('change', () => {
@@ -2397,6 +2413,9 @@ topSvg.addEventListener('pointermove', (e) => {
     st.s = Math.max(minS, Math.min(maxS, sRaw));
     renderStationList();
   }
+  const currentBeam = 2 * Math.max(...bl.peaks.map(p => p.y));
+  beamEl.value = currentBeam.toFixed(2);
+  beamOut.textContent = fmtLength(currentBeam);
   rebuildHull();
   renderSideView();
   renderTopView();
@@ -2584,6 +2603,9 @@ function applyScaleY(r) {
   bl.sternHandle.dy *= r;
   bl.bowHandle.dy   *= r;
   bl.peaks.forEach(pk => { pk.y *= r; pk.hdy *= r; });
+  const currentBeam = 2 * Math.max(...bl.peaks.map(p => p.y));
+  beamEl.value = currentBeam.toFixed(2);
+  beamOut.textContent = fmtLength(currentBeam);
 }
 
 function applyScaleZ(r) {
@@ -3384,6 +3406,9 @@ function syncUIFromState() {
   // Sliders / dropdowns
   lengthEl.value         = state.length.toFixed(2);
   lengthOut.textContent  = fmtLength(state.length);
+  const currentBeam = 2 * Math.max(...state.beamLine.peaks.map(p => p.y));
+  beamEl.value           = currentBeam.toFixed(2);
+  beamOut.textContent    = fmtLength(currentBeam);
   loftResEl.value        = state.loftRes;
   xSubdivEl.value        = String(state.xSubdiv);
   spineRadiusEl.value    = String(state.spineRadius);

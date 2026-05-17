@@ -212,6 +212,8 @@ Needs design before coding:
 | Make the station centerline in Side View curved (vertical average of Keel and Deck curves), styled as a thin solid purple control line (#7c3aed, width 1.6), and add a premium micro-animation highlight on hover. | curved-loftline-fix |
 | Synchronize length slider, length output readout text, and top view rendering when dragging the deck line endpoints along X. | deck-length-sync |
 | Correct scale gizmo cursors: dynamically assign vertical ns-resize or horizontal ew-resize cursors based on coordinate layout, and set the 3D overlay scale gizmo cursor to grab. | cursor-resize-fix |
+| Add a dynamic Beam width slider (under Hull length) that proportionally scales all Y coordinates of the beam curve, styled with a real-time unit readout in metric and imperial. | beam-slider-addon |
+
 
 
 
