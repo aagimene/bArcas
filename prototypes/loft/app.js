@@ -123,6 +123,95 @@ function defaultChineHandles() {
   };
 }
 
+// Enforce C1 continuity on the chine handles: after a drag updates one
+// side, mirror its 3D direction onto the other side while preserving the
+// other side's existing length. The "handles + anchor" therefore always
+// form a straight line in 3D space, but magnitudes (aft vs fore length)
+// remain independent. Called from every chine-handle drag.
+function mirrorChineHandleDirection(handles, dragged) {
+  const other = dragged === 'fore' ? 'aft' : 'fore';
+  const h = handles[dragged];
+  const o = handles[other];
+  const len = Math.hypot(h.dx, h.dy, h.dz);
+  if (len < 1e-6) return;
+  const oLen = Math.hypot(o.dx, o.dy, o.dz);
+  o.dx = -h.dx * oLen / len;
+  o.dy = -h.dy * oLen / len;
+  o.dz = -h.dz * oLen / len;
+}
+
+// Delete a chine control point with the contiguity / minimum-size rules:
+//   • If the remaining anchor count would drop below 2 → delete the
+//     entire chine (after user confirmation).
+//   • If the remaining anchors would not span a contiguous range of
+//     stations (e.g. removing the middle of a 3-anchor chine) → delete
+//     the entire chine (after confirmation).
+//   • Otherwise → remove just the clicked anchor.
+// "Delete the entire chine" means remove the chine flag and any inserted
+// section ctrl-pt from every station that carries it; the section curve
+// loses those knots (keel/deck endpoints are protected — they only get
+// their chineIdx cleared).
+// Returns true if any change was made, false on user cancel.
+function deleteChinePointWithConfirmation(stationIdx, pointIdx) {
+  const station = state.stations[stationIdx];
+  const point = station?.points[pointIdx];
+  if (!point || point.chineIdx == null) return false;
+  const chineIdx = point.chineIdx;
+
+  const allAnchors = [];
+  state.stations.forEach((st, si) => {
+    st.points.forEach((p, pi) => {
+      if (p.chineIdx === chineIdx) allAnchors.push({ stationIdx: si, pointIdx: pi });
+    });
+  });
+  const remaining = allAnchors.filter(a => !(a.stationIdx === stationIdx && a.pointIdx === pointIdx));
+
+  let deleteWholeChine = remaining.length < 2;
+  if (!deleteWholeChine) {
+    const sortedStByS = state.stations.map((st, i) => ({ st, i }))
+      .sort((a, b) => a.st.s - b.st.s);
+    const ordOf = new Map(sortedStByS.map((entry, ord) => [entry.i, ord]));
+    const ords = [...new Set(remaining.map(a => a.stationIdx))].map(i => ordOf.get(i)).sort((a, b) => a - b);
+    for (let k = 1; k < ords.length; k++) {
+      if (ords[k] - ords[k - 1] !== 1) { deleteWholeChine = true; break; }
+    }
+  }
+
+  const removeAtIdx = (stIdx, pi) => {
+    const st = state.stations[stIdx];
+    const last = st.points.length - 1;
+    if (pi > 0 && pi < last) {
+      st.points.splice(pi, 1);
+    } else {
+      // Endpoint (keel or deck-end) — keep the geometry, just drop the chine tag.
+      st.points[pi].chineIdx = null;
+      delete st.points[pi].chineHandles;
+    }
+  };
+
+  if (deleteWholeChine) {
+    const n = allAnchors.length;
+    const reason = remaining.length < 2
+      ? `Deleting this point would leave chine #${chineIdx} with fewer than 2 anchors.`
+      : `Deleting this point would split chine #${chineIdx} into non-contiguous segments.`;
+    const ok = confirm(`${reason}\n\nDelete the entire chine #${chineIdx} (${n} anchor${n === 1 ? '' : 's'})?`);
+    if (!ok) return false;
+    // Group by station so we splice from end → start (descending pointIdx).
+    const byStation = new Map();
+    for (const a of allAnchors) {
+      if (!byStation.has(a.stationIdx)) byStation.set(a.stationIdx, []);
+      byStation.get(a.stationIdx).push(a.pointIdx);
+    }
+    for (const [stIdx, pis] of byStation.entries()) {
+      pis.sort((a, b) => b - a);
+      for (const pi of pis) removeAtIdx(stIdx, pi);
+    }
+  } else {
+    removeAtIdx(stationIdx, pointIdx);
+  }
+  return true;
+}
+
 // Migrate older saved states: section points may have boolean `chine` (legacy)
 // or be missing the new `chineIdx`/`chineHandles` fields. Mutates in place.
 function migrateChineFields(state) {
@@ -2240,14 +2329,20 @@ function renderSectionView() {
   sectionSvg.appendChild(el('path', { class: 'section-mirror', d: portPath, style: sw(1.5) }));
 
   // Tangent handles (drawn first so they sit underneath the knot circles).
+  // For chine points, the handle line + dot use the chine colour so a single
+  // glance tells the user which section knot anchors which chine.
   deriveSectionHandles(station.points);
   station.points.forEach((p, i) => {
     const h = sectionKnotHandles(p);
+    const isChine = p.chineIdx != null;
+    const col     = isChine ? chineColor(p.chineIdx) : '#2563eb';
+    const lineStyle = `stroke:${col};` + sw(1.4);
+    const dotStyle  = `fill:${col};`  + sw(1.4);
     if (i > 0) {
       const ax = bOf(h.aft.b), ay = nOf(h.aft.n);
       sectionSvg.appendChild(el('line', {
         x1: bOf(p.b), y1: nOf(p.n), x2: ax, y2: ay,
-        class: 'section-handle-line', style: sw(1.4),
+        class: 'section-handle-line', style: lineStyle,
       }));
       sectionSvg.appendChild(el('circle', {
         cx: ax, cy: ay, r: 14/sf, class: 'handle-hit',
@@ -2255,7 +2350,7 @@ function renderSectionView() {
       }));
       sectionSvg.appendChild(el('circle', {
         cx: ax, cy: ay, r: 5/sf, class: 'section-handle',
-        style: sw(1.4),
+        style: dotStyle,
         'data-drag': 'ctrl-aft', 'data-idx': String(i),
       }));
     }
@@ -2263,7 +2358,7 @@ function renderSectionView() {
       const fx = bOf(h.fore.b), fy = nOf(h.fore.n);
       sectionSvg.appendChild(el('line', {
         x1: bOf(p.b), y1: nOf(p.n), x2: fx, y2: fy,
-        class: 'section-handle-line', style: sw(1.4),
+        class: 'section-handle-line', style: lineStyle,
       }));
       sectionSvg.appendChild(el('circle', {
         cx: fx, cy: fy, r: 14/sf, class: 'handle-hit',
@@ -2271,7 +2366,7 @@ function renderSectionView() {
       }));
       sectionSvg.appendChild(el('circle', {
         cx: fx, cy: fy, r: 5/sf, class: 'section-handle',
-        style: sw(1.4),
+        style: dotStyle,
         'data-drag': 'ctrl-fore', 'data-idx': String(i),
       }));
     }
@@ -2308,44 +2403,10 @@ function renderSectionView() {
     }
   });
 
-  // ── Chine 3D handles projected onto the section plane (Y-Z) ───────────
-  // When the chine editor is on, each chine point gets aft/fore handles
-  // edited in section space: drag updates (dy, dz) components of the 3D
-  // handle vector while dx stays put.
-  if (state.chineEditor?.enabled && state.layers.section.chines) {
-    // Compute the station's frame to translate world (Δy, Δz) into section
-    // space deltas (Δb, Δn). The selected station's frame is what we need
-    // because the section view shows only this station.
-    const frame = stationFrame(state, station);
-    station.points.forEach((p, i) => {
-      if (p.chineIdx == null) return;
-      if (!p.chineHandles) p.chineHandles = defaultChineHandles();
-      const col = chineColor(p.chineIdx);
-      const drawHandle = (which) => {
-        const h = p.chineHandles[which];
-        const { db, dn } = chineWorldDeltaToSection(frame, h.dy, h.dz);
-        const cx = bOf(p.b), cy = nOf(p.n);
-        const hx = bOf(p.b + db), hy = nOf(p.n + dn);
-        sectionSvg.appendChild(el('line', { x1: cx, y1: cy, x2: hx, y2: hy,
-          stroke: col, 'stroke-dasharray': '4 3', style: sw(1.2),
-          opacity: 0.8, 'pointer-events': 'none' }));
-        sectionSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 14/sf,
-          class: 'handle-hit',
-          'data-drag': `chine-${which}-section`,
-          'data-station-idx': String(sel.stationIdx),
-          'data-point-idx': String(i),
-        }));
-        sectionSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 5/sf,
-          fill: col, stroke: 'white', style: sw(1.4),
-          'data-drag': `chine-${which}-section`,
-          'data-station-idx': String(sel.stationIdx),
-          'data-point-idx': String(i),
-        }));
-      };
-      drawHandle('aft');
-      drawHandle('fore');
-    });
-  }
+  // Per the design: the chine line's 3D Bezier handles are edited in the
+  // side and top views (where the longitudinal sweep is visible). The
+  // section view shows only the per-section-knot tangent handles
+  // (angle/aftLen/foreLen), now coloured per chine for chine points.
 
   if (station.points.length <= 5) {
     sectionSvg.appendChild(el('text', {
@@ -3131,6 +3192,7 @@ topSvg.addEventListener('pointermove', (e) => {
     // Update dx, dy components of the 3D handle; dz stays.
     p.chineHandles[which].dx = wx - frame.x;
     p.chineHandles[which].dy = wy - ((p.b / frame.maxB) * frame.halfB);
+    mirrorChineHandleDirection(p.chineHandles, which);
   }
   const currentBeam = 2 * Math.max(...bl.peaks.map(p => p.y));
   beamEl.value = currentBeam.toFixed(2);
@@ -3513,6 +3575,7 @@ sideSvg.addEventListener('pointermove', (e) => {
     const frame = stationFrame(state, st);
     p.chineHandles[which].dx = wx - frame.x;
     p.chineHandles[which].dz = wz - (frame.keelZ + p.n * frame.height);
+    mirrorChineHandleDirection(p.chineHandles, which);
     rebuildHull(); renderSideView(); renderTopView();
   }
   // Section view depends on the live H/B aspect at the selected station —
@@ -4512,6 +4575,20 @@ sectionSvg.addEventListener('contextmenu', (e) => {
   const sel = selectedStationObj();
   if (!sel) return;
   const station = sel.ref;
+  const point = station.points[i];
+  // Chine points: smart deletion with confirmation when removing one would
+  // violate the chine's ≥ 2 anchors / contiguous-range invariant.
+  if (point && point.chineIdx != null) {
+    const stationIdx = state.stations.indexOf(station);
+    if (deleteChinePointWithConfirmation(stationIdx, i)) {
+      renderStationList();
+      renderSectionView();
+      rebuildHull();
+      renderSideView();
+      renderTopView();
+    }
+    return;
+  }
   if (i === 0 || i === station.points.length - 1) return;
   if (station.points.length <= 3) return;
   station.points.splice(i, 1);
