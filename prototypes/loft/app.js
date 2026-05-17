@@ -974,7 +974,7 @@ function updateThreeGizmo() {
     hit.dataset.scaleAxis = d.axis;
     hit.dataset.scaleDirX = d.sx.toFixed(4);
     hit.dataset.scaleDirY = d.sy.toFixed(4);
-    hit.style.cursor = 'crosshair';
+    hit.style.cursor = 'grab';
     hit.style.pointerEvents = 'all';
     threeGizmoSvg.appendChild(hit);
 
@@ -1349,6 +1349,7 @@ function appendScaleGizmo2D(svg, gcx, gcy, sf, axes) {
     }));
 
     // Large transparent hit area
+    const cursor = Math.abs(ax.screenDirY) > Math.abs(ax.screenDirX) ? 'ns-resize' : 'ew-resize';
     g.appendChild(el('rect', {
       x: ex - 3 * hs, y: ey - 3 * hs,
       width: 6 * hs, height: 6 * hs,
@@ -1356,7 +1357,7 @@ function appendScaleGizmo2D(svg, gcx, gcy, sf, axes) {
       'data-scale-axis': ax.axis,
       'data-scale-dir-x': ax.screenDirX.toFixed(4),
       'data-scale-dir-y': ax.screenDirY.toFixed(4),
-      style: 'cursor:ew-resize; pointer-events:all',
+      style: `cursor:${cursor}; pointer-events:all`,
     }));
 
     // Visible square handle (rotated 45° → diamond)
