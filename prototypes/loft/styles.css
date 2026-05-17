@@ -812,8 +812,10 @@ main {
   #side-view[data-layer-keel="off"]     [class*="keel"],
   #side-view[data-layer-deck="off"]     [class*="deck-bezier"],
   #side-view[data-layer-stations="off"] [class*="station-line"],
+  #side-view[data-layer-stations="off"] .station-add-line,
   #top-view[data-layer-beam="off"]      [class*="beam-curve"],
   #top-view[data-layer-stations="off"]  [class*="station-chord"],
+  #top-view[data-layer-stations="off"]  .station-add-line,
   #section-view[data-layer-controls="off"] [class*="section-curve"],
   #section-view[data-layer-controls="off"] [class*="section-mirror"]
 ) {
@@ -886,19 +888,23 @@ main {
 /* ── Station-add line: longitudinal centerline you can click to add a station ── */
 #side-view .station-add-line,
 #top-view  .station-add-line {
-  stroke: #c4b5fd;
-  stroke-width: 1;
-  stroke-dasharray: 6 4;
+  stroke: #7c3aed;
+  stroke-width: 1.6;
+  fill: none;
   pointer-events: none;
-  opacity: 0.7;
+  opacity: 0.75;
+  transition: stroke-width 0.15s ease, opacity 0.15s ease;
 }
 #side-view .station-add-hit,
 #top-view  .station-add-hit {
+  fill: none;
   stroke: transparent;
   stroke-width: 14;
   cursor: copy;
 }
-#side-view .station-add-hit:hover,
-#top-view  .station-add-hit:hover {
-  stroke: rgba(124, 58, 237, 0.18);
+/* Trigger an elegant micro-animation highlight on the visible curve/line when the adjacent hit area is hovered */
+#side-view .station-add-hit:hover + .station-add-line,
+#top-view  .station-add-hit:hover + .station-add-line {
+  stroke-width: 2.2;
+  opacity: 1;
 }

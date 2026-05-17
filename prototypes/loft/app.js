@@ -1265,11 +1265,11 @@ function renderTopView() {
     const x1 = 0, x2 = 0;
     const y1 = yOfT(sternKnot.x), y2 = yOfT(bowKnot.x);
     topSvg.appendChild(el('line', {
-      x1, y1, x2, y2, class: 'station-add-line',
-    }));
-    topSvg.appendChild(el('line', {
       x1, y1, x2, y2, class: 'station-add-hit',
       'data-drag-action': 'add-station',
+    }));
+    topSvg.appendChild(el('line', {
+      x1, y1, x2, y2, class: 'station-add-line',
     }));
   }
 
@@ -1531,25 +1531,24 @@ function renderSideView() {
       sideSvg.appendChild(el('text', { x: xOf(k.x), y: yOf(0) + 22/sf, class: 'label', 'text-anchor': 'middle', 'font-size': 9/sf }, 'bow'));
   });
 
-  // ── Station-add line: longitudinal centerline through the loft ──────
+  // ── Station-add line: curved longitudinal centerline through the loft ──────
   // Visible when the stations layer is active.  Click → insert a new
   // station at that X with section shape interpolated from the current
   // loft (so the lofted surface is unchanged at the moment of insertion).
   {
-    const sp = state.spine.knots;
-    const stX = sp[0].x, bwX = sp[sp.length-1].x;
-    const dkS_ = sampledSpine(state.deckLine.knots, 32);
-    // Midline z = average of keel z and deck z along the length.
-    const midZ = (sp.reduce((a,k) => a + k.z, 0) / sp.length
-                + state.deckLine.knots.reduce((a,k) => a + k.z, 0) / state.deckLine.knots.length) / 2;
-    void dkS_; // silence unused
-    const x1 = xOf(stX), x2 = xOf(bwX), y = yOf(midZ);
-    sideSvg.appendChild(el('line', {
-      x1, y1: y, x2, y2: y, class: 'station-add-line',
-    }));
-    sideSvg.appendChild(el('line', {
-      x1, y1: y, x2, y2: y, class: 'station-add-hit',
+    const midlinePts = spSampled.pts.map(kp => {
+      const deckZ = curveYAtX(deckSampled, kp.x);
+      const midZ  = (kp.y + deckZ) / 2;
+      return { x: kp.x, z: midZ };
+    });
+    const midlineD = 'M ' + midlinePts.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.z).toFixed(2)}`).join(' L ');
+
+    sideSvg.appendChild(el('path', {
+      d: midlineD, class: 'station-add-hit',
       'data-drag-action': 'add-station',
+    }));
+    sideSvg.appendChild(el('path', {
+      d: midlineD, class: 'station-add-line',
     }));
   }
 

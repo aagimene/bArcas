@@ -209,6 +209,8 @@ Needs design before coding:
 | Make the controls drawer integrate into the layout grid as a squeezing sidebar on desktop, with mobile fallback. | controls-grid-squeeze |
 | Set width: 100% and height: 100% on the Three.js canvas element so that it resizes seamlessly and keeps the hull perfectly centered when the sidebar collapses/expands. | three-center-fit |
 | Fix Three.js canvas layout expansion by applying CSS !important on width/height and letting the ResizeObserver trigger a full render resize (updating canvas inline styles W/H). | three-render-fix |
+| Make the station centerline in Side View curved (vertical average of Keel and Deck curves), styled as a thin solid purple control line (#7c3aed, width 1.6), and add a premium micro-animation highlight on hover. | curved-loftline-fix |
+
 
 
 
