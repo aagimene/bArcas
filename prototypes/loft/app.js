@@ -2715,7 +2715,9 @@ sideSvg.addEventListener('pointermove', (e) => {
     if (drag.idx === 0)                k.x = spKnots[0].x = wx;
     if (drag.idx === dkKnots.length-1) k.x = spKnots[spKnots.length-1].x = wx;
     state.length = spKnots[spKnots.length-1].x - spKnots[0].x;
-    rebuildHull(); renderSideView();
+    lengthEl.value = state.length.toFixed(2);
+    lengthOut.textContent = fmtLength(state.length);
+    rebuildHull(); renderSideView(); renderTopView();
   } else if (drag.kind === 'deck-fore') {
     const k = state.deckLine.knots[drag.idx];
     if (!k) return;

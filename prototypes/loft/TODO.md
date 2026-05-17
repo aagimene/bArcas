@@ -210,6 +210,8 @@ Needs design before coding:
 | Set width: 100% and height: 100% on the Three.js canvas element so that it resizes seamlessly and keeps the hull perfectly centered when the sidebar collapses/expands. | three-center-fit |
 | Fix Three.js canvas layout expansion by applying CSS !important on width/height and letting the ResizeObserver trigger a full render resize (updating canvas inline styles W/H). | three-render-fix |
 | Make the station centerline in Side View curved (vertical average of Keel and Deck curves), styled as a thin solid purple control line (#7c3aed, width 1.6), and add a premium micro-animation highlight on hover. | curved-loftline-fix |
+| Synchronize length slider, length output readout text, and top view rendering when dragging the deck line endpoints along X. | deck-length-sync |
+
 
 
 
