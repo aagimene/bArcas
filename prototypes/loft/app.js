@@ -2623,9 +2623,10 @@ document.addEventListener('pointercancel', () => { scaleDrag = null; }, true);
 // Attach a capture-phase pointerdown listener to a SVG so that clicks on
 // [data-scale-axis] elements start a scale drag and stop further propagation
 // (preventing the pan handler from treating the click as a background tap).
-function attachScaleGizmoPointer(svg) {
+function attachScaleGizmoPointer(svg, view) {
   svg.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
+    if (state.layers[view] && !state.layers[view].gizmo) return;
     const target = e.target.closest('[data-scale-axis]');
     if (!target) return;
     e.preventDefault();
@@ -2642,8 +2643,8 @@ function attachScaleGizmoPointer(svg) {
   }, true);
 }
 
-attachScaleGizmoPointer(sideSvg);
-attachScaleGizmoPointer(topSvg);
+attachScaleGizmoPointer(sideSvg, 'side');
+attachScaleGizmoPointer(topSvg, 'top');
 // Section view intentionally has no scale gizmo: scaling is meaningless in
 // normalised (b, n) section space — Y/Z scaling lives on top/side/3D views.
 

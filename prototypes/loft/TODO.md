@@ -204,4 +204,6 @@ Needs design before coding:
 | Prevent translation drift (panning) during scale gizmo drag | gizmo-pan-fix |
 | Update starting layout percentages (col 25%, row 66%) | layout-66 |
 | Fix inactive layer styling: hide large transparent hit targets entirely, style solid handles and hollow anchors elegantly instead of generating thick solid grey circles. | layer-toggles-fix |
+| Block scale-gizmo drag events in top and side views when the gizmo layer is toggled off. | gizmo-toggle-lock |
+
 
