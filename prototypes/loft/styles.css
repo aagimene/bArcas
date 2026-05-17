@@ -840,9 +840,10 @@ main {
 /* Scale gizmo off → faded, non-interactive. */
 [data-layer-gizmo="off"] .scale-gizmo {
   opacity: 0.25;
+  pointer-events: none !important;
 }
-[data-layer-gizmo="off"] [data-scale-axis] {
-  pointer-events: none;
+[data-layer-gizmo="off"] .scale-gizmo * {
+  pointer-events: none !important;
 }
 
 /* ── Station-add line: longitudinal centerline you can click to add a station ── */

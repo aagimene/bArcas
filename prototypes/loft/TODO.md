@@ -205,5 +205,7 @@ Needs design before coding:
 | Update starting layout percentages (col 25%, row 66%) | layout-66 |
 | Fix inactive layer styling: hide large transparent hit targets entirely, style solid handles and hollow anchors elegantly instead of generating thick solid grey circles. | layer-toggles-fix |
 | Block scale-gizmo drag events in top and side views when the gizmo layer is toggled off. | gizmo-toggle-lock |
+| Apply pointer-events: none !important to deactivated scale gizmos and all their descendants so colocated control points can be clicked. | gizmo-pass-through |
+
 
 
