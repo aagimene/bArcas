@@ -40,6 +40,7 @@ until it has been chunked, prioritized, and confirmed by the user.
   position; the new station should automatically assume the interpolated
   cross-section shape of the existing lofted geometry at that point, so the
   hull shape does not change at all upon insertion.
+  **NOTE 2026-05-16:** Interactive click-to-add with dynamic station preview is now functional, but the resulting station added is still not perfect; it sometimes inserts additional unnecessary points and changes/deforms the loft geometry slightly. Needs refinement.
 
 - **Section view: uneditable center-loft marker.** The companion to the
   station-add line — show a small dot/cross in the cross-section view at
@@ -213,6 +214,8 @@ Needs design before coding:
 | Synchronize length slider, length output readout text, and top view rendering when dragging the deck line endpoints along X. | deck-length-sync |
 | Correct scale gizmo cursors: dynamically assign vertical ns-resize or horizontal ew-resize cursors based on coordinate layout, and set the 3D overlay scale gizmo cursor to grab. | cursor-resize-fix |
 | Add a dynamic Beam width slider (under Hull length) that proportionally scales all Y coordinates of the beam curve, styled with a real-time unit readout in metric and imperial. | beam-slider-addon |
+| Add a dynamic, semitransparent purple dashed station preview line that tracks the pointer along the centerline in Top and Side views before clicking to add. | station-preview-hover |
+
 
 
 

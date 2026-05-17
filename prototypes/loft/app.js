@@ -1271,6 +1271,9 @@ function renderTopView() {
     topSvg.appendChild(el('line', {
       x1, y1, x2, y2, class: 'station-add-line',
     }));
+    topSvg.appendChild(el('line', {
+      class: 'station-preview-line', id: 'top-station-preview',
+    }));
   }
 
   // ── Station marks ────────────────────────────────────────────────────
@@ -1550,6 +1553,9 @@ function renderSideView() {
     }));
     sideSvg.appendChild(el('path', {
       d: midlineD, class: 'station-add-line',
+    }));
+    sideSvg.appendChild(el('line', {
+      class: 'station-preview-line', id: 'side-station-preview',
     }));
   }
 
@@ -3438,6 +3444,58 @@ function syncUIFromState() {
   // Station label/count display
   stationLabel.textContent = stationLabelFor(state.selectedStation);
 }
+
+// Centerline hover station preview lines
+sideSvg.addEventListener('pointermove', (e) => {
+  const hit = e.target.closest('[data-drag-action="add-station"]');
+  const preview = document.getElementById('side-station-preview');
+  if (!hit || !preview || !state.layers.side.stations) {
+    if (preview) preview.style.display = 'none';
+    return;
+  }
+  const { x } = svgToLocal(sideSvg, e);
+  const wx = x / SIDE_SCALE;
+
+  const spSampled = sampledSpine(state.spine.knots, 32);
+  const deckSampled = sampledSpine(state.deckLine.knots, 32);
+  const keelZ = curveYAtX(spSampled, wx);
+  const deckZ = curveYAtX(deckSampled, wx);
+
+  preview.setAttribute('x1', String(wx * SIDE_SCALE));
+  preview.setAttribute('y1', String(-keelZ * SIDE_SCALE));
+  preview.setAttribute('x2', String(wx * SIDE_SCALE));
+  preview.setAttribute('y2', String(-deckZ * SIDE_SCALE));
+  preview.style.display = 'block';
+});
+
+sideSvg.addEventListener('pointerleave', () => {
+  const preview = document.getElementById('side-station-preview');
+  if (preview) preview.style.display = 'none';
+});
+
+topSvg.addEventListener('pointermove', (e) => {
+  const hit = e.target.closest('[data-drag-action="add-station"]');
+  const preview = document.getElementById('top-station-preview');
+  if (!hit || !preview || !state.layers.top.stations) {
+    if (preview) preview.style.display = 'none';
+    return;
+  }
+  const { wx } = svgToLocalTop(e);
+  const beamPts = sampledBeamLine(state);
+  const halfB = beamEvalAt(beamPts, wx);
+
+  // SVG X = world Y * TOP_SCALE_Y, SVG Y = -world X * TOP_SCALE_X
+  preview.setAttribute('x1', String(-halfB * TOP_SCALE_Y));
+  preview.setAttribute('y1', String(-wx * TOP_SCALE_X));
+  preview.setAttribute('x2', String(halfB * TOP_SCALE_Y));
+  preview.setAttribute('y2', String(-wx * TOP_SCALE_X));
+  preview.style.display = 'block';
+});
+
+topSvg.addEventListener('pointerleave', () => {
+  const preview = document.getElementById('top-station-preview');
+  if (preview) preview.style.display = 'none';
+});
 
 // Click near rocker → insert on-curve knot; click near deck curve → insert handle.
 sideSvg.addEventListener('click', (e) => {
