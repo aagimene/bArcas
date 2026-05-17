@@ -207,6 +207,8 @@ Needs design before coding:
 | Block scale-gizmo drag events in top and side views when the gizmo layer is toggled off. | gizmo-toggle-lock |
 | Apply pointer-events: none !important to deactivated scale gizmos and all their descendants so colocated control points can be clicked. | gizmo-pass-through |
 | Make the controls drawer integrate into the layout grid as a squeezing sidebar on desktop, with mobile fallback. | controls-grid-squeeze |
+| Set width: 100% and height: 100% on the Three.js canvas element so that it resizes seamlessly and keeps the hull perfectly centered when the sidebar collapses/expands. | three-center-fit |
+
 
 
 
