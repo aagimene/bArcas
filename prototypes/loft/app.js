@@ -488,6 +488,139 @@ function sectionKnotHandles(k) {
   };
 }
 
+// Build the dense polyline + cumulative arc-length array for a section.
+// Returned in the shape sampleSection / sampleSectionAnchored both consume.
+// Every section control-point knot lands as an exact dense sample (the t=0
+// of its outgoing Bezier segment, with the final knot appended explicitly),
+// so any (b, n) of a knot can be matched exactly by closest-point lookup.
+function denseSection(section) {
+  const pts = section;
+  const np  = pts.length;
+  deriveSectionHandles(pts);
+  const dense = [];
+  for (let i = 0; i < np - 1; i++) {
+    const k0 = pts[i], k1 = pts[i + 1];
+    const h0 = sectionKnotHandles(k0);
+    const h1 = sectionKnotHandles(k1);
+    const c1 = h0.fore;
+    const c2 = h1.aft;
+    const steps = 24;
+    for (let s = 0; s < steps; s++) {
+      const t = s / steps, u = 1 - t;
+      dense.push({
+        b: u*u*u*k0.b + 3*u*u*t*c1.b + 3*u*t*t*c2.b + t*t*t*k1.b,
+        n: u*u*u*k0.n + 3*u*u*t*c1.n + 3*u*t*t*c2.n + t*t*t*k1.n,
+      });
+    }
+  }
+  dense.push({ b: pts[np-1].b, n: pts[np-1].n });
+  const arc = [0];
+  for (let i = 1; i < dense.length; i++) {
+    const db = dense[i].b - dense[i-1].b, dn = dense[i].n - dense[i-1].n;
+    arc.push(arc[i-1] + Math.hypot(db, dn));
+  }
+  return { dense, arc, total: arc[arc.length - 1] || 1 };
+}
+
+// Locate the arc-length position of an anchor (b, n) on the section curve
+// by closest-point lookup on the dense polyline. Section control points
+// land as exact dense samples, so for chine anchors (which ARE section
+// control points) this is exact.
+function anchorArcLength(denseInfo, b, n) {
+  const { dense, arc } = denseInfo;
+  let bestI = 0, bestD = Infinity;
+  for (let i = 0; i < dense.length; i++) {
+    const d = Math.hypot(dense[i].b - b, dense[i].n - n);
+    if (d < bestD) { bestD = d; bestI = i; }
+  }
+  return arc[bestI];
+}
+
+// Resample a section to N points, with optional anchor constraints.
+// `anchors` is an array of { idx, b, n } where `idx` is the output sample
+// index that must land exactly on (b, n). The remaining samples are
+// distributed by uniform arc-length within each gap between anchors
+// (including the implicit anchors at idx=0 ↔ arc=0 and idx=N-1 ↔ arc=total).
+// With `anchors=[]` this is equivalent to plain sampleSection.
+function sampleSectionAnchored(section, N, anchors) {
+  if (section.length < 2) return Array.from({ length: N }, () => ({ b: 0, n: 0 }));
+  const info = denseSection(section);
+  const { dense, arc, total } = info;
+
+  const cleaned = (anchors || [])
+    .filter(a => a.idx > 0 && a.idx < N - 1)
+    .sort((a, b) => a.idx - b.idx);
+  const knownIdx = [0, ...cleaned.map(a => a.idx), N - 1];
+  const knownArc = [0, ...cleaned.map(a => anchorArcLength(info, a.b, a.n)), total];
+
+  const out = new Array(N);
+  let segLo = 0;
+  for (let k = 0; k < N; k++) {
+    while (segLo < knownIdx.length - 2 && knownIdx[segLo + 1] <= k) segLo++;
+    const i0 = knownIdx[segLo], i1 = knownIdx[segLo + 1];
+    const span = i1 - i0;
+    const t = span > 0 ? (k - i0) / span : 0;
+    const target = knownArc[segLo] + t * (knownArc[segLo + 1] - knownArc[segLo]);
+    // Binary search arc[] for `target`
+    let lo = 0, hi = arc.length - 1;
+    while (hi - lo > 1) {
+      const m = (lo + hi) >> 1;
+      if (arc[m] <= target) lo = m; else hi = m;
+    }
+    const dt = arc[hi] === arc[lo] ? 0 : (target - arc[lo]) / (arc[hi] - arc[lo]);
+    out[k] = {
+      b: dense[lo].b + dt * (dense[hi].b - dense[lo].b),
+      n: dense[lo].n + dt * (dense[hi].n - dense[lo].n),
+    };
+  }
+  // Snap anchor outputs to exact (b, n) so the loft passes literally through them.
+  for (const a of cleaned) out[a.idx] = { b: a.b, n: a.n };
+  return out;
+}
+
+// Assign each chineIdx in the model a transverse column index in [1, N-2].
+// Chines are ordered by their average n (height) across the anchors they
+// touch — bottom-most chine takes the lowest column, deck-side the highest.
+// Collisions on the same target column are resolved greedily into the
+// nearest still-free slot.
+function assignChineColumns(state, N) {
+  const anchorsByIdx = new Map();
+  state.stations.forEach((st) => {
+    for (const p of st.points) {
+      if (p.chineIdx == null) continue;
+      const arr = anchorsByIdx.get(p.chineIdx) || [];
+      arr.push(p);
+      anchorsByIdx.set(p.chineIdx, arr);
+    }
+  });
+  const list = [];
+  for (const [chineIdx, anchors] of anchorsByIdx.entries()) {
+    const avgN = anchors.reduce((s, p) => s + p.n, 0) / anchors.length;
+    list.push({ chineIdx, avgN });
+  }
+  list.sort((a, b) => a.avgN - b.avgN);
+  const cols = new Map();
+  const used = new Set();
+  const numChines = list.length;
+  for (let i = 0; i < numChines; i++) {
+    let want = Math.round((i + 1) / (numChines + 1) * (N - 1));
+    want = Math.max(1, Math.min(N - 2, want));
+    // Greedy nudge if column already used
+    let col = want, offset = 1;
+    while (used.has(col) && (col > 1 || col < N - 2)) {
+      const up   = Math.min(N - 2, want + offset);
+      const down = Math.max(1, want - offset);
+      if      (!used.has(up))   col = up;
+      else if (!used.has(down)) col = down;
+      else offset++;
+      if (offset > N) break;
+    }
+    used.add(col);
+    cols.set(list[i].chineIdx, col);
+  }
+  return cols;
+}
+
 // Sample a starboard-only cross-section to N transverse points by arc-length
 // equal spacing. Curve is a piecewise cubic Bezier through on-curve knots
 // with C1-continuous tangent handles (angle/aftLen/foreLen) — same model as
@@ -671,16 +804,41 @@ function buildLoft(state) {
   const sortedSt = [...state.stations]
     .filter(st => st.s > 1e-6 && st.s < 1 - 1e-6)
     .sort((a, b) => a.s - b.s);
+
+  // Assign each chineIdx a transverse column index so the loft mesh's edge
+  // loop at that column passes exactly through the chine's (b, n) at every
+  // station carrying that chine. Non-carrying stations contribute the
+  // arc-length-fraction sample at the same column, which the b/n splines
+  // then smoothly interpolate — i.e. chines "feather out" outside their
+  // s-range instead of producing a corner.
+  const chineCols = assignChineColumns(state, N);
+  const stationAnchors = (st) => {
+    const a = [];
+    for (const p of st.points) {
+      if (p.chineIdx == null) continue;
+      const col = chineCols.get(p.chineIdx);
+      if (col == null) continue;
+      a.push({ idx: col, b: p.b, n: p.n });
+    }
+    return a;
+  };
   // Use the nearest station's section shape at each tip (or default if none).
-  const tipSamples = (nearestSt) =>
-    sampleSection(nearestSt ? nearestSt.points : defaultSection(), N);
+  // Tip section seeds inherit the nearest station's chine anchors so the
+  // chine's column stays consistent across the bow/stern tip rows (the
+  // tip collapses to a point via halfB→0 so the chine line ends in the
+  // hull centreline, satisfying the "feather out" interpretation).
+  const tipSamples = (nearestSt) => {
+    const pts = nearestSt ? nearestSt.points : defaultSection();
+    const anchors = nearestSt ? stationAnchors(nearestSt) : [];
+    return sampleSectionAnchored(pts, N, anchors);
+  };
   const tip0 = tipSamples(sortedSt[0]);
   const tip1 = tipSamples(sortedSt[sortedSt.length - 1]);
 
-  // Base rows: tips + interior stations.
+  // Base rows: tips + interior stations, each sampled with its own chine anchors.
   const baseSt = [
     { s: 0, samples: tip0 },
-    ...sortedSt.map(st => ({ s: st.s, samples: sampleSection(st.points, N) })),
+    ...sortedSt.map(st => ({ s: st.s, samples: sampleSectionAnchored(st.points, N, stationAnchors(st)) })),
     { s: 1, samples: tip1 },
   ];
   const M = baseSt.length;
@@ -806,7 +964,7 @@ function buildLoft(state) {
     const deckZ       = curveYAtX(deckSampled, keel.x);  // same fix as the dense loft
     const height = Math.max(0.001, deckZ - keel.z);
     const halfB  = beamEvalAt(beamPts, keel.x);
-    const samples = sampleSection(st.points, N);
+    const samples = sampleSectionAnchored(st.points, N, stationAnchors(st));
     const maxB = Math.max(...samples.map(s => s.b), 1e-9);
     return {
       s: st.s,
