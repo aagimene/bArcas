@@ -1144,21 +1144,26 @@ function sampleChineLine(anchors, stepsPerSeg = 24) {
   return out;
 }
 
-// Compute "tube" samples along the chine line — one continuous tube per
-// chine, not per anchor. At each sample we carry the chine's 3D position,
-// the section-tangent unit direction in 3D (YZ plane only — the section is
-// at constant X for any given anchor station, but between anchors we lerp),
-// and the half-width `w` (in 3D world units) derived ENTIRELY from the
-// section-knot bezier handles: longer aftLen/foreLen → softer chine →
-// wider tube. The chine's longitudinal 3D handles only affect the chine
-// line's *shape*; the tube's transverse width is purely sharpness.
+// Compute "tube" samples + feather endpoint data for a single chine.
 //
-// Returns [] when the chine has fewer than 2 anchors.
+// Body: per-sample {pos, tanY, tanZ, wF, wA} where
+//   pos     = 3D chine line sample
+//   tanY/Z  = section-tangent unit vector in YZ (lerp between neighbour anchors)
+//   wF      = section FORE handle length at this sample (3D world units)
+//   wA      = section AFT  handle length at this sample (3D world units)
+// → forward edge offset = +tan * wF, backward edge offset = −tan * wA.
+//   Asymmetric widths capture the case where section aft ≠ fore.
+//
+// Caps: at each chine endpoint we also carry
+//   { anchor3D, sectionTan, wF, wA, featherVec3D }
+// where featherVec3D is the OUTWARD chine handle (anchor[0].aft for the
+// start cap, anchor[last].fore for the end cap). The cap is a two-quarter
+// ellipse sweeping from fwd-tip through anchor+featherVec to bwd-tip, so
+// the feather tip literally is the chine outward handle endpoint.
+//
+// Returns null when the chine has fewer than 2 anchors.
 function chineInfluenceTubeSamples(state, anchors, stepsPerSeg = 20) {
-  if (anchors.length < 2) return [];
-  // Per-anchor section-tangent unit YZ + scale factor `mag` (so that
-  // multiplying a section-knot handle length L by mag gives the matching
-  // 3D world length of that handle).
+  if (anchors.length < 2) return null;
   const tan = anchors.map(a => {
     const angle = a.p.angle ?? 0;
     const dyPerB = a.frame.halfB / a.frame.maxB;
@@ -1167,13 +1172,10 @@ function chineInfluenceTubeSamples(state, anchors, stepsPerSeg = 20) {
     const mag = Math.hypot(dy, dz);
     return mag < 1e-9 ? { y: 0, z: 0, mag: 0 } : { y: dy / mag, z: dz / mag, mag };
   });
-  // Per-anchor half-width = avg(aftLen, foreLen) in (b, n) space × `mag`.
-  const widths = anchors.map((a, i) => {
-    const sAvg = ((a.p.aftLen ?? 0) + (a.p.foreLen ?? 0)) / 2;
-    return sAvg * tan[i].mag;
-  });
+  const wForeAt = anchors.map((a, i) => (a.p.foreLen ?? 0) * tan[i].mag);
+  const wAftAt  = anchors.map((a, i) => (a.p.aftLen  ?? 0) * tan[i].mag);
 
-  const out = [];
+  const samples = [];
   for (let i = 0; i < anchors.length - 1; i++) {
     const a = anchors[i], b = anchors[i + 1];
     const ah = a.p.chineHandles?.fore || { dx: 0, dy: 0, dz: 0 };
@@ -1182,7 +1184,8 @@ function chineInfluenceTubeSamples(state, anchors, stepsPerSeg = 20) {
     const P1 = { x: P0.x + ah.dx, y: P0.y + ah.dy, z: P0.z + ah.dz };
     const P2 = { x: P3.x + bh.dx, y: P3.y + bh.dy, z: P3.z + bh.dz };
     const ta = tan[i], tb = tan[i + 1];
-    const wa = widths[i], wb = widths[i + 1];
+    const wFa = wForeAt[i], wFb = wForeAt[i + 1];
+    const wAa = wAftAt[i],  wAb = wAftAt[i + 1];
     const jStart = (i === 0) ? 0 : 1;
     for (let j = jStart; j <= stepsPerSeg; j++) {
       const t = j / stepsPerSeg, u = 1 - t;
@@ -1195,80 +1198,121 @@ function chineInfluenceTubeSamples(state, anchors, stepsPerSeg = 20) {
       let tZ = ta.z + t * (tb.z - ta.z);
       const tLen = Math.hypot(tY, tZ);
       if (tLen > 1e-9) { tY /= tLen; tZ /= tLen; }
-      const w = wa + t * (wb - wa);
-      out.push({ pos, tanY: tY, tanZ: tZ, w });
+      const wF = wFa + t * (wFb - wFa);
+      const wA = wAa + t * (wAb - wAa);
+      samples.push({ pos, tanY: tY, tanZ: tZ, wF, wA });
     }
   }
-  return out;
+  const first = anchors[0];
+  const last  = anchors[anchors.length - 1];
+  return {
+    samples,
+    startCap: {
+      anchor3D: first.world,
+      sectionTan: { y: tan[0].y, z: tan[0].z },
+      wF: wForeAt[0],
+      wA: wAftAt[0],
+      featherVec3D: first.p.chineHandles?.aft || { dx: 0, dy: 0, dz: 0 },
+    },
+    endCap: {
+      anchor3D: last.world,
+      sectionTan: { y: tan[tan.length - 1].y, z: tan[tan.length - 1].z },
+      wF: wForeAt[wForeAt.length - 1],
+      wA: wAftAt[wAftAt.length - 1],
+      featherVec3D: last.p.chineHandles?.fore || { dx: 0, dy: 0, dz: 0 },
+    },
+  };
 }
 
-// Build a closed 2D polygon (list of {x,y}) for the chine influence tube,
-// projected onto a view's plane and with half-circle end caps. The polygon
-// is a stadium-like shape that curves along the chine line:
-//   forward edge (anchor +tan*w)  ->  end-cap arc (180° in view plane)
-//   backward edge (anchor −tan*w, reversed)  ->  start-cap arc
-// `view` is 'side' (X-Z) or 'top' (X-Y). `ySign` flips coords for the port
-// mirror in top view. Output coordinates are world units in the chosen plane
-// (the caller applies xOf/yOf or xOfT/yOfT to project to screen).
-function chineInfluenceLoop2D(samples3D, view, ySign = 1, capSteps = 14) {
-  if (samples3D.length < 2) return [];
-  const proj = samples3D.map(s => {
-    if (view === 'side') {
-      return { px: s.pos.x, py: s.pos.z, oy: s.tanZ * s.w };
-    } else {
-      return { px: s.pos.x, py: ySign * s.pos.y, oy: ySign * s.tanY * s.w };
-    }
-  });
-  const N = proj.length;
-  const fwd = proj.map(p => ({ x: p.px,           y: p.py + p.oy }));
-  const bwd = proj.map(p => ({ x: p.px,           y: p.py - p.oy }));
+// Build a closed 2D polygon for the chine influence tube. The body is
+// asymmetric (fwd offset uses section foreLen, bwd uses section aftLen);
+// each cap is a two-quarter ellipse from fwd-tip → feather tip → bwd-tip
+// where the feather tip is the chine outward handle endpoint projected
+// into the view plane. View ∈ {'side','top'}; ySign mirrors top view's
+// port copy. Output coords are world units in the chosen plane.
+function chineInfluenceLoop2D(tubeData, view, ySign = 1, capSteps = 14) {
+  const samples = tubeData.samples;
+  if (!samples || samples.length < 2) return [];
 
-  // Chine direction (along curve) at end-points — used to know which way
-  // the cap arc should bulge.
-  const chineDir = (i) => {
-    const a = i === 0 ? proj[0] : proj[i - 1];
-    const b = i === N - 1 ? proj[N - 1] : proj[i + 1];
-    return { x: b.px - a.px, y: b.py - a.py };
+  const project2D = (pos3D) => {
+    if (view === 'side') return { x: pos3D.x, y: pos3D.z };
+    return { x: pos3D.x, y: ySign * pos3D.y };
   };
-  const buildCap = (idx, startOffSign, capDirSign) => {
-    const center = { x: proj[idx].px, y: proj[idx].py };
-    const ox = 0, oy = startOffSign * proj[idx].oy;
-    const radius = Math.hypot(ox, oy);
-    if (radius < 1e-6) return [];
-    const startAng = Math.atan2(oy, ox);
-    const dir = chineDir(idx);
-    const dx = capDirSign * dir.x, dy = capDirSign * dir.y;
-    const dirLen = Math.hypot(dx, dy);
-    if (dirLen < 1e-9) return [];
-    let delta = Math.atan2(dy, dx) - startAng;
-    while (delta > Math.PI)  delta -= 2 * Math.PI;
-    while (delta < -Math.PI) delta += 2 * Math.PI;
-    const sweepSign = delta >= 0 ? 1 : -1;
-    const arc = [];
-    for (let k = 1; k < capSteps; k++) {
-      const a = startAng + sweepSign * (k / capSteps) * Math.PI;
-      arc.push({ x: center.x + radius * Math.cos(a), y: center.y + radius * Math.sin(a) });
+  // Signed offset value in the view plane (per unit width).
+  const offComp = (tanY, tanZ) => {
+    if (view === 'side') return tanZ;
+    return ySign * tanY;
+  };
+  // 2D projection of a 3D delta vector.
+  const projVec = (vec3D) => {
+    if (view === 'side') return { x: vec3D.x, y: vec3D.z };
+    return { x: vec3D.x, y: ySign * vec3D.y };
+  };
+
+  const fwd = samples.map(s => {
+    const p = project2D(s.pos);
+    return { x: p.x, y: p.y + offComp(s.tanY, s.tanZ) * s.wF };
+  });
+  const bwd = samples.map(s => {
+    const p = project2D(s.pos);
+    return { x: p.x, y: p.y - offComp(s.tanY, s.tanZ) * s.wA };
+  });
+
+  // Build cap as a two-quarter ellipse from fwd-tip → featherTip → bwd-tip.
+  // Uses (vecF, vecA) section-plane semi-axes and vecFeather as the third
+  // "out-of-section" axis. Both halves of the cap share vecFeather so the
+  // feather tip is exactly anchor + featherVec projected into the view.
+  const buildCap = (cap) => {
+    const center = project2D(cap.anchor3D);
+    const sOff = offComp(cap.sectionTan.y, cap.sectionTan.z); // scalar (signed)
+    const vecF = { x: 0, y: sOff * cap.wF };                   // fwd-tip − center
+    const vecA = { x: 0, y: -sOff * cap.wA };                  // bwd-tip − center
+    const vecFeather = projVec(cap.featherVec3D);              // featherTip − center
+    const out = [];
+    // Quarter 1: θ ∈ (0, π/2] — fwd-tip → featherTip.
+    // P(θ) = center + cos(θ)·vecF + sin(θ)·vecFeather
+    for (let k = 1; k <= capSteps; k++) {
+      const θ = (k / capSteps) * (Math.PI / 2);
+      const c = Math.cos(θ), s = Math.sin(θ);
+      out.push({
+        x: center.x + c * vecF.x + s * vecFeather.x,
+        y: center.y + c * vecF.y + s * vecFeather.y,
+      });
     }
-    return arc;
+    // Quarter 2: θ ∈ (π/2, π] — featherTip → bwd-tip.
+    // P(θ) = center − cos(θ)·vecA + sin(θ)·vecFeather (so θ=π gives center+vecA = bwd-tip).
+    for (let k = 1; k <= capSteps; k++) {
+      const θ = Math.PI / 2 + (k / capSteps) * (Math.PI / 2);
+      const c = Math.cos(θ), s = Math.sin(θ);
+      out.push({
+        x: center.x - c * vecA.x + s * vecFeather.x,
+        y: center.y - c * vecA.y + s * vecFeather.y,
+      });
+    }
+    return out;
   };
-  const endCap   = buildCap(N - 1, +1, +1); // fwd[end] → sweep ahead of chine → bwd[end]
-  const startCap = buildCap(0,     -1, -1); // bwd[0]   → sweep behind chine  → fwd[0]
+
+  const endCapPoints   = buildCap(tubeData.endCap);   // fwd[last] → endFeather → bwd[last]
+  const startCapPoints = buildCap(tubeData.startCap); // fwd[0]    → startFeather → bwd[0]
+
   return [
-    ...fwd,
-    ...endCap,
-    ...bwd.slice().reverse(),
-    ...startCap,
+    ...fwd,                                  // fwd[0..last]
+    ...endCapPoints,                         // arc to bwd[last]
+    ...bwd.slice().reverse(),                // bwd[last..0]
+    ...startCapPoints.slice().reverse(),     // arc from bwd[0] to fwd[0] (via startFeather)
   ];
 }
 
-// Walk every chine and produce its full-length influence-tube samples
+// Walk every chine and produce its full-length influence-tube data
 // (one entry per chineIdx so the rendering loop can colour them).
+// Each entry: { chineIdx, tubeData: { samples, startCap, endCap } }.
 function collectChineInfluenceShapes(state) {
   const byIdx = collectChinesByIdx(state);
   const out = [];
   for (const [chineIdx, anchors] of byIdx.entries()) {
-    if (anchors.length < 2) continue;
-    out.push({ chineIdx, samples: chineInfluenceTubeSamples(state, anchors) });
+    const tubeData = chineInfluenceTubeSamples(state, anchors);
+    if (!tubeData) continue;
+    out.push({ chineIdx, tubeData });
   }
   return out;
 }
@@ -1561,28 +1605,57 @@ function rebuildChineLines3D() {
     chineGroup.add(mkLine(-1));
   }
   // Influence tube — one continuous edge pair per chine (fwd / bwd along
-  // the section-tangent direction). Drawn as two THREE.Lines per side,
-  // mirrored for port. End-cap arcs are not added in 3D for now — the
-  // chine line itself anchors the tube's "centerline".
+  // the section-tangent direction, asymmetric per anchor) + two cap arcs
+  // at the chine endpoints feathering by the outward chine handle vector.
+  // Mirrored for port.
   const shapes = collectChineInfluenceShapes(state);
+  const CAP_STEPS_3D = 12;
   for (const sh of shapes) {
+    const td = sh.tubeData;
+    if (!td) continue;
     const color = new THREE.Color(chineColor(sh.chineIdx));
     const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.55, depthTest: true });
-    const fwdPts = sh.samples.map(s => ({
-      x: s.pos.x, y: s.pos.y + s.tanY * s.w, z: s.pos.z + s.tanZ * s.w,
+    // Forward / backward edges along the chine body (asymmetric widths).
+    const fwdPts = td.samples.map(s => ({
+      x: s.pos.x, y: s.pos.y + s.tanY * s.wF, z: s.pos.z + s.tanZ * s.wF,
     }));
-    const bwdPts = sh.samples.map(s => ({
-      x: s.pos.x, y: s.pos.y - s.tanY * s.w, z: s.pos.z - s.tanZ * s.w,
+    const bwdPts = td.samples.map(s => ({
+      x: s.pos.x, y: s.pos.y - s.tanY * s.wA, z: s.pos.z - s.tanZ * s.wA,
     }));
-    const mkEdge = (pts, sign) => {
+    // 3D two-quarter cap arc — same parametric as the 2D version but in full 3D.
+    const buildCap3D = (cap) => {
+      const center = cap.anchor3D;
+      const tan3D  = { x: 0, y: cap.sectionTan.y, z: cap.sectionTan.z };
+      const vecF = { x: 0, y: tan3D.y * cap.wF,  z: tan3D.z * cap.wF  };
+      const vecA = { x: 0, y: -tan3D.y * cap.wA, z: -tan3D.z * cap.wA };
+      const f    = cap.featherVec3D;
+      const out = [];
+      for (let k = 0; k <= CAP_STEPS_3D; k++) {
+        const θ = (k / CAP_STEPS_3D) * (Math.PI / 2);
+        const c = Math.cos(θ), s = Math.sin(θ);
+        out.push({ x: center.x + c * vecF.x + s * f.dx,
+                   y: center.y + c * vecF.y + s * f.dy,
+                   z: center.z + c * vecF.z + s * f.dz });
+      }
+      for (let k = 1; k <= CAP_STEPS_3D; k++) {
+        const θ = Math.PI / 2 + (k / CAP_STEPS_3D) * (Math.PI / 2);
+        const c = Math.cos(θ), s = Math.sin(θ);
+        out.push({ x: center.x - c * vecA.x + s * f.dx,
+                   y: center.y - c * vecA.y + s * f.dy,
+                   z: center.z - c * vecA.z + s * f.dz });
+      }
+      return out;
+    };
+    const endCap3D   = buildCap3D(td.endCap);
+    const startCap3D = buildCap3D(td.startCap).reverse();
+    const loop3D = [...fwdPts, ...endCap3D, ...bwdPts.slice().reverse(), ...startCap3D];
+    const mkLoop = (sign) => {
       const g = new THREE.BufferGeometry();
-      g.setFromPoints(pts.map(p => new THREE.Vector3(p.x, p.z, sign * p.y)));
+      g.setFromPoints(loop3D.map(p => new THREE.Vector3(p.x, p.z, sign * p.y)));
       return new THREE.Line(g, mat);
     };
-    chineGroup.add(mkEdge(fwdPts,  1));
-    chineGroup.add(mkEdge(bwdPts,  1));
-    chineGroup.add(mkEdge(fwdPts, -1));
-    chineGroup.add(mkEdge(bwdPts, -1));
+    chineGroup.add(mkLoop( 1));
+    chineGroup.add(mkLoop(-1));
   }
 }
 
@@ -2001,7 +2074,7 @@ function renderTopView() {
     for (const sh of shapes) {
       const col = chineColor(sh.chineIdx);
       for (const sign of [1, -1]) {
-        const loop = chineInfluenceLoop2D(sh.samples, 'top', sign);
+        const loop = chineInfluenceLoop2D(sh.tubeData, 'top', sign);
         if (loop.length < 3) continue;
         const d = 'M ' + loop.map(p => `${xOfT(p.y).toFixed(2)} ${yOfT(p.x).toFixed(2)}`).join(' L ') + ' Z';
         topSvg.appendChild(el('path', {
@@ -2062,13 +2135,12 @@ function renderTopView() {
         const drawHandle = (which) => {
           const h = a.p.chineHandles?.[which];
           if (!h) return;
-          const isUsed = (which === 'fore' && ai < anchors.length - 1) ||
-                         (which === 'aft'  && ai > 0);
+          // Terminal handles are now feather handles — fully functional.
           const hx = xOfT(a.world.y + h.dy);
           const hy = yOfT(a.world.x + h.dx);
           topSvg.appendChild(el('line', { x1: cx, y1: cy, x2: hx, y2: hy,
             stroke: col, 'stroke-width': 0.9/tf, 'stroke-dasharray': '3 2',
-            opacity: isUsed ? 0.85 : 0.3, style: 'pointer-events:none' }));
+            opacity: 0.85, style: 'pointer-events:none' }));
           topSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 12/tf,
             fill: 'transparent', class: 'handle-hit',
             'data-drag': `chine-${which}-top`,
@@ -2077,7 +2149,6 @@ function renderTopView() {
           }));
           topSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 3.5/tf,
             fill: col, stroke: 'white', 'stroke-width': 1/tf,
-            opacity: isUsed ? 1 : 0.4,
             'data-drag': `chine-${which}-top`,
             'data-station-idx': String(a.stationIdx),
             'data-point-idx': String(a.pointIdx),
@@ -2411,7 +2482,7 @@ function renderSideView() {
   {
     const shapes = collectChineInfluenceShapes(state);
     for (const sh of shapes) {
-      const loop = chineInfluenceLoop2D(sh.samples, 'side');
+      const loop = chineInfluenceLoop2D(sh.tubeData, 'side');
       if (loop.length < 3) continue;
       const col = chineColor(sh.chineIdx);
       const d = 'M ' + loop.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.y).toFixed(2)}`).join(' L ') + ' Z';
@@ -2469,15 +2540,14 @@ function renderSideView() {
         const drawHandle = (which) => {
           const h = a.p.chineHandles?.[which];
           if (!h) return;
-          // Only draw fore for non-last and aft for non-first as they have
-          // no effect at terminal anchors; show both faded so user knows.
-          const isUsed = (which === 'fore' && ai < anchors.length - 1) ||
-                         (which === 'aft'  && ai > 0);
+          // All four handle slots are now functional: internal handles drive
+          // the chine line bezier; terminal handles drive the feathering at
+          // the chine endpoints. Render at full opacity everywhere.
           const hx = xOf(a.world.x + h.dx);
           const hy = yOf(a.world.z + h.dz);
           sideSvg.appendChild(el('line', { x1: cx, y1: cy, x2: hx, y2: hy,
             stroke: col, 'stroke-width': 0.9/sf, 'stroke-dasharray': '3 2',
-            opacity: isUsed ? 0.85 : 0.3, style: 'pointer-events:none' }));
+            opacity: 0.85, style: 'pointer-events:none' }));
           sideSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 12/sf,
             fill: 'transparent', class: 'handle-hit',
             'data-drag': `chine-${which}-side`,
@@ -2486,7 +2556,6 @@ function renderSideView() {
           }));
           sideSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 3.5/sf,
             fill: col, stroke: 'white', 'stroke-width': 1/sf,
-            opacity: isUsed ? 1 : 0.4,
             'data-drag': `chine-${which}-side`,
             'data-station-idx': String(a.stationIdx),
             'data-point-idx': String(a.pointIdx),
