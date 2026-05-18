@@ -1011,7 +1011,7 @@ function buildLoft(state) {
     };
   });
 
-  return { positions, indices, rows: denseRows, stationRows, N, M: Mdense };
+  return { positions, indices, rows: denseRows, stationRows, N, M: Mdense, chineCols };
 }
 
 // Sample the lofted section in (b, n) at any normalized arc length s.
@@ -1179,26 +1179,39 @@ function sampleChineLine(anchors, stepsPerSeg = 24) {
   return out;
 }
 
-// Compute "tube" samples + feather endpoint data for a single chine.
+// Compute "tube" samples for a single chine by walking the actual loft
+// mesh — the chine line and influence tube both follow the loft's
+// vertices at column kCol, not a separate bezier through anchors. This
+// keeps line + shading exactly on the surface.
 //
-// Body: per-sample {pos, tanY, tanZ, wF, wA} where
-//   pos     = 3D chine line sample
-//   tanY/Z  = section-tangent unit vector in YZ (lerp between neighbour anchors)
-//   wF      = section FORE handle length at this sample (3D world units)
-//   wA      = section AFT  handle length at this sample (3D world units)
-// → forward edge offset = +tan * wF, backward edge offset = −tan * wA.
-//   Asymmetric widths capture the case where section aft ≠ fore.
+// Each sample: { pos, tanY, tanZ, wF, wA }.
+//   pos     — loft vertex at column kCol (already in 3D world coords).
+//   tanY/Z  — section-tangent unit YZ vector, interpolated between the
+//             two bracketing chine anchors (linear in X). Held at the
+//             nearest endpoint's tangent in the feather regions.
+//   wF      — section FORE handle length (3D world units), interpolated
+//             within the chine span; faded linearly to 0 from anchor
+//             value at the feather-region inner edge to 0 at the
+//             feather-region outer edge.
+//   wA      — same for section AFT handle.
 //
-// Caps: at each chine endpoint we also carry
-//   { anchor3D, sectionTan, wF, wA, featherVec3D }
-// where featherVec3D is the OUTWARD chine handle (anchor[0].aft for the
-// start cap, anchor[last].fore for the end cap). The cap is a two-quarter
-// ellipse sweeping from fwd-tip through anchor+featherVec to bwd-tip, so
-// the feather tip literally is the chine outward handle endpoint.
+// The tube body therefore runs along the loft from
+//   (first anchor's X − aft feather length)
+// to
+//   (last  anchor's X + fore feather length),
+// tapering to zero width at both extremes.
 //
-// Returns null when the chine has fewer than 2 anchors.
-function chineInfluenceTubeSamples(state, anchors, stepsPerSeg = 20) {
-  if (anchors.length < 2) return null;
+// Returns null if the chine has < 2 anchors, no column assigned, or no
+// loft data yet.
+function chineLoftSamples(state, anchors, loft, kCol) {
+  if (!loft || !anchors || anchors.length < 2 || kCol == null) return null;
+  const firstA = anchors[0], lastA = anchors[anchors.length - 1];
+  const aftFeatherLen  = Math.abs(firstA.p.chineHandles?.aft?.dx  ?? 0);
+  const foreFeatherLen = Math.abs(lastA.p.chineHandles?.fore?.dx ?? 0);
+  const xMin = firstA.world.x - aftFeatherLen;
+  const xMax = lastA.world.x  + foreFeatherLen;
+
+  // Per-anchor section tangent unit YZ + magnitude scale factor.
   const tan = anchors.map(a => {
     const angle = a.p.angle ?? 0;
     const dyPerB = a.frame.halfB / a.frame.maxB;
@@ -1210,83 +1223,64 @@ function chineInfluenceTubeSamples(state, anchors, stepsPerSeg = 20) {
   const wForeAt = anchors.map((a, i) => (a.p.foreLen ?? 0) * tan[i].mag);
   const wAftAt  = anchors.map((a, i) => (a.p.aftLen  ?? 0) * tan[i].mag);
 
-  const samples = [];
-  for (let i = 0; i < anchors.length - 1; i++) {
-    const a = anchors[i], b = anchors[i + 1];
-    const ah = a.p.chineHandles?.fore || { dx: 0, dy: 0, dz: 0 };
-    const bh = b.p.chineHandles?.aft  || { dx: 0, dy: 0, dz: 0 };
-    const P0 = a.world, P3 = b.world;
-    const P1 = { x: P0.x + ah.dx, y: P0.y + ah.dy, z: P0.z + ah.dz };
-    const P2 = { x: P3.x + bh.dx, y: P3.y + bh.dy, z: P3.z + bh.dz };
-    const ta = tan[i], tb = tan[i + 1];
-    const wFa = wForeAt[i], wFb = wForeAt[i + 1];
-    const wAa = wAftAt[i],  wAb = wAftAt[i + 1];
-    const jStart = (i === 0) ? 0 : 1;
-    for (let j = jStart; j <= stepsPerSeg; j++) {
-      const t = j / stepsPerSeg, u = 1 - t;
-      const pos = {
-        x: u*u*u*P0.x + 3*u*u*t*P1.x + 3*u*t*t*P2.x + t*t*t*P3.x,
-        y: u*u*u*P0.y + 3*u*u*t*P1.y + 3*u*t*t*P2.y + t*t*t*P3.y,
-        z: u*u*u*P0.z + 3*u*u*t*P1.z + 3*u*t*t*P2.z + t*t*t*P3.z,
-      };
-      let tY = ta.y + t * (tb.y - ta.y);
-      let tZ = ta.z + t * (tb.z - ta.z);
+  const out = [];
+  for (const row of loft.rows) {
+    const pos = row[kCol];
+    if (!pos) continue;
+    if (pos.x < xMin - 1e-9 || pos.x > xMax + 1e-9) continue;
+    out.push({ pos: { x: pos.x, y: pos.y, z: pos.z }, tanY: 0, tanZ: 0, wF: 0, wA: 0 });
+  }
+  if (out.length < 2) return null;
+  out.sort((a, b) => a.pos.x - b.pos.x);
+
+  const lastIdx = anchors.length - 1;
+  for (const s of out) {
+    const x = s.pos.x;
+    if (x < firstA.world.x) {
+      const dist = firstA.world.x - x;
+      const fade = aftFeatherLen > 1e-9 ? Math.max(0, Math.min(1, 1 - dist / aftFeatherLen)) : 1;
+      s.tanY = tan[0].y;  s.tanZ = tan[0].z;
+      s.wF = wForeAt[0] * fade;
+      s.wA = wAftAt[0]  * fade;
+    } else if (x > lastA.world.x) {
+      const dist = x - lastA.world.x;
+      const fade = foreFeatherLen > 1e-9 ? Math.max(0, Math.min(1, 1 - dist / foreFeatherLen)) : 1;
+      s.tanY = tan[lastIdx].y;  s.tanZ = tan[lastIdx].z;
+      s.wF = wForeAt[lastIdx] * fade;
+      s.wA = wAftAt[lastIdx]  * fade;
+    } else {
+      // Within the chine span — linear interp by X between bracketing anchors.
+      let i = 0;
+      while (i < anchors.length - 1 && anchors[i + 1].world.x < x) i++;
+      const a = anchors[i], b = anchors[i + 1];
+      const dx = b.world.x - a.world.x;
+      const t = dx > 1e-9 ? (x - a.world.x) / dx : 0;
+      let tY = tan[i].y + t * (tan[i + 1].y - tan[i].y);
+      let tZ = tan[i].z + t * (tan[i + 1].z - tan[i].z);
       const tLen = Math.hypot(tY, tZ);
       if (tLen > 1e-9) { tY /= tLen; tZ /= tLen; }
-      const wF = wFa + t * (wFb - wFa);
-      const wA = wAa + t * (wAb - wAa);
-      samples.push({ pos, tanY: tY, tanZ: tZ, wF, wA });
+      s.tanY = tY;  s.tanZ = tZ;
+      s.wF = wForeAt[i] + t * (wForeAt[i + 1] - wForeAt[i]);
+      s.wA = wAftAt[i]  + t * (wAftAt[i + 1]  - wAftAt[i]);
     }
   }
-  const first = anchors[0];
-  const last  = anchors[anchors.length - 1];
-  return {
-    samples,
-    startCap: {
-      anchor3D: first.world,
-      sectionTan: { y: tan[0].y, z: tan[0].z },
-      wF: wForeAt[0],
-      wA: wAftAt[0],
-      featherVec3D: first.p.chineHandles?.aft || { dx: 0, dy: 0, dz: 0 },
-    },
-    endCap: {
-      anchor3D: last.world,
-      sectionTan: { y: tan[tan.length - 1].y, z: tan[tan.length - 1].z },
-      wF: wForeAt[wForeAt.length - 1],
-      wA: wAftAt[wAftAt.length - 1],
-      featherVec3D: last.p.chineHandles?.fore || { dx: 0, dy: 0, dz: 0 },
-    },
-  };
+  return out;
 }
 
-// Build a closed 2D polygon for the chine influence tube. The body is
-// asymmetric (fwd offset uses section foreLen, bwd uses section aftLen);
-// each cap is a two-quarter ellipse from fwd-tip → feather tip → bwd-tip
-// where the feather tip is the chine outward handle endpoint projected
-// into the view plane. View ∈ {'side','top'}; ySign mirrors top view's
-// port copy. Output coords are world units in the chosen plane.
-function chineInfluenceLoop2D(tubeData, view, ySign = 1, capSteps = 14) {
-  const samples = tubeData.samples;
+// Build a closed 2D polygon for the chine influence tube from loft samples.
+// Widths fade to 0 at the feather endpoints, so the forward and backward
+// edges meet naturally — no separate cap geometry needed.
+// View ∈ {'side', 'top'}; ySign mirrors top view's port copy.
+function chineInfluenceLoop2D(samples, view, ySign = 1) {
   if (!samples || samples.length < 2) return [];
-
   const project2D = (pos3D) => {
     if (view === 'side') return { x: pos3D.x, y: pos3D.z };
     return { x: pos3D.x, y: ySign * pos3D.y };
   };
-  // Signed offset value in the view plane (per unit width).
   const offComp = (tanY, tanZ) => {
     if (view === 'side') return tanZ;
     return ySign * tanY;
   };
-  // 2D projection of a 3D delta vector (chineHandles use dx/dy/dz field names).
-  const projVec = (vec3D) => {
-    const dx = vec3D.dx ?? vec3D.x ?? 0;
-    const dy = vec3D.dy ?? vec3D.y ?? 0;
-    const dz = vec3D.dz ?? vec3D.z ?? 0;
-    if (view === 'side') return { x: dx, y: dz };
-    return { x: dx, y: ySign * dy };
-  };
-
   const fwd = samples.map(s => {
     const p = project2D(s.pos);
     return { x: p.x, y: p.y + offComp(s.tanY, s.tanZ) * s.wF };
@@ -1295,62 +1289,23 @@ function chineInfluenceLoop2D(tubeData, view, ySign = 1, capSteps = 14) {
     const p = project2D(s.pos);
     return { x: p.x, y: p.y - offComp(s.tanY, s.tanZ) * s.wA };
   });
-
-  // Build cap as a two-quarter ellipse from fwd-tip → featherTip → bwd-tip.
-  // Uses (vecF, vecA) section-plane semi-axes and vecFeather as the third
-  // "out-of-section" axis. Both halves of the cap share vecFeather so the
-  // feather tip is exactly anchor + featherVec projected into the view.
-  const buildCap = (cap) => {
-    const center = project2D(cap.anchor3D);
-    const sOff = offComp(cap.sectionTan.y, cap.sectionTan.z); // scalar (signed)
-    const vecF = { x: 0, y: sOff * cap.wF };                   // fwd-tip − center
-    const vecA = { x: 0, y: -sOff * cap.wA };                  // bwd-tip − center
-    const vecFeather = projVec(cap.featherVec3D);              // featherTip − center
-    const out = [];
-    // Quarter 1: θ ∈ (0, π/2] — fwd-tip → featherTip.
-    // P(θ) = center + cos(θ)·vecF + sin(θ)·vecFeather
-    for (let k = 1; k <= capSteps; k++) {
-      const θ = (k / capSteps) * (Math.PI / 2);
-      const c = Math.cos(θ), s = Math.sin(θ);
-      out.push({
-        x: center.x + c * vecF.x + s * vecFeather.x,
-        y: center.y + c * vecF.y + s * vecFeather.y,
-      });
-    }
-    // Quarter 2: θ ∈ (π/2, π] — featherTip → bwd-tip.
-    // P(θ) = center − cos(θ)·vecA + sin(θ)·vecFeather (so θ=π gives center+vecA = bwd-tip).
-    for (let k = 1; k <= capSteps; k++) {
-      const θ = Math.PI / 2 + (k / capSteps) * (Math.PI / 2);
-      const c = Math.cos(θ), s = Math.sin(θ);
-      out.push({
-        x: center.x - c * vecA.x + s * vecFeather.x,
-        y: center.y - c * vecA.y + s * vecFeather.y,
-      });
-    }
-    return out;
-  };
-
-  const endCapPoints   = buildCap(tubeData.endCap);   // fwd[last] → endFeather → bwd[last]
-  const startCapPoints = buildCap(tubeData.startCap); // fwd[0]    → startFeather → bwd[0]
-
-  return [
-    ...fwd,                                  // fwd[0..last]
-    ...endCapPoints,                         // arc to bwd[last]
-    ...bwd.slice().reverse(),                // bwd[last..0]
-    ...startCapPoints.slice().reverse(),     // arc from bwd[0] to fwd[0] (via startFeather)
-  ];
+  return [...fwd, ...bwd.slice().reverse()];
 }
 
-// Walk every chine and produce its full-length influence-tube data
-// (one entry per chineIdx so the rendering loop can colour them).
-// Each entry: { chineIdx, tubeData: { samples, startCap, endCap } }.
-function collectChineInfluenceShapes(state) {
+// Walk every chine and produce its loft-derived sample list (one entry
+// per chineIdx). `loft` is the current lastLoft; `loft.chineCols` is the
+// per-chineIdx column index map. Returns [] if loft hasn't been built
+// yet or no chines are placed.
+function collectChineInfluenceShapes(state, loft) {
+  if (!loft || !loft.chineCols) return [];
   const byIdx = collectChinesByIdx(state);
   const out = [];
   for (const [chineIdx, anchors] of byIdx.entries()) {
-    const tubeData = chineInfluenceTubeSamples(state, anchors);
-    if (!tubeData) continue;
-    out.push({ chineIdx, tubeData });
+    const kCol = loft.chineCols.get(chineIdx);
+    if (kCol == null) continue;
+    const samples = chineLoftSamples(state, anchors, loft, kCol);
+    if (!samples) continue;
+    out.push({ chineIdx, anchors, samples });
   }
   return out;
 }
@@ -1619,78 +1574,44 @@ function rebuildHull() {
   return loft;
 }
 
-// Rebuild the 3D chine line overlay — one starboard + one mirrored port copy
-// per chineIdx, plus an influence-ellipse loop at each anchor (also mirrored)
-// so the chine's sharpness is visible in 3D.
+// Rebuild the 3D chine overlay: per chine, draw the loft-derived chine
+// line + the influence tube as a closed loop (fwd edge + reversed bwd
+// edge — widths fade to zero at the feather endpoints, so the polygon
+// closes naturally without separate cap arcs). Both line and tube
+// mirrored for port.
 function rebuildChineLines3D() {
   while (chineGroup.children.length) {
     const c = chineGroup.children.pop();
     c.geometry?.dispose();
     c.material?.dispose?.();
   }
-  const byIdx = collectChinesByIdx(state);
-  for (const [idx, anchors] of byIdx.entries()) {
-    if (anchors.length < 2) continue;
-    const pts3D = sampleChineLine(anchors, 24);
-    const color = new THREE.Color(chineColor(idx));
-    const mat = new THREE.LineBasicMaterial({ color, linewidth: 2, depthTest: true });
+  const shapes = collectChineInfluenceShapes(state, lastLoft);
+  for (const sh of shapes) {
+    if (sh.samples.length < 2) continue;
+    const color = new THREE.Color(chineColor(sh.chineIdx));
+    const matLine = new THREE.LineBasicMaterial({ color, linewidth: 2, depthTest: true });
+    const matTube = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.55, depthTest: true });
+    // Chine line — polyline through the loft samples.
+    const linePts = sh.samples.map(s => s.pos);
     const mkLine = (sign) => {
       const g = new THREE.BufferGeometry();
-      g.setFromPoints(pts3D.map(p => new THREE.Vector3(p.x, p.z, sign * p.y)));
-      return new THREE.Line(g, mat);
+      g.setFromPoints(linePts.map(p => new THREE.Vector3(p.x, p.z, sign * p.y)));
+      return new THREE.Line(g, matLine);
     };
     chineGroup.add(mkLine( 1));
     chineGroup.add(mkLine(-1));
-  }
-  // Influence tube — one continuous edge pair per chine (fwd / bwd along
-  // the section-tangent direction, asymmetric per anchor) + two cap arcs
-  // at the chine endpoints feathering by the outward chine handle vector.
-  // Mirrored for port.
-  const shapes = collectChineInfluenceShapes(state);
-  const CAP_STEPS_3D = 12;
-  for (const sh of shapes) {
-    const td = sh.tubeData;
-    if (!td) continue;
-    const color = new THREE.Color(chineColor(sh.chineIdx));
-    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.55, depthTest: true });
-    // Forward / backward edges along the chine body (asymmetric widths).
-    const fwdPts = td.samples.map(s => ({
+    // Influence tube — fwd + bwd edges, widths fade to 0 at feather ends.
+    const fwdPts = sh.samples.map(s => ({
       x: s.pos.x, y: s.pos.y + s.tanY * s.wF, z: s.pos.z + s.tanZ * s.wF,
     }));
-    const bwdPts = td.samples.map(s => ({
+    const bwdPts = sh.samples.map(s => ({
       x: s.pos.x, y: s.pos.y - s.tanY * s.wA, z: s.pos.z - s.tanZ * s.wA,
     }));
-    // 3D two-quarter cap arc — same parametric as the 2D version but in full 3D.
-    const buildCap3D = (cap) => {
-      const center = cap.anchor3D;
-      const tan3D  = { x: 0, y: cap.sectionTan.y, z: cap.sectionTan.z };
-      const vecF = { x: 0, y: tan3D.y * cap.wF,  z: tan3D.z * cap.wF  };
-      const vecA = { x: 0, y: -tan3D.y * cap.wA, z: -tan3D.z * cap.wA };
-      const f    = cap.featherVec3D;
-      const out = [];
-      for (let k = 0; k <= CAP_STEPS_3D; k++) {
-        const θ = (k / CAP_STEPS_3D) * (Math.PI / 2);
-        const c = Math.cos(θ), s = Math.sin(θ);
-        out.push({ x: center.x + c * vecF.x + s * f.dx,
-                   y: center.y + c * vecF.y + s * f.dy,
-                   z: center.z + c * vecF.z + s * f.dz });
-      }
-      for (let k = 1; k <= CAP_STEPS_3D; k++) {
-        const θ = Math.PI / 2 + (k / CAP_STEPS_3D) * (Math.PI / 2);
-        const c = Math.cos(θ), s = Math.sin(θ);
-        out.push({ x: center.x - c * vecA.x + s * f.dx,
-                   y: center.y - c * vecA.y + s * f.dy,
-                   z: center.z - c * vecA.z + s * f.dz });
-      }
-      return out;
-    };
-    const endCap3D   = buildCap3D(td.endCap);
-    const startCap3D = buildCap3D(td.startCap).reverse();
-    const loop3D = [...fwdPts, ...endCap3D, ...bwdPts.slice().reverse(), ...startCap3D];
+    const loop3D = [...fwdPts, ...bwdPts.slice().reverse()];
     const mkLoop = (sign) => {
       const g = new THREE.BufferGeometry();
       g.setFromPoints(loop3D.map(p => new THREE.Vector3(p.x, p.z, sign * p.y)));
-      return new THREE.Line(g, mat);
+      return new THREE.Line(g, matTube);
     };
     chineGroup.add(mkLoop( 1));
     chineGroup.add(mkLoop(-1));
@@ -2106,29 +2027,12 @@ function renderTopView() {
   topSvg.appendChild(el('text', { x: 0, y: yOfT(bowKnot.x)   - 8/tf,  class: 'label', 'text-anchor': 'middle', 'font-size': 9/tf }, 'bow'));
   topSvg.appendChild(el('text', { x: 0, y: yOfT(sternKnot.x) + 16/tf, class: 'label', 'text-anchor': 'middle', 'font-size': 9/tf }, 'stern'));
 
-  // ── Chine influence tubes (top view, stbd + port mirror) ─────────────
+  // ── Chines (loft-derived line + influence tube + anchor markers + feather handles) ─
   {
-    const shapes = collectChineInfluenceShapes(state);
-    for (const sh of shapes) {
-      const col = chineColor(sh.chineIdx);
-      for (const sign of [1, -1]) {
-        const loop = chineInfluenceLoop2D(sh.tubeData, 'top', sign);
-        if (loop.length < 3) continue;
-        const d = 'M ' + loop.map(p => `${xOfT(p.y).toFixed(2)} ${yOfT(p.x).toFixed(2)}`).join(' L ') + ' Z';
-        topSvg.appendChild(el('path', {
-          d, class: 'chine-influence',
-          stroke: col, fill: col,
-          style: `stroke-width:${1.4/tf}; fill-opacity:${sign > 0 ? 0.10 : 0.05}; stroke-opacity:${sign > 0 ? 0.9 : 0.45}`,
-        }));
-      }
-    }
-  }
-
-  // ── Chine lines (top view: x-y plane) ─────────────────────────────────
-  {
-    const byIdx = collectChinesByIdx(state);
+    const shapes = collectChineInfluenceShapes(state, lastLoft);
     const editor = state.chineEditor && state.chineEditor.enabled;
-    // Curved ghost preview while drawing.
+
+    // Ghost preview while drawing.
     if (chineDraw) {
       const ghost3D = ghostChineLine();
       if (ghost3D.length > 1) {
@@ -2150,51 +2054,76 @@ function renderTopView() {
         }));
       }
     }
-    for (const [idx, anchors] of byIdx.entries()) {
-      const col = chineColor(idx);
-      const drawCurve = (sign) => {
-        if (anchors.length < 2) return;
-        const pts3D = sampleChineLine(anchors, 20);
-        const d = 'M ' + pts3D.map(p => `${xOfT(sign * p.y).toFixed(2)} ${yOfT(p.x).toFixed(2)}`).join(' L ');
+
+    // Influence tubes (stbd + port mirror).
+    for (const sh of shapes) {
+      const col = chineColor(sh.chineIdx);
+      for (const sign of [1, -1]) {
+        const loop = chineInfluenceLoop2D(sh.samples, 'top', sign);
+        if (loop.length < 3) continue;
+        const d = 'M ' + loop.map(p => `${xOfT(p.y).toFixed(2)} ${yOfT(p.x).toFixed(2)}`).join(' L ') + ' Z';
+        topSvg.appendChild(el('path', {
+          d, class: 'chine-influence',
+          stroke: col, fill: col,
+          style: `stroke-width:${1.4/tf}; fill-opacity:${sign > 0 ? 0.10 : 0.05}; stroke-opacity:${sign > 0 ? 0.9 : 0.45}`,
+        }));
+      }
+    }
+    // Chine line — polyline through the loft samples (stbd + port mirror).
+    for (const sh of shapes) {
+      if (sh.samples.length < 2) continue;
+      const col = chineColor(sh.chineIdx);
+      for (const sign of [1, -1]) {
+        const d = 'M ' + sh.samples.map(s => `${xOfT(sign * s.pos.y).toFixed(2)} ${yOfT(s.pos.x).toFixed(2)}`).join(' L ');
         topSvg.appendChild(el('path', { d, class: 'chine-line', stroke: col, fill: 'none', style: `stroke-width:${1.8/tf}`, opacity: sign > 0 ? 1 : 0.4 }));
-      };
-      drawCurve( 1);
-      drawCurve(-1);
-      // Anchors (starboard only; port mirror is read-only) + handles.
-      anchors.forEach((a, ai) => {
+      }
+    }
+    // Anchor markers (stbd only — port mirror is read-only).
+    for (const sh of shapes) {
+      const col = chineColor(sh.chineIdx);
+      sh.anchors.forEach((a) => {
         const cx = xOfT(a.world.y), cy = yOfT(a.world.x);
         topSvg.appendChild(el('circle', { cx, cy, r: 4.5/tf, class: 'chine-anchor', fill: col, stroke: 'white', 'stroke-width': 1.2/tf }));
         topSvg.appendChild(el('text', {
           x: cx + 7/tf, y: cy + 4/tf,
           fill: col, class: 'chine-id-label',
           'font-size': 9/tf, 'font-weight': 'bold', 'pointer-events': 'none',
-        }, '#' + idx));
-        if (!editor) return;
-        const drawHandle = (which) => {
-          const h = a.p.chineHandles?.[which];
+        }, '#' + sh.chineIdx));
+      });
+    }
+    // Feather-length handles — only OUTWARD handle at each chine endpoint,
+    // ±X-only direction, drawn on the chine line in top view (anchor's y).
+    if (editor) {
+      for (const sh of shapes) {
+        const col = chineColor(sh.chineIdx);
+        const first = sh.anchors[0], last = sh.anchors[sh.anchors.length - 1];
+        const drawFeather = (anchor, which) => {
+          const h = anchor.p.chineHandles?.[which];
           if (!h) return;
-          // Terminal handles are now feather handles — fully functional.
-          const hx = xOfT(a.world.y + h.dy);
-          const hy = yOfT(a.world.x + h.dx);
+          const hx = xOfT(anchor.world.y);
+          const hy = yOfT(anchor.world.x + h.dx);
+          const cx = xOfT(anchor.world.y), cy = yOfT(anchor.world.x);
           topSvg.appendChild(el('line', { x1: cx, y1: cy, x2: hx, y2: hy,
-            stroke: col, 'stroke-width': 0.9/tf, 'stroke-dasharray': '3 2',
+            stroke: col, 'stroke-width': 1.2/tf, 'stroke-dasharray': '4 3',
             opacity: 0.85, style: 'pointer-events:none' }));
           topSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 12/tf,
             fill: 'transparent', class: 'handle-hit',
-            'data-drag': `chine-${which}-top`,
-            'data-station-idx': String(a.stationIdx),
-            'data-point-idx': String(a.pointIdx),
+            'data-drag': `chine-feather-top`,
+            'data-station-idx': String(anchor.stationIdx),
+            'data-point-idx': String(anchor.pointIdx),
+            'data-which': which,
           }));
-          topSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 3.5/tf,
+          topSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 4/tf,
             fill: col, stroke: 'white', 'stroke-width': 1/tf,
-            'data-drag': `chine-${which}-top`,
-            'data-station-idx': String(a.stationIdx),
-            'data-point-idx': String(a.pointIdx),
+            'data-drag': `chine-feather-top`,
+            'data-station-idx': String(anchor.stationIdx),
+            'data-point-idx': String(anchor.pointIdx),
+            'data-which': which,
           }));
         };
-        drawHandle('aft');
-        drawHandle('fore');
-      });
+        drawFeather(first, 'aft');
+        drawFeather(last,  'fore');
+      }
     }
   }
 
@@ -2515,30 +2444,13 @@ function renderSideView() {
     sideSvg.appendChild(group);
   }
 
-  // ── Chine influence tubes (one per chine, follows the chine curve) ────
-  // Drawn BEFORE chine anchors / line so labels and dots sit on top.
+  // ── Chines (loft-derived line + influence tube + anchor markers + feather handles) ─
   {
-    const shapes = collectChineInfluenceShapes(state);
-    for (const sh of shapes) {
-      const loop = chineInfluenceLoop2D(sh.tubeData, 'side');
-      if (loop.length < 3) continue;
-      const col = chineColor(sh.chineIdx);
-      const d = 'M ' + loop.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.y).toFixed(2)}`).join(' L ') + ' Z';
-      sideSvg.appendChild(el('path', {
-        d, class: 'chine-influence',
-        stroke: col, fill: col,
-        style: `stroke-width:${1.4/sf}; fill-opacity:0.10; stroke-opacity:0.9`,
-      }));
-    }
-  }
-
-  // ── Chine lines (longitudinal 3D bezier through chine points) ─────────
-  // Drawn AFTER stations so the chine line appears on top of station chords.
-  {
-    const byIdx = collectChinesByIdx(state);
+    const shapes = collectChineInfluenceShapes(state, lastLoft);
     const editor = state.chineEditor && state.chineEditor.enabled;
-    // Curved ghost preview while drawing — sampled bezier through existing
-    // anchors + cursor, so the user sees where the chine will sweep.
+
+    // Ghost while drawing — bezier through anchors + cursor (not loft-derived
+    // because the cursor's anchor isn't placed yet so the loft doesn't have it).
     if (chineDraw) {
       const ghost3D = ghostChineLine();
       if (ghost3D.length > 1) {
@@ -2558,50 +2470,76 @@ function renderSideView() {
         }));
       }
     }
-    for (const [idx, anchors] of byIdx.entries()) {
-      const col = chineColor(idx);
-      if (anchors.length >= 2) {
-        const pts3D = sampleChineLine(anchors, 20);
-        const d = 'M ' + pts3D.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.z).toFixed(2)}`).join(' L ');
-        sideSvg.appendChild(el('path', { d, class: 'chine-line', stroke: col, fill: 'none', style: `stroke-width:${1.8/sf}` }));
-      }
-      // Anchors + handle gizmos (only when editor mode is on).
-      anchors.forEach((a, ai) => {
+
+    // Influence tubes (fill + perimeter), drawn first so dots sit on top.
+    for (const sh of shapes) {
+      const loop = chineInfluenceLoop2D(sh.samples, 'side');
+      if (loop.length < 3) continue;
+      const col = chineColor(sh.chineIdx);
+      const d = 'M ' + loop.map(p => `${xOf(p.x).toFixed(2)} ${yOf(p.y).toFixed(2)}`).join(' L ') + ' Z';
+      sideSvg.appendChild(el('path', {
+        d, class: 'chine-influence',
+        stroke: col, fill: col,
+        style: `stroke-width:${1.4/sf}; fill-opacity:0.10; stroke-opacity:0.9`,
+      }));
+    }
+    // Chine line — polyline through the loft samples (the literal column-kCol
+    // edge on the surface, within the feather range).
+    for (const sh of shapes) {
+      if (sh.samples.length < 2) continue;
+      const col = chineColor(sh.chineIdx);
+      const d = 'M ' + sh.samples.map(s => `${xOf(s.pos.x).toFixed(2)} ${yOf(s.pos.z).toFixed(2)}`).join(' L ');
+      sideSvg.appendChild(el('path', { d, class: 'chine-line', stroke: col, fill: 'none', style: `stroke-width:${1.8/sf}` }));
+    }
+    // Anchor markers (non-interactive) + chine id label.
+    for (const sh of shapes) {
+      const col = chineColor(sh.chineIdx);
+      sh.anchors.forEach((a) => {
         const cx = xOf(a.world.x), cy = yOf(a.world.z);
         sideSvg.appendChild(el('circle', { cx, cy, r: 4.5/sf, class: 'chine-anchor', fill: col, stroke: 'white', 'stroke-width': 1.2/sf }));
         sideSvg.appendChild(el('text', {
           x: cx + 7/sf, y: cy - 6/sf,
           fill: col, class: 'chine-id-label',
           'font-size': 9/sf, 'font-weight': 'bold', 'pointer-events': 'none',
-        }, '#' + idx));
-        if (!editor) return;
-        const drawHandle = (which) => {
-          const h = a.p.chineHandles?.[which];
+        }, '#' + sh.chineIdx));
+      });
+    }
+    // Feather-length handles — only the OUTWARD handle at each chine endpoint
+    // (first.aft, last.fore), constrained to ±X (no direction freedom). Only
+    // rendered when the chine editor is enabled.
+    if (editor) {
+      for (const sh of shapes) {
+        const col = chineColor(sh.chineIdx);
+        const first = sh.anchors[0], last = sh.anchors[sh.anchors.length - 1];
+        const drawFeather = (anchor, which) => {
+          const h = anchor.p.chineHandles?.[which];
           if (!h) return;
-          // All four handle slots are now functional: internal handles drive
-          // the chine line bezier; terminal handles drive the feathering at
-          // the chine endpoints. Render at full opacity everywhere.
-          const hx = xOf(a.world.x + h.dx);
-          const hy = yOf(a.world.z + h.dz);
+          // Position is on the same Z as the anchor; direction sign is the
+          // sign of the (now mandatory) ±X-only dx component.
+          const hx = xOf(anchor.world.x + h.dx);
+          const hy = yOf(anchor.world.z);
+          const cx = xOf(anchor.world.x), cy = yOf(anchor.world.z);
           sideSvg.appendChild(el('line', { x1: cx, y1: cy, x2: hx, y2: hy,
-            stroke: col, 'stroke-width': 0.9/sf, 'stroke-dasharray': '3 2',
+            stroke: col, 'stroke-width': 1.2/sf, 'stroke-dasharray': '4 3',
             opacity: 0.85, style: 'pointer-events:none' }));
           sideSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 12/sf,
             fill: 'transparent', class: 'handle-hit',
-            'data-drag': `chine-${which}-side`,
-            'data-station-idx': String(a.stationIdx),
-            'data-point-idx': String(a.pointIdx),
+            'data-drag': `chine-feather-side`,
+            'data-station-idx': String(anchor.stationIdx),
+            'data-point-idx': String(anchor.pointIdx),
+            'data-which': which,
           }));
-          sideSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 3.5/sf,
+          sideSvg.appendChild(el('circle', { cx: hx, cy: hy, r: 4/sf,
             fill: col, stroke: 'white', 'stroke-width': 1/sf,
-            'data-drag': `chine-${which}-side`,
-            'data-station-idx': String(a.stationIdx),
-            'data-point-idx': String(a.pointIdx),
+            'data-drag': `chine-feather-side`,
+            'data-station-idx': String(anchor.stationIdx),
+            'data-point-idx': String(anchor.pointIdx),
+            'data-which': which,
           }));
         };
-        drawHandle('aft');
-        drawHandle('fore');
-      });
+        drawFeather(first, 'aft');
+        drawFeather(last,  'fore');
+      }
     }
   }
 
@@ -3585,6 +3523,7 @@ topSvg.addEventListener('pointerdown', (e) => {
     zi: target.dataset.zi !== undefined ? +target.dataset.zi : undefined,
     stationIdx: target.dataset.stationIdx !== undefined ? +target.dataset.stationIdx : undefined,
     pointIdx:   target.dataset.pointIdx   !== undefined ? +target.dataset.pointIdx   : undefined,
+    which:      target.dataset.which,
   };
   if (topDrag.kind === 'station') selectStation(+topDrag.id);
   topSvg.setPointerCapture(e.pointerId);
@@ -3636,16 +3575,25 @@ topSvg.addEventListener('pointermove', (e) => {
     const maxS = idx === sortedSt.length-1 ? 0.99 : sortedSt[idx+1].s - 0.01;
     st.s = Math.max(minS, Math.min(maxS, sRaw));
     renderStationList();
-  } else if (topDrag.kind === 'chine-aft-top' || topDrag.kind === 'chine-fore-top') {
-    const which = topDrag.kind === 'chine-aft-top' ? 'aft' : 'fore';
-    const st = state.stations[topDrag.stationIdx];
-    const p  = st?.points[topDrag.pointIdx];
+  } else if (topDrag.kind === 'chine-feather-top') {
+    const which   = topDrag.which || 'aft';
+    const st      = state.stations[topDrag.stationIdx];
+    const p       = st?.points[topDrag.pointIdx];
     if (!p || !p.chineHandles) return;
-    const frame = stationFrame(state, st);
-    // Update dx, dy components of the 3D handle; dz stays.
-    p.chineHandles[which].dx = wx - frame.x;
-    p.chineHandles[which].dy = wy - ((p.b / frame.maxB) * frame.halfB);
-    mirrorChineHandleDirection(p.chineHandles, which);
+    const anchorX = spineAt(sampledSpine(state.spine.knots, 32), st.s).p.x;
+    const sternX  = state.spine.knots[0].x;
+    const bowX    = state.spine.knots[state.spine.knots.length - 1].x;
+    let dx = wx - anchorX;
+    if (which === 'aft') {
+      const minDx = sternX - anchorX;
+      dx = Math.max(minDx + 1e-4, Math.min(0, dx));
+    } else {
+      const maxDx = bowX - anchorX;
+      dx = Math.max(0, Math.min(maxDx - 1e-4, dx));
+    }
+    p.chineHandles[which].dx = dx;
+    p.chineHandles[which].dy = 0;
+    p.chineHandles[which].dz = 0;
   }
   const currentBeam = 2 * Math.max(...bl.peaks.map(p => p.y));
   beamEl.value = currentBeam.toFixed(2);
@@ -3939,6 +3887,7 @@ sideSvg.addEventListener('pointerdown', (e) => {
     zi: target.dataset.zi !== undefined ? +target.dataset.zi : undefined,
     stationIdx: target.dataset.stationIdx !== undefined ? +target.dataset.stationIdx : undefined,
     pointIdx:   target.dataset.pointIdx   !== undefined ? +target.dataset.pointIdx   : undefined,
+    which:      target.dataset.which,
   };
   if (kind === 'station') selectStation(idx);
   sideSvg.setPointerCapture(e.pointerId);
@@ -4020,17 +3969,31 @@ sideSvg.addEventListener('pointermove', (e) => {
     const hi = drag.idx === sortedSt.length-1 ? 0.99 : sortedSt[drag.idx+1].s - 0.01;
     st.s = Math.max(lo, Math.min(hi, s));
     renderStationList(); rebuildHull(); renderSideView(); renderTopView();
-  } else if (drag.kind === 'chine-aft-side' || drag.kind === 'chine-fore-side') {
-    // Side view edits the (dx, dz) components of the 3D chine handle; dy stays.
-    const which = drag.kind === 'chine-aft-side' ? 'aft' : 'fore';
-    const st = state.stations[drag.stationIdx];
-    const p  = st?.points[drag.pointIdx];
+  } else if (drag.kind === 'chine-feather-side') {
+    // Drag the chine feather-length handle along the X axis only. Direction
+    // is fixed (− for first-anchor.aft, + for last-anchor.fore); magnitude
+    // is clamped to the distance from the anchor to the bow/stern tip so
+    // the feather can't run off the hull.
+    const which   = drag.which || 'aft';
+    const st      = state.stations[drag.stationIdx];
+    const p       = st?.points[drag.pointIdx];
     if (!p || !p.chineHandles) return;
-    const frame = stationFrame(state, st);
-    p.chineHandles[which].dx = wx - frame.x;
-    p.chineHandles[which].dz = wz - (frame.keelZ + p.n * frame.height);
-    mirrorChineHandleDirection(p.chineHandles, which);
-    rebuildHull(); renderSideView(); renderTopView();
+    const anchorX = spineAt(sampledSpine(state.spine.knots, 32), st.s).p.x;
+    const sternX  = state.spine.knots[0].x;
+    const bowX    = state.spine.knots[state.spine.knots.length - 1].x;
+    let dx = wx - anchorX;
+    if (which === 'aft') {
+      const minDx = sternX - anchorX; // negative
+      dx = Math.max(minDx + 1e-4, Math.min(0, dx));
+    } else {
+      const maxDx = bowX - anchorX;   // positive
+      dx = Math.max(0, Math.min(maxDx - 1e-4, dx));
+    }
+    p.chineHandles[which].dx = dx;
+    p.chineHandles[which].dy = 0;
+    p.chineHandles[which].dz = 0;
+    rebuildChineLines3D();
+    renderSideView(); renderTopView();
   }
   // Section view depends on the live H/B aspect at the selected station —
   // re-render so the cross-section's apparent height tracks Z/beam edits.
