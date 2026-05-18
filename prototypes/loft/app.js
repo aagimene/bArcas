@@ -878,8 +878,16 @@ function buildLoft(state) {
           if (k === kCol) continue;
           if (entry.samples[k].b > maxB) maxB = entry.samples[k].b;
         }
-        const b = (chineWorld.y / halfB) * maxB;
-        const n = (chineWorld.z - keelZ) / height;
+        // CRITICAL: clamp the override (b, n) to the section's normal range.
+        // Without this, halfB → 0 at the tip rows blows up `b = y/halfB*maxB`
+        // to huge values; the row's maxB then balloons, every other column
+        // squashes toward zero, and the result is spike-fin facets sticking
+        // out of the hull. Clamping keeps the chine on (or inside) the
+        // natural beam line so it converges to the centerline at the tip.
+        const bRaw = (chineWorld.y / halfB) * maxB;
+        const nRaw = (chineWorld.z - keelZ) / height;
+        const b = Math.max(0, Math.min(maxB, bRaw));
+        const n = Math.max(0, Math.min(1, nRaw));
         entry.samples[kCol] = { b, n };
       });
     }
