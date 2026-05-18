@@ -927,11 +927,12 @@ main {
 [data-layer-chines="off"] [data-drag^="chine-"] {
   display: none;
 }
-/* Chine influence ellipse — sharpness × handle-length area of effect. */
+/* Chine influence ellipse — sharpness × handle-length area of effect.
+ * Solid outline around the perimeter; the fill is set inline at low opacity. */
 .chine-influence {
   pointer-events: none;
   stroke-linejoin: round;
-  stroke-dasharray: 4 3;
+  stroke-linecap: round;
 }
 .chine-id-label {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

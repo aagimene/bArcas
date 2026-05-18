@@ -841,6 +841,50 @@ function buildLoft(state) {
     ...sortedSt.map(st => ({ s: st.s, samples: sampleSectionAnchored(st.points, N, stationAnchors(st)) })),
     { s: 1, samples: tip1 },
   ];
+
+  // ── Chine extrapolation past chine endpoints ──────────────────────────
+  // For every station that does NOT carry a given chine, override that
+  // chine's column-k_c sample with the chine's *extrapolated* (b, n) at the
+  // station's X. The chine continues along the outward chine handle tangent
+  // from its first/last anchor all the way out to the bow/stern tip, so the
+  // longitudinal b/n splines no longer "correct" back to the natural
+  // arc-length sample (which used to swing the column back toward the
+  // section's normal curve outside the chine span).
+  {
+    const chinesByIdx = collectChinesByIdx(state);
+    for (const [chineIdx, kCol] of chineCols.entries()) {
+      const anchors = chinesByIdx.get(chineIdx);
+      if (!anchors || anchors.length < 2) continue;
+      const carryingStations = new Set(anchors.map(a => state.stations[a.stationIdx]));
+      const minX = anchors[0].world.x, maxX = anchors[anchors.length - 1].world.x;
+      baseSt.forEach((entry, m) => {
+        const isTip = (m === 0 || m === baseSt.length - 1);
+        const st    = isTip ? null : sortedSt[m - 1];
+        if (st && carryingStations.has(st)) return; // already anchored exactly
+        const stationX = spineAt(spSampled, entry.s).p.x;
+        // Stations within chine X range but not carrying — possible only at
+        // tip rows (s=0/1) since interior chines are contiguous; treat all
+        // non-carrying stations identically via the extrapolator.
+        const chineWorld = chinePosAtX(anchors, stationX);
+        if (!chineWorld) return;
+        const keelZ  = spineAt(spSampled, entry.s).p.z;
+        const deckZ  = curveYAtX(deckSampled, stationX);
+        const height = Math.max(0.001, deckZ - keelZ);
+        const halfB  = Math.max(0.001, beamEvalAt(beamPts, stationX));
+        // Use the maximum b from the entry's other samples for normalisation
+        // (excluding kCol itself so the override doesn't bootstrap maxB).
+        let maxB = 1e-9;
+        for (let k = 0; k < entry.samples.length; k++) {
+          if (k === kCol) continue;
+          if (entry.samples[k].b > maxB) maxB = entry.samples[k].b;
+        }
+        const b = (chineWorld.y / halfB) * maxB;
+        const n = (chineWorld.z - keelZ) / height;
+        entry.samples[kCol] = { b, n };
+      });
+    }
+  }
+
   const M = baseSt.length;
   const baseS = baseSt.map(b => b.s);
 
@@ -1243,10 +1287,13 @@ function chineInfluenceLoop2D(tubeData, view, ySign = 1, capSteps = 14) {
     if (view === 'side') return tanZ;
     return ySign * tanY;
   };
-  // 2D projection of a 3D delta vector.
+  // 2D projection of a 3D delta vector (chineHandles use dx/dy/dz field names).
   const projVec = (vec3D) => {
-    if (view === 'side') return { x: vec3D.x, y: vec3D.z };
-    return { x: vec3D.x, y: ySign * vec3D.y };
+    const dx = vec3D.dx ?? vec3D.x ?? 0;
+    const dy = vec3D.dy ?? vec3D.y ?? 0;
+    const dz = vec3D.dz ?? vec3D.z ?? 0;
+    if (view === 'side') return { x: dx, y: dz };
+    return { x: dx, y: ySign * dy };
   };
 
   const fwd = samples.map(s => {
@@ -1315,6 +1362,41 @@ function collectChineInfluenceShapes(state) {
     out.push({ chineIdx, tubeData });
   }
   return out;
+}
+
+// Evaluate the chine's 3D position at a given world X — either by sampling
+// the chine line bezier when x is inside the chine span, or by linearly
+// extrapolating from the nearest chine endpoint along that endpoint's
+// outward chine handle direction (so the chine literally continues along
+// its own tangent past the first/last anchor, all the way out to bow/stern
+// tip if needed). Returns null when the chine has fewer than 2 anchors or
+// when the outward handle is degenerate.
+function chinePosAtX(anchors, x) {
+  if (!anchors || anchors.length < 2) return null;
+  const first = anchors[0], last = anchors[anchors.length - 1];
+  const minX = first.world.x, maxX = last.world.x;
+  if (x >= minX && x <= maxX) {
+    const pts = sampleChineLine(anchors, 64);
+    if (pts.length === 0) return null;
+    let bestI = 0, bestD = Infinity;
+    for (let i = 0; i < pts.length; i++) {
+      const d = Math.abs(pts[i].x - x);
+      if (d < bestD) { bestD = d; bestI = i; }
+    }
+    return pts[bestI];
+  }
+  const useFirst = x < minX;
+  const anchor = useFirst ? first : last;
+  const outward = useFirst
+    ? (anchor.p.chineHandles?.aft  || { dx: 0, dy: 0, dz: 0 })
+    : (anchor.p.chineHandles?.fore || { dx: 0, dy: 0, dz: 0 });
+  if (Math.abs(outward.dx) < 1e-9) return null;
+  const t = (x - anchor.world.x) / outward.dx;
+  return {
+    x: anchor.world.x + t * outward.dx,
+    y: anchor.world.y + t * outward.dy,
+    z: anchor.world.z + t * outward.dz,
+  };
 }
 
 // Nearest existing station index to a given world X (returns null if none).
@@ -2080,7 +2162,7 @@ function renderTopView() {
         topSvg.appendChild(el('path', {
           d, class: 'chine-influence',
           stroke: col, fill: col,
-          style: `stroke-width:${1/tf}; fill-opacity:${sign > 0 ? 0.10 : 0.05}; stroke-opacity:${sign > 0 ? 0.55 : 0.30}`,
+          style: `stroke-width:${1.4/tf}; fill-opacity:${sign > 0 ? 0.10 : 0.05}; stroke-opacity:${sign > 0 ? 0.9 : 0.45}`,
         }));
       }
     }
@@ -2489,7 +2571,7 @@ function renderSideView() {
       sideSvg.appendChild(el('path', {
         d, class: 'chine-influence',
         stroke: col, fill: col,
-        style: `stroke-width:${1/sf}; fill-opacity:0.10; stroke-opacity:0.55`,
+        style: `stroke-width:${1.4/sf}; fill-opacity:0.10; stroke-opacity:0.9`,
       }));
     }
   }
