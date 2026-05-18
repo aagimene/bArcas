@@ -811,14 +811,35 @@ function buildLoft(state) {
   // arc-length-fraction sample at the same column, which the b/n splines
   // then smoothly interpolate — i.e. chines "feather out" outside their
   // s-range instead of producing a corner.
-  const chineCols = assignChineColumns(state, N);
+  const chineCols    = assignChineColumns(state, N);
+  const chinesByIdx  = collectChinesByIdx(state);
+  // For each station, return the chine anchors used by sampleSectionAnchored
+  // to put the loft's column k_c on the chine. Carrier stations (those that
+  // hold a section knot with `chineIdx`) anchor at the user's exact (b, n);
+  // non-carrying stations get a GHOST anchor whose (b, n) is the natural
+  // section curve evaluated at the chine's interpolated arc-length fraction
+  // t. The ghost lives only here — it never modifies section.points, so the
+  // section curve at non-chine stations stays untouched. The loft column k_c
+  // gets a smooth, continuous (b, n) across every station and the mesh no
+  // longer "swoops out" past a chine endpoint.
   const stationAnchors = (st) => {
     const a = [];
+    const carrierChines = new Set();
     for (const p of st.points) {
       if (p.chineIdx == null) continue;
       const col = chineCols.get(p.chineIdx);
       if (col == null) continue;
       a.push({ idx: col, b: p.b, n: p.n });
+      carrierChines.add(p.chineIdx);
+    }
+    for (const [chineIdx, anchorsForChine] of chinesByIdx.entries()) {
+      if (anchorsForChine.length < 2) continue;
+      if (carrierChines.has(chineIdx))  continue;
+      const col = chineCols.get(chineIdx);
+      if (col == null) continue;
+      const t  = chineTAtStationS(state, anchorsForChine, st.s);
+      const bn = sectionPointAtT(st.points, t);
+      a.push({ idx: col, b: bn.b, n: bn.n });
     }
     return a;
   };
@@ -841,40 +862,6 @@ function buildLoft(state) {
     ...sortedSt.map(st => ({ s: st.s, samples: sampleSectionAnchored(st.points, N, stationAnchors(st)) })),
     { s: 1, samples: tip1 },
   ];
-
-  // ── Chine column held at endpoint anchor's (b, n) past the chine span ──
-  // Decision: the chine's column k_c is anchored at carrying stations to
-  // the chine's exact (b, n); at every station OUTSIDE the chine's anchor
-  // s-range (including the bow/stern tip rows), the column simply holds
-  // the *nearest endpoint* anchor's (b, n). No world-coord extrapolation,
-  // no fading in the column — the section's `halfB → 0` at the tips
-  // collapses the world position to the centerline naturally, so the
-  // chine line tapers smoothly to the tip in 3D without ever "swinging
-  // back" to the arc-length sample. Section curves at non-chine stations
-  // are NOT modified (no inserted knee, no handle modulation) — only the
-  // chine's column slot is held.
-  {
-    const chinesByIdx = collectChinesByIdx(state);
-    for (const [chineIdx, kCol] of chineCols.entries()) {
-      const anchors = chinesByIdx.get(chineIdx);
-      if (!anchors || anchors.length < 2) continue;
-      const carryingStations = new Set(anchors.map(a => state.stations[a.stationIdx]));
-      const firstAnchorX = anchors[0].world.x;
-      const lastAnchorX  = anchors[anchors.length - 1].world.x;
-      const firstBN = { b: anchors[0].p.b,                       n: anchors[0].p.n };
-      const lastBN  = { b: anchors[anchors.length - 1].p.b,      n: anchors[anchors.length - 1].p.n };
-      baseSt.forEach((entry, m) => {
-        const isTip = (m === 0 || m === baseSt.length - 1);
-        const st    = isTip ? null : sortedSt[m - 1];
-        if (st && carryingStations.has(st)) return; // already anchored exactly
-        const stationX = spineAt(spSampled, entry.s).p.x;
-        const useFirst = stationX < firstAnchorX;
-        const useLast  = stationX > lastAnchorX;
-        if (!useFirst && !useLast) return;        // inside chine span but non-carrying — leave natural
-        entry.samples[kCol] = useFirst ? { ...firstBN } : { ...lastBN };
-      });
-    }
-  }
 
   const M = baseSt.length;
   const baseS = baseSt.map(b => b.s);
@@ -1308,6 +1295,50 @@ function collectChineInfluenceShapes(state, loft) {
     out.push({ chineIdx, anchors, samples });
   }
   return out;
+}
+
+// For a single chine, compute its arc-length-fraction t at a target station's
+// s by:
+//   • measuring each carrier's t = (arc-length of carrier's (b, n) on its
+//     own section curve) / (carrier's total section arc-length);
+//   • linearly interpolating those t values vs station s; outside the
+//     carrier range, hold the nearest carrier's t.
+// `anchorsForChine` is the array returned by collectChinesByIdx()
+// (entries with stationIdx + p).
+function chineTAtStationS(state, anchorsForChine, targetS) {
+  if (!anchorsForChine || anchorsForChine.length === 0) return 0;
+  const carrierTs = anchorsForChine.map(a => {
+    const carrier = state.stations[a.stationIdx];
+    const info = denseSection(carrier.points);
+    const t = info.total > 1e-9 ? anchorArcLength(info, a.p.b, a.p.n) / info.total : 0;
+    return { s: carrier.s, t };
+  }).sort((a, b) => a.s - b.s);
+  if (targetS <= carrierTs[0].s)                       return carrierTs[0].t;
+  if (targetS >= carrierTs[carrierTs.length - 1].s)    return carrierTs[carrierTs.length - 1].t;
+  let i = 0;
+  while (i < carrierTs.length - 1 && carrierTs[i + 1].s < targetS) i++;
+  const aL = carrierTs[i], aR = carrierTs[i + 1];
+  const f = aR.s > aL.s ? (targetS - aL.s) / (aR.s - aL.s) : 0;
+  return aL.t + f * (aR.t - aL.t);
+}
+
+// Evaluate a section curve's dense polyline at the given arc-length
+// fraction t ∈ [0, 1], returning the (b, n) point on the curve. Used to
+// produce a "ghost" chine anchor on a non-carrying station's natural
+// section curve at the chine's interpolated t.
+function sectionPointAtT(sectionPoints, t) {
+  const info = denseSection(sectionPoints);
+  const target = Math.max(0, Math.min(1, t)) * info.total;
+  let lo = 0, hi = info.arc.length - 1;
+  while (hi - lo > 1) {
+    const m = (lo + hi) >> 1;
+    if (info.arc[m] <= target) lo = m; else hi = m;
+  }
+  const f = info.arc[hi] === info.arc[lo] ? 0 : (target - info.arc[lo]) / (info.arc[hi] - info.arc[lo]);
+  return {
+    b: info.dense[lo].b + f * (info.dense[hi].b - info.dense[lo].b),
+    n: info.dense[lo].n + f * (info.dense[hi].n - info.dense[lo].n),
+  };
 }
 
 // Nearest existing station index to a given world X (returns null if none).
