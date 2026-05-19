@@ -2965,7 +2965,18 @@ function addStationAtS(s) {
   for (const st of state.stations) {
     if (Math.abs(st.s - s) < minGap) return false;
   }
-  const points = sectionAtS(state, s, 7);
+  // Seed new station from the nearest existing neighbor's points (deep copy).
+  // This preserves the neighbor's exact shape — same control-point count,
+  // same b/n values, handles, and chine assignments — so the hull appearance
+  // barely changes at insertion, matching what would happen if you slid the
+  // neighbor's station to that longitudinal position.
+  const sorted = [...state.stations].sort((a, b) => a.s - b.s);
+  const nearest = sorted.length
+    ? sorted.reduce((best, st) => Math.abs(st.s - s) < Math.abs(best.s - s) ? st : best)
+    : null;
+  const points = nearest
+    ? JSON.parse(JSON.stringify(nearest.points))
+    : sectionAtS(state, s, 7);
   state.stations.sort((a, b) => a.s - b.s);
   let insertIdx = state.stations.findIndex(st => st.s > s);
   if (insertIdx === -1) insertIdx = state.stations.length;
