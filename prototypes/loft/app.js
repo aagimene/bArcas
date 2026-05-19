@@ -2694,10 +2694,8 @@ function renderSectionView() {
     keelZ = spineAt(spS, station.s).p.z;
     Hm  = Math.max(0.005, spineAt(dkS, station.s).p.z - keelZ);
     Bm  = Math.max(0.005, beamEvalAt(sampledBeamLine(state), xAt));
-    if (!sectionDrag) {
-      const maxB = Math.max(1e-9, ...station.points.map(p => p.b));
-      SECTION_SCALE_N = Math.max(40, Math.min(900, SECTION_SCALE_B * (Hm / Bm) * maxB));
-    }
+    const maxB = Math.max(1e-9, ...station.points.map(p => p.b));
+    SECTION_SCALE_N = Math.max(40, Math.min(900, SECTION_SCALE_B * (Hm / Bm) * maxB));
   }
   applySectionViewBox();
 
