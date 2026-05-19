@@ -35,7 +35,7 @@ const state = {
   length: 4.8,
   loftRes: '24',
   xSubdiv: 16,
-  loftMode: 'smooth',  // smooth | parallels | uniform | isoparametric | ruled | stations-only
+  loftMode: 'smooth',  // smooth | uniform
   selectedStation: 0,
   spine: {
     knots: [
@@ -851,7 +851,6 @@ function buildLoft(state) {
   const N = parseInt(state.loftRes, 10) || 24;
   const mode = state.loftMode || 'smooth';
   let xSubdiv = Math.max(1, parseInt(state.xSubdiv, 10) || 1);
-  if (mode === 'stations-only') xSubdiv = 1;   // mesh just spans station rows
 
   const spSampled   = sampledSpine(state.spine.knots,   64);
   const deckSampled = sampledSpine(state.deckLine.knots, 64);
@@ -861,13 +860,7 @@ function buildLoft(state) {
     .filter(st => st.s > 1e-6 && st.s < 1 - 1e-6)
     .sort((a, b) => a.s - b.s);
 
-  // ── Build the b/n evaluator + chineCols per loft-calculation mode ──────
-  // Each mode produces `baseSt` (rows of {s, samples[N]} from stern tip
-  // through interior stations to bow tip) and EITHER `bnEvaluator(s)` →
-  // [{b,n}, …] for (b, n)-based modes, or `worldEvaluator(s)` → [{x,y,z}, …]
-  // for the 'ruled' mode (which interpolates world positions directly).
-  // Only 'smooth' uses chines — every other mode ignores them.
-  let baseSt, bnEvaluator = null, worldEvaluator = null, chineCols = null;
+  let baseSt, bnEvaluator = null, chineCols = null;
 
   if (mode === 'smooth' || mode === 'uniform') {
     // Chine-aware sampling: assignChineColumns + ghost anchors at curve-at-t
@@ -921,103 +914,13 @@ function buildLoft(state) {
       n: Math.max(0, Math.min(1, nSplines[k](s))),
     }));
   }
-  else if (mode === 'parallels') {
-    // Constant (b, n) per column = average of every station's uniform
-    // arc-length samples. Longitudinal lines are parallel in normalised
-    // section space; in world space they follow halfB(x) / height(x).
-    const allSamples = sortedSt.map(st => sampleSection(st.points, N));
-    const refSamples = new Array(N);
-    const M = allSamples.length || 1;
-    for (let k = 0; k < N; k++) {
-      let bSum = 0, nSum = 0;
-      for (const sm of allSamples) { bSum += sm[k].b; nSum += sm[k].n; }
-      refSamples[k] = { b: bSum / M, n: nSum / M };
-    }
-    baseSt = [
-      { s: 0, samples: refSamples },
-      ...sortedSt.map(st => ({ s: st.s, samples: refSamples })),
-      { s: 1, samples: refSamples },
-    ];
-    bnEvaluator = (_) => refSamples;
-  }
-  else if (mode === 'isoparametric' || mode === 'stations-only') {
-    // Per-station uniform arc-length sampling + linear interpolation across
-    // stations. Chines do not affect geometry in these modes.
-    const tipSamples = (nearestSt) =>
-      sampleSection(nearestSt ? nearestSt.points : defaultSection(), N);
-    baseSt = [
-      { s: 0, samples: tipSamples(sortedSt[0]) },
-      ...sortedSt.map(st => ({ s: st.s, samples: sampleSection(st.points, N) })),
-      { s: 1, samples: tipSamples(sortedSt[sortedSt.length - 1]) },
-    ];
-    const baseS = baseSt.map(b => b.s);
-    const bSplines = [], nSplines = [];
-    for (let k = 0; k < N; k++) {
-      bSplines[k] = linearInterpNonUniform(baseS, baseSt.map(b => b.samples[k].b));
-      nSplines[k] = linearInterpNonUniform(baseS, baseSt.map(b => b.samples[k].n));
-    }
-    bnEvaluator = (s) => Array.from({ length: N }, (_, k) => ({
-      b: Math.max(0, bSplines[k](s)),
-      n: Math.max(0, Math.min(1, nSplines[k](s))),
-    }));
-  }
-  else if (mode === 'ruled') {
-    // Flat ruled strips between consecutive station rows. Compute each
-    // base row's world positions first (using that row's own halfB/height),
-    // then linearly interpolate world coordinates for densified rows
-    // between stations. The X coord is also lerped, so the row sits on
-    // the straight line between the two stations rather than on the rocker.
-    const tipSamples = (nearestSt) =>
-      sampleSection(nearestSt ? nearestSt.points : defaultSection(), N);
-    baseSt = [
-      { s: 0, samples: tipSamples(sortedSt[0]) },
-      ...sortedSt.map(st => ({ s: st.s, samples: sampleSection(st.points, N) })),
-      { s: 1, samples: tipSamples(sortedSt[sortedSt.length - 1]) },
-    ];
-    const baseS = baseSt.map(b => b.s);
-    const baseWorld = baseSt.map(entry => {
-      const { p: keel } = spineAt(spSampled, entry.s);
-      const deckZ  = curveYAtX(deckSampled, keel.x);
-      const height = Math.max(0.001, deckZ - keel.z);
-      const halfB  = Math.max(0.001, beamEvalAt(beamPts, keel.x));
-      const maxB   = Math.max(...entry.samples.map(s => s.b), 1e-9);
-      return entry.samples.map(({ b, n }) => ({
-        x: keel.x,
-        y: (b / maxB) * halfB,
-        z: keel.z + n * height,
-      }));
-    });
-    worldEvaluator = (s) => {
-      if (s <= baseS[0])                    return baseWorld[0];
-      if (s >= baseS[baseS.length - 1])     return baseWorld[baseWorld.length - 1];
-      let i = 0;
-      while (i < baseS.length - 1 && baseS[i + 1] < s) i++;
-      const t = (s - baseS[i]) / (baseS[i + 1] - baseS[i]);
-      const out = new Array(N);
-      for (let k = 0; k < N; k++) {
-        out[k] = {
-          x: baseWorld[i][k].x + t * (baseWorld[i + 1][k].x - baseWorld[i][k].x),
-          y: baseWorld[i][k].y + t * (baseWorld[i + 1][k].y - baseWorld[i][k].y),
-          z: baseWorld[i][k].z + t * (baseWorld[i + 1][k].z - baseWorld[i][k].z),
-        };
-      }
-      return out;
-    };
-  }
 
   const M = baseSt.length;
 
-  // Dense longitudinal sampling — keel and deck from the rocker / deck-line
-  // curves for (b, n)-based modes; from per-station world positions in
-  // 'ruled' mode.
   const Mdense = xSubdiv > 1 ? (M - 1) * xSubdiv + 1 : M;
   const denseRows = [];
   for (let i = 0; i < Mdense; i++) {
     const s = i / (Mdense - 1);
-    if (worldEvaluator) {
-      denseRows.push(worldEvaluator(s));
-      continue;
-    }
     const { p: keel } = spineAt(spSampled, s);
     const deckZ  = curveYAtX(deckSampled, keel.x);
     const height = Math.max(0.001, deckZ - keel.z);
@@ -1112,25 +1015,18 @@ function buildLoft(state) {
     tipFace(Mdense - 1, true);     // bow
   }
 
-  // Expose station row world positions (for selection band + 3D highlight).
-  // Use the same evaluator the dense loop used so each loft mode is consistent.
   const stationRows = sortedSt.map((st) => {
-    let pts;
-    if (worldEvaluator) {
-      pts = worldEvaluator(st.s);
-    } else {
-      const { p: keel } = spineAt(spSampled, st.s);
-      const deckZ  = curveYAtX(deckSampled, keel.x);
-      const height = Math.max(0.001, deckZ - keel.z);
-      const halfB  = beamEvalAt(beamPts, keel.x);
-      const samples = bnEvaluator(st.s);
-      const maxB = Math.max(...samples.map(s => s.b), 1e-9);
-      pts = samples.map(({ b, n }) => ({
-        x: keel.x,
-        y: (b / maxB) * halfB,
-        z: keel.z + n * height,
-      }));
-    }
+    const { p: keel } = spineAt(spSampled, st.s);
+    const deckZ  = curveYAtX(deckSampled, keel.x);
+    const height = Math.max(0.001, deckZ - keel.z);
+    const halfB  = beamEvalAt(beamPts, keel.x);
+    const samples = bnEvaluator(st.s);
+    const maxB = Math.max(...samples.map(s => s.b), 1e-9);
+    const pts = samples.map(({ b, n }) => ({
+      x: keel.x,
+      y: (b / maxB) * halfB,
+      z: keel.z + n * height,
+    }));
     return { s: st.s, points: pts };
   });
 
