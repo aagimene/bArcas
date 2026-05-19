@@ -869,8 +869,13 @@ function buildLoft(state) {
   // Only 'smooth' uses chines — every other mode ignores them.
   let baseSt, bnEvaluator = null, worldEvaluator = null, chineCols = null;
 
-  if (mode === 'smooth') {
-    // Cubic-spline interpolation per column with ghost chine anchors.
+  if (mode === 'smooth' || mode === 'uniform') {
+    // Chine-aware sampling: assignChineColumns + ghost anchors at curve-at-t
+    // for non-carriers, so the chine column k_c stays consistent across every
+    // station and the section curves at non-chine stations stay untouched.
+    // Smooth uses a natural cubic spline across stations (C2, may overshoot
+    // slightly); Uniform uses Catmull-Rom (C1, no overshoot, passes exactly
+    // through every station's samples). Everything else is identical.
     chineCols          = assignChineColumns(state, N);
     const chinesByIdx  = collectChinesByIdx(state);
     const stationAnchors = (st) => {
@@ -905,10 +910,11 @@ function buildLoft(state) {
       { s: 1, samples: tipSamples(sortedSt[sortedSt.length - 1]) },
     ];
     const baseS = baseSt.map(b => b.s);
+    const interp = (mode === 'smooth') ? naturalCubicNonUniform : catmullRomNonUniform;
     const bSplines = [], nSplines = [];
     for (let k = 0; k < N; k++) {
-      bSplines[k] = naturalCubicNonUniform(baseS, baseSt.map(b => b.samples[k].b));
-      nSplines[k] = naturalCubicNonUniform(baseS, baseSt.map(b => b.samples[k].n));
+      bSplines[k] = interp(baseS, baseSt.map(b => b.samples[k].b));
+      nSplines[k] = interp(baseS, baseSt.map(b => b.samples[k].n));
     }
     bnEvaluator = (s) => Array.from({ length: N }, (_, k) => ({
       b: Math.max(0, bSplines[k](s)),
@@ -934,10 +940,9 @@ function buildLoft(state) {
     ];
     bnEvaluator = (_) => refSamples;
   }
-  else if (mode === 'uniform' || mode === 'isoparametric' || mode === 'stations-only') {
-    // Per-station uniform arc-length sampling + Catmull-Rom (uniform)
-    // or linear (isoparametric / stations-only) interpolation across
-    // stations. No chine anchors.
+  else if (mode === 'isoparametric' || mode === 'stations-only') {
+    // Per-station uniform arc-length sampling + linear interpolation across
+    // stations. Chines do not affect geometry in these modes.
     const tipSamples = (nearestSt) =>
       sampleSection(nearestSt ? nearestSt.points : defaultSection(), N);
     baseSt = [
@@ -946,11 +951,10 @@ function buildLoft(state) {
       { s: 1, samples: tipSamples(sortedSt[sortedSt.length - 1]) },
     ];
     const baseS = baseSt.map(b => b.s);
-    const interp = (mode === 'uniform') ? catmullRomNonUniform : linearInterpNonUniform;
     const bSplines = [], nSplines = [];
     for (let k = 0; k < N; k++) {
-      bSplines[k] = interp(baseS, baseSt.map(b => b.samples[k].b));
-      nSplines[k] = interp(baseS, baseSt.map(b => b.samples[k].n));
+      bSplines[k] = linearInterpNonUniform(baseS, baseSt.map(b => b.samples[k].b));
+      nSplines[k] = linearInterpNonUniform(baseS, baseSt.map(b => b.samples[k].n));
     }
     bnEvaluator = (s) => Array.from({ length: N }, (_, k) => ({
       b: Math.max(0, bSplines[k](s)),
