@@ -4955,6 +4955,7 @@ sectionSvg.addEventListener('pointerdown', (e) => {
   const target = e.target.closest('[data-drag]');
   if (!target) return;
   e.preventDefault();
+  const { x: x0, y: y0 } = svgToLocal(sectionSvg, e);
   sectionDrag = {
     kind: target.dataset.drag,
     idx: +target.dataset.idx,
@@ -4962,6 +4963,7 @@ sectionSvg.addEventListener('pointerdown', (e) => {
     pointIdx:   target.dataset.pointIdx   !== undefined ? +target.dataset.pointIdx   : undefined,
     pointerId: e.pointerId,
     moved: false,
+    lastX: x0, lastY: y0,
   };
   sectionSvg.setPointerCapture(e.pointerId);
 });
@@ -4978,10 +4980,14 @@ sectionSvg.addEventListener('pointermove', (e) => {
   const n = -y / SECTION_SCALE_N;
 
   if (sectionDrag.kind === 'ctrl') {
-    // Move on-curve knot. Keel (idx 0) and deck-end (last) are locked.
+    // Move on-curve knot using incremental deltas so a changing SECTION_SCALE_N
+    // (from maxB growing as the point is dragged outward) doesn't shift the
+    // absolute SVG-to-world mapping mid-drag and cause a feedback loop.
     if (i === 0 || i === lastIdx) return;
-    station.points[i].b = Math.max(0, b);
-    station.points[i].n = n;
+    const db = (x - sectionDrag.lastX) / SECTION_SCALE_B;
+    const dn = -(y - sectionDrag.lastY) / SECTION_SCALE_N;
+    station.points[i].b = Math.max(0, station.points[i].b + db);
+    station.points[i].n = station.points[i].n + dn;
   } else if (sectionDrag.kind === 'ctrl-fore') {
     // Drag outgoing handle: updates angle (shared) + foreLen; aftLen stays.
     const k = station.points[i];
@@ -5010,6 +5016,8 @@ sectionSvg.addEventListener('pointermove', (e) => {
   } else {
     return;
   }
+  sectionDrag.lastX = x;
+  sectionDrag.lastY = y;
   sectionDrag.moved = true;
   renderSectionView();
   rebuildHull();
