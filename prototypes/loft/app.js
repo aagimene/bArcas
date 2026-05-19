@@ -2889,6 +2889,29 @@ function fmtMM(m) {
   const inches = m * 39.3700787;
   return `${mm.toFixed(0)} mm  ·  ${inches.toFixed(3)}″`;
 }
+// parseUnitM(str) → metres or null. Accepts: "16ft", "16'2\"", "5m", "500cm", "196in", "22\""
+function parseUnitM(str) {
+  if (!str) return null;
+  str = str.trim().replace(/″|"/g, '"').replace(/′|'/g, "'");
+  const low = str.toLowerCase();
+  // feet + optional inches: 16ft2in, 16'2", 16' 2"
+  let m;
+  m = low.match(/^([\d.]+)\s*(?:ft|feet|')\s*([\d.]+)\s*(?:in|"|inches)?$/);
+  if (m) return (parseFloat(m[1]) + parseFloat(m[2]) / 12) * 0.3048;
+  // feet only
+  m = low.match(/^([\d.]+)\s*(?:ft|feet|')$/);
+  if (m) return parseFloat(m[1]) * 0.3048;
+  // inches
+  m = low.match(/^([\d.]+)\s*(?:in|"|inches)$/);
+  if (m) return parseFloat(m[1]) * 0.0254;
+  // cm
+  m = low.match(/^([\d.]+)\s*cm$/);
+  if (m) return parseFloat(m[1]) / 100;
+  // m
+  m = low.match(/^([\d.]+)\s*m$/);
+  if (m) return parseFloat(m[1]);
+  return null;
+}
 
 // ── Controls panel (Phase A: read-only-ish) ──────────────────────────────
 
@@ -3073,6 +3096,15 @@ lengthEl.addEventListener('input', () => {
   renderSectionView();
 });
 
+const lengthTextEl = document.getElementById('length-text');
+lengthTextEl.addEventListener('change', () => {
+  const v = parseUnitM(lengthTextEl.value);
+  if (v == null || v < 0.3 || v > 13) { lengthTextEl.classList.add('error'); return; }
+  lengthTextEl.classList.remove('error');
+  lengthEl.value = v.toFixed(3);
+  lengthEl.dispatchEvent(new Event('input'));
+});
+
 // Beam slider — proportionally rescales all Y coordinates (overall beam width).
 beamEl.addEventListener('input', () => {
   const newBeam = parseFloat(beamEl.value);
@@ -3085,6 +3117,15 @@ beamEl.addEventListener('input', () => {
     renderTopView();
     renderSectionView();
   }
+});
+
+const beamTextEl = document.getElementById('beam-text');
+beamTextEl.addEventListener('change', () => {
+  const v = parseUnitM(beamTextEl.value);
+  if (v == null || v < 0.02 || v > 1.6) { beamTextEl.classList.add('error'); return; }
+  beamTextEl.classList.remove('error');
+  beamEl.value = v.toFixed(3);
+  beamEl.dispatchEvent(new Event('input'));
 });
 
 loftResEl.addEventListener('change', () => {
@@ -4628,6 +4669,31 @@ document.addEventListener('click', (e) => {
   document.querySelectorAll('.layers-btn.open').forEach(b => b.classList.remove('open'));
 });
 
+// ── Viz (view settings) popovers ─────────────────────────────────────────
+document.querySelectorAll('.viz-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const view = btn.dataset.vizView;
+    const pop  = document.getElementById('viz-panel-' + view);
+    if (!pop) return;
+    const isOpen = pop.classList.contains('open');
+    document.querySelectorAll('.viz-panel.open').forEach(p => p.classList.remove('open'));
+    document.querySelectorAll('.viz-btn.open').forEach(b => b.classList.remove('open'));
+    document.querySelectorAll('.layers-popover.open').forEach(p => p.classList.remove('open'));
+    document.querySelectorAll('.layers-btn.open').forEach(b => b.classList.remove('open'));
+    if (!isOpen) {
+      positionPopover(pop, btn);
+      pop.classList.add('open');
+      btn.classList.add('open');
+    }
+  });
+});
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.viz-btn') || e.target.closest('.viz-panel')) return;
+  document.querySelectorAll('.viz-panel.open').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.viz-btn.open').forEach(b => b.classList.remove('open'));
+}, { capture: false });
+
 // Initial: apply state to all SVGs.  (Re-applied by syncUIFromState too.)
 applyAllLayerStates();
 {
@@ -4721,9 +4787,11 @@ function syncUIFromState() {
   // Sliders / dropdowns
   lengthEl.value         = state.length.toFixed(2);
   lengthOut.textContent  = fmtLength(state.length);
+  lengthTextEl.value = '';
   const currentBeam = 2 * Math.max(...state.beamLine.peaks.map(p => p.y));
   beamEl.value           = currentBeam.toFixed(2);
   beamOut.textContent    = fmtLength(currentBeam);
+  beamTextEl.value = '';
   loftResEl.value        = state.loftRes;
   xSubdivEl.value        = String(state.xSubdiv);
   loftModeEl.value       = state.loftMode || 'smooth';

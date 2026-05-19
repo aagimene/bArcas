@@ -1031,3 +1031,73 @@ body.chine-editor-active #section-view {
   opacity: 0.55;
   display: none;
 }
+
+/* ── Viz (view settings) button + panel ───────────────────────────────── */
+.viz-btn {
+  padding: 0 0.3rem;
+  font-size: 0.88rem;
+  line-height: 1.1;
+  color: #64748b;
+  background: none;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.viz-btn:hover { color: #0f172a; border-color: #94a3b8; }
+.viz-btn.open  { background: #1f2937; color: white; border-color: #1f2937; }
+
+.viz-panel {
+  position: fixed;
+  z-index: 200;
+  min-width: 200px;
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 0.5rem 0.6rem;
+  font-size: 0.82rem;
+  display: none;
+}
+.viz-panel.open { display: block; }
+.viz-panel-wide { min-width: 240px; }
+
+.viz-panel-title {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: #475569;
+  margin-bottom: 0.4rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+.viz-section { margin-top: 0.5rem; }
+.viz-section + .viz-section { border-top: 1px solid #e2e8f0; padding-top: 0.5rem; }
+.viz-section-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.35rem;
+}
+.viz-panel label { width: 100%; }
+.viz-panel .ref-file-label { margin-bottom: 0.3rem; }
+.viz-panel select { width: 100%; margin-bottom: 0.3rem; }
+.viz-panel .mesh-toggle { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.3rem; }
+.viz-opacity-row { display: flex; align-items: center; gap: 0.35rem; flex-wrap: nowrap; }
+.viz-opacity-row input[type="range"] { flex: 1; }
+.viz-opacity-row output { min-width: 2.5rem; text-align: right; }
+
+/* Unit text input beside slider */
+.unit-input {
+  display: block;
+  width: 100%;
+  margin-top: 0.2rem;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  font-size: 0.78rem;
+  color: #1f2937;
+  background: #f8fafc;
+}
+.unit-input:focus { outline: none; border-color: #2563eb; background: white; }
+.unit-input.error { border-color: #ef4444; background: #fff1f2; }
