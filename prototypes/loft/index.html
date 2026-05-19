@@ -17,7 +17,7 @@
 <body>
 
 <header>
-  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · chine-ghost-anchor</span>
+  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · loft-modes</span>
   <h1>Loft</h1>
   <p class="subtitle">
     Design a 3D kayak hull from a curved spine (rocker) and a set of cross-sections, lofted live.
@@ -54,6 +54,16 @@
       </label>
       <label>Beam width <output id="beam-out"></output>
         <input type="range" id="beam" min="0.3" max="1.0" step="0.01" value="0.56">
+      </label>
+      <label>Loft mode
+        <select id="loft-mode">
+          <option value="smooth" selected>Smooth (cubic, chines)</option>
+          <option value="parallels">Parallels (const per col)</option>
+          <option value="uniform">Uniform (Catmull-Rom)</option>
+          <option value="isoparametric">Isoparametric (linear)</option>
+          <option value="ruled">Ruled (3D-linear strips)</option>
+          <option value="stations-only">Stations only (no subdiv)</option>
+        </select>
       </label>
       <label>Section subdivisions (Y-Z)
         <select id="loft-res">
@@ -290,6 +300,6 @@
   Source: <a href="https://github.com/aagimene/bArcas/tree/main/prototypes/loft" target="_blank" rel="noopener">github.com/aagimene/bArcas</a>.
 </p>
 
-<script type="module" src="app.js?v=chine-ghost-anchor"></script>
+<script type="module" src="app.js?v=loft-modes"></script>
 </body>
 </html>

@@ -35,6 +35,7 @@ const state = {
   length: 4.8,
   loftRes: '24',
   xSubdiv: 16,
+  loftMode: 'smooth',  // smooth | parallels | uniform | isoparametric | ruled | stations-only
   selectedStation: 0,
   spine: {
     knots: [
@@ -731,6 +732,62 @@ function beamEvalAt(beamPts, wx) {
   return Math.max(0, beamPts[lo].y + t * (beamPts[hi].y - beamPts[lo].y));
 }
 
+// Catmull-Rom interpolator through (sₖ, vₖ) at non-uniform knots. C1 tangent-
+// continuous, no overshoot, passes exactly through every input point. Endpoint
+// tangents use one-sided differences. Returns an evaluator f(s) consumable
+// in the same way as the natural-cubic version.
+function catmullRomNonUniform(ss, vs) {
+  const n = ss.length;
+  if (n === 0) return () => 0;
+  if (n === 1) return () => vs[0];
+  if (n === 2) {
+    return (s) => {
+      if (s <= ss[0]) return vs[0];
+      if (s >= ss[1]) return vs[1];
+      const t = (s - ss[0]) / (ss[1] - ss[0]);
+      return vs[0] + t * (vs[1] - vs[0]);
+    };
+  }
+  const tangents = new Array(n);
+  for (let i = 0; i < n; i++) {
+    if      (i === 0)        tangents[i] = (vs[1]   - vs[0])   / (ss[1]   - ss[0]);
+    else if (i === n - 1)    tangents[i] = (vs[n-1] - vs[n-2]) / (ss[n-1] - ss[n-2]);
+    else                     tangents[i] = (vs[i+1] - vs[i-1]) / (ss[i+1] - ss[i-1]);
+  }
+  return (s) => {
+    if (s <= ss[0])      return vs[0];
+    if (s >= ss[n - 1])  return vs[n - 1];
+    let i = 0;
+    while (i < n - 1 && ss[i + 1] < s) i++;
+    const dt = ss[i + 1] - ss[i];
+    const u  = (s - ss[i]) / dt;
+    const u2 = u * u, u3 = u2 * u;
+    const h00 =  2*u3 - 3*u2 + 1;
+    const h10 =     u3 - 2*u2 + u;
+    const h01 = -2*u3 + 3*u2;
+    const h11 =     u3 -   u2;
+    return h00 * vs[i] + h10 * tangents[i] * dt
+         + h01 * vs[i + 1] + h11 * tangents[i + 1] * dt;
+  };
+}
+
+// Linear interpolator through (sₖ, vₖ) at non-uniform knots. Used for the
+// 'isoparametric' loft mode (piecewise linear longitudinal lines between
+// stations) and as a fallback for short input arrays.
+function linearInterpNonUniform(ss, vs) {
+  const n = ss.length;
+  if (n === 0) return () => 0;
+  if (n === 1) return () => vs[0];
+  return (s) => {
+    if (s <= ss[0])     return vs[0];
+    if (s >= ss[n - 1]) return vs[n - 1];
+    let i = 0;
+    while (i < n - 1 && ss[i + 1] < s) i++;
+    const t = (s - ss[i]) / (ss[i + 1] - ss[i]);
+    return vs[i] + t * (vs[i + 1] - vs[i]);
+  };
+}
+
 // Natural cubic spline through (sₖ, vₖ) at non-uniform knots — used for
 // longitudinal b/n interpolation between stations. Returns an evaluator f(s).
 // Natural BCs: M_0 = M_{n-1} = 0. Tridiagonal solve via Thomas.
@@ -792,105 +849,176 @@ function naturalCubicNonUniform(ss, vs) {
 // rocker — keel/deck always come from the Bezier, never re-splined.
 function buildLoft(state) {
   const N = parseInt(state.loftRes, 10) || 24;
-  const xSubdiv = Math.max(1, parseInt(state.xSubdiv, 10) || 1);
+  const mode = state.loftMode || 'smooth';
+  let xSubdiv = Math.max(1, parseInt(state.xSubdiv, 10) || 1);
+  if (mode === 'stations-only') xSubdiv = 1;   // mesh just spans station rows
 
   const spSampled   = sampledSpine(state.spine.knots,   64);
   const deckSampled = sampledSpine(state.deckLine.knots, 64);
   const beamPts     = sampledBeamLine(state);
 
-  // Tips use a full cross-section shape (not all-zero) so the b/n splines
-  // for the deck column (k=N-1) stay near n=1 everywhere. Convergence to a
-  // single point at bow/stern is handled by halfB→0 and height→0 there.
   const sortedSt = [...state.stations]
     .filter(st => st.s > 1e-6 && st.s < 1 - 1e-6)
     .sort((a, b) => a.s - b.s);
 
-  // Assign each chineIdx a transverse column index so the loft mesh's edge
-  // loop at that column passes exactly through the chine's (b, n) at every
-  // station carrying that chine. Non-carrying stations contribute the
-  // arc-length-fraction sample at the same column, which the b/n splines
-  // then smoothly interpolate — i.e. chines "feather out" outside their
-  // s-range instead of producing a corner.
-  const chineCols    = assignChineColumns(state, N);
-  const chinesByIdx  = collectChinesByIdx(state);
-  // For each station, return the chine anchors used by sampleSectionAnchored
-  // to put the loft's column k_c on the chine. Carrier stations (those that
-  // hold a section knot with `chineIdx`) anchor at the user's exact (b, n);
-  // non-carrying stations get a GHOST anchor whose (b, n) is the natural
-  // section curve evaluated at the chine's interpolated arc-length fraction
-  // t. The ghost lives only here — it never modifies section.points, so the
-  // section curve at non-chine stations stays untouched. The loft column k_c
-  // gets a smooth, continuous (b, n) across every station and the mesh no
-  // longer "swoops out" past a chine endpoint.
-  const stationAnchors = (st) => {
-    const a = [];
-    const carrierChines = new Set();
-    for (const p of st.points) {
-      if (p.chineIdx == null) continue;
-      const col = chineCols.get(p.chineIdx);
-      if (col == null) continue;
-      a.push({ idx: col, b: p.b, n: p.n });
-      carrierChines.add(p.chineIdx);
+  // ── Build the b/n evaluator + chineCols per loft-calculation mode ──────
+  // Each mode produces `baseSt` (rows of {s, samples[N]} from stern tip
+  // through interior stations to bow tip) and EITHER `bnEvaluator(s)` →
+  // [{b,n}, …] for (b, n)-based modes, or `worldEvaluator(s)` → [{x,y,z}, …]
+  // for the 'ruled' mode (which interpolates world positions directly).
+  // Only 'smooth' uses chines — every other mode ignores them.
+  let baseSt, bnEvaluator = null, worldEvaluator = null, chineCols = null;
+
+  if (mode === 'smooth') {
+    // Cubic-spline interpolation per column with ghost chine anchors.
+    chineCols          = assignChineColumns(state, N);
+    const chinesByIdx  = collectChinesByIdx(state);
+    const stationAnchors = (st) => {
+      const a = [];
+      const carrierChines = new Set();
+      for (const p of st.points) {
+        if (p.chineIdx == null) continue;
+        const col = chineCols.get(p.chineIdx);
+        if (col == null) continue;
+        a.push({ idx: col, b: p.b, n: p.n });
+        carrierChines.add(p.chineIdx);
+      }
+      for (const [chineIdx, anchorsForChine] of chinesByIdx.entries()) {
+        if (anchorsForChine.length < 2) continue;
+        if (carrierChines.has(chineIdx))  continue;
+        const col = chineCols.get(chineIdx);
+        if (col == null) continue;
+        const t  = chineTAtStationS(state, anchorsForChine, st.s);
+        const bn = sectionPointAtT(st.points, t);
+        a.push({ idx: col, b: bn.b, n: bn.n });
+      }
+      return a;
+    };
+    const tipSamples = (nearestSt) => {
+      const pts = nearestSt ? nearestSt.points : defaultSection();
+      const anchors = nearestSt ? stationAnchors(nearestSt) : [];
+      return sampleSectionAnchored(pts, N, anchors);
+    };
+    baseSt = [
+      { s: 0, samples: tipSamples(sortedSt[0]) },
+      ...sortedSt.map(st => ({ s: st.s, samples: sampleSectionAnchored(st.points, N, stationAnchors(st)) })),
+      { s: 1, samples: tipSamples(sortedSt[sortedSt.length - 1]) },
+    ];
+    const baseS = baseSt.map(b => b.s);
+    const bSplines = [], nSplines = [];
+    for (let k = 0; k < N; k++) {
+      bSplines[k] = naturalCubicNonUniform(baseS, baseSt.map(b => b.samples[k].b));
+      nSplines[k] = naturalCubicNonUniform(baseS, baseSt.map(b => b.samples[k].n));
     }
-    for (const [chineIdx, anchorsForChine] of chinesByIdx.entries()) {
-      if (anchorsForChine.length < 2) continue;
-      if (carrierChines.has(chineIdx))  continue;
-      const col = chineCols.get(chineIdx);
-      if (col == null) continue;
-      const t  = chineTAtStationS(state, anchorsForChine, st.s);
-      const bn = sectionPointAtT(st.points, t);
-      a.push({ idx: col, b: bn.b, n: bn.n });
+    bnEvaluator = (s) => Array.from({ length: N }, (_, k) => ({
+      b: Math.max(0, bSplines[k](s)),
+      n: Math.max(0, Math.min(1, nSplines[k](s))),
+    }));
+  }
+  else if (mode === 'parallels') {
+    // Constant (b, n) per column = average of every station's uniform
+    // arc-length samples. Longitudinal lines are parallel in normalised
+    // section space; in world space they follow halfB(x) / height(x).
+    const allSamples = sortedSt.map(st => sampleSection(st.points, N));
+    const refSamples = new Array(N);
+    const M = allSamples.length || 1;
+    for (let k = 0; k < N; k++) {
+      let bSum = 0, nSum = 0;
+      for (const sm of allSamples) { bSum += sm[k].b; nSum += sm[k].n; }
+      refSamples[k] = { b: bSum / M, n: nSum / M };
     }
-    return a;
-  };
-  // Use the nearest station's section shape at each tip (or default if none).
-  // Tip section seeds inherit the nearest station's chine anchors so the
-  // chine's column stays consistent across the bow/stern tip rows (the
-  // tip collapses to a point via halfB→0 so the chine line ends in the
-  // hull centreline, satisfying the "feather out" interpretation).
-  const tipSamples = (nearestSt) => {
-    const pts = nearestSt ? nearestSt.points : defaultSection();
-    const anchors = nearestSt ? stationAnchors(nearestSt) : [];
-    return sampleSectionAnchored(pts, N, anchors);
-  };
-  const tip0 = tipSamples(sortedSt[0]);
-  const tip1 = tipSamples(sortedSt[sortedSt.length - 1]);
-
-  // Base rows: tips + interior stations, each sampled with its own chine anchors.
-  const baseSt = [
-    { s: 0, samples: tip0 },
-    ...sortedSt.map(st => ({ s: st.s, samples: sampleSectionAnchored(st.points, N, stationAnchors(st)) })),
-    { s: 1, samples: tip1 },
-  ];
-
-  const M = baseSt.length;
-  const baseS = baseSt.map(b => b.s);
-
-  // Build b/n splines for cross-section shape interpolation.
-  const bSplines = [], nSplines = [];
-  for (let k = 0; k < N; k++) {
-    bSplines[k] = naturalCubicNonUniform(baseS, baseSt.map(b => b.samples[k].b));
-    nSplines[k] = naturalCubicNonUniform(baseS, baseSt.map(b => b.samples[k].n));
+    baseSt = [
+      { s: 0, samples: refSamples },
+      ...sortedSt.map(st => ({ s: st.s, samples: refSamples })),
+      { s: 1, samples: refSamples },
+    ];
+    bnEvaluator = (_) => refSamples;
+  }
+  else if (mode === 'uniform' || mode === 'isoparametric' || mode === 'stations-only') {
+    // Per-station uniform arc-length sampling + Catmull-Rom (uniform)
+    // or linear (isoparametric / stations-only) interpolation across
+    // stations. No chine anchors.
+    const tipSamples = (nearestSt) =>
+      sampleSection(nearestSt ? nearestSt.points : defaultSection(), N);
+    baseSt = [
+      { s: 0, samples: tipSamples(sortedSt[0]) },
+      ...sortedSt.map(st => ({ s: st.s, samples: sampleSection(st.points, N) })),
+      { s: 1, samples: tipSamples(sortedSt[sortedSt.length - 1]) },
+    ];
+    const baseS = baseSt.map(b => b.s);
+    const interp = (mode === 'uniform') ? catmullRomNonUniform : linearInterpNonUniform;
+    const bSplines = [], nSplines = [];
+    for (let k = 0; k < N; k++) {
+      bSplines[k] = interp(baseS, baseSt.map(b => b.samples[k].b));
+      nSplines[k] = interp(baseS, baseSt.map(b => b.samples[k].n));
+    }
+    bnEvaluator = (s) => Array.from({ length: N }, (_, k) => ({
+      b: Math.max(0, bSplines[k](s)),
+      n: Math.max(0, Math.min(1, nSplines[k](s))),
+    }));
+  }
+  else if (mode === 'ruled') {
+    // Flat ruled strips between consecutive station rows. Compute each
+    // base row's world positions first (using that row's own halfB/height),
+    // then linearly interpolate world coordinates for densified rows
+    // between stations. The X coord is also lerped, so the row sits on
+    // the straight line between the two stations rather than on the rocker.
+    const tipSamples = (nearestSt) =>
+      sampleSection(nearestSt ? nearestSt.points : defaultSection(), N);
+    baseSt = [
+      { s: 0, samples: tipSamples(sortedSt[0]) },
+      ...sortedSt.map(st => ({ s: st.s, samples: sampleSection(st.points, N) })),
+      { s: 1, samples: tipSamples(sortedSt[sortedSt.length - 1]) },
+    ];
+    const baseS = baseSt.map(b => b.s);
+    const baseWorld = baseSt.map(entry => {
+      const { p: keel } = spineAt(spSampled, entry.s);
+      const deckZ  = curveYAtX(deckSampled, keel.x);
+      const height = Math.max(0.001, deckZ - keel.z);
+      const halfB  = Math.max(0.001, beamEvalAt(beamPts, keel.x));
+      const maxB   = Math.max(...entry.samples.map(s => s.b), 1e-9);
+      return entry.samples.map(({ b, n }) => ({
+        x: keel.x,
+        y: (b / maxB) * halfB,
+        z: keel.z + n * height,
+      }));
+    });
+    worldEvaluator = (s) => {
+      if (s <= baseS[0])                    return baseWorld[0];
+      if (s >= baseS[baseS.length - 1])     return baseWorld[baseWorld.length - 1];
+      let i = 0;
+      while (i < baseS.length - 1 && baseS[i + 1] < s) i++;
+      const t = (s - baseS[i]) / (baseS[i + 1] - baseS[i]);
+      const out = new Array(N);
+      for (let k = 0; k < N; k++) {
+        out[k] = {
+          x: baseWorld[i][k].x + t * (baseWorld[i + 1][k].x - baseWorld[i][k].x),
+          y: baseWorld[i][k].y + t * (baseWorld[i + 1][k].y - baseWorld[i][k].y),
+          z: baseWorld[i][k].z + t * (baseWorld[i + 1][k].z - baseWorld[i][k].z),
+        };
+      }
+      return out;
+    };
   }
 
-  // Dense longitudinal sampling — keel and deck from curves directly.
+  const M = baseSt.length;
+
+  // Dense longitudinal sampling — keel and deck from the rocker / deck-line
+  // curves for (b, n)-based modes; from per-station world positions in
+  // 'ruled' mode.
   const Mdense = xSubdiv > 1 ? (M - 1) * xSubdiv + 1 : M;
   const denseRows = [];
   for (let i = 0; i < Mdense; i++) {
     const s = i / (Mdense - 1);
+    if (worldEvaluator) {
+      denseRows.push(worldEvaluator(s));
+      continue;
+    }
     const { p: keel } = spineAt(spSampled, s);
-    // Sample the deck at the row's actual X — not at arc-length s — so the
-    // deck row of the loft traces the green deck Bezier exactly.  Using
-    // spineAt(deckSampled, s) would pick the deck point at the same arc-
-    // length fraction along the deck, whose x usually differs from keel.x
-    // whenever the curves have different shapes.
     const deckZ  = curveYAtX(deckSampled, keel.x);
     const height = Math.max(0.001, deckZ - keel.z);
     const halfB  = beamEvalAt(beamPts, keel.x);
-    const samples = Array.from({ length: N }, (_, k) => ({
-      b: Math.max(0, bSplines[k](s)),
-      n: Math.max(0, Math.min(1, nSplines[k](s))),
-    }));
+    const samples = bnEvaluator(s);
     const maxB = Math.max(...samples.map(s => s.b), 1e-9);
     denseRows.push(samples.map(({ b, n }) => ({
       x: keel.x,
@@ -980,22 +1108,26 @@ function buildLoft(state) {
     tipFace(Mdense - 1, true);     // bow
   }
 
-  // Expose dense rows for SVG wireframe and station row data for selection.
-  const stationRows = sortedSt.map((st, i) => {
-    const { p: keel } = spineAt(spSampled, st.s);
-    const deckZ       = curveYAtX(deckSampled, keel.x);  // same fix as the dense loft
-    const height = Math.max(0.001, deckZ - keel.z);
-    const halfB  = beamEvalAt(beamPts, keel.x);
-    const samples = sampleSectionAnchored(st.points, N, stationAnchors(st));
-    const maxB = Math.max(...samples.map(s => s.b), 1e-9);
-    return {
-      s: st.s,
-      points: samples.map(({ b, n }) => ({
+  // Expose station row world positions (for selection band + 3D highlight).
+  // Use the same evaluator the dense loop used so each loft mode is consistent.
+  const stationRows = sortedSt.map((st) => {
+    let pts;
+    if (worldEvaluator) {
+      pts = worldEvaluator(st.s);
+    } else {
+      const { p: keel } = spineAt(spSampled, st.s);
+      const deckZ  = curveYAtX(deckSampled, keel.x);
+      const height = Math.max(0.001, deckZ - keel.z);
+      const halfB  = beamEvalAt(beamPts, keel.x);
+      const samples = bnEvaluator(st.s);
+      const maxB = Math.max(...samples.map(s => s.b), 1e-9);
+      pts = samples.map(({ b, n }) => ({
         x: keel.x,
         y: (b / maxB) * halfB,
         z: keel.z + n * height,
-      })),
-    };
+      }));
+    }
+    return { s: st.s, points: pts };
   });
 
   return { positions, indices, rows: denseRows, stationRows, N, M: Mdense, chineCols };
@@ -3062,6 +3194,16 @@ xSubdivEl.addEventListener('change', () => {
   renderTopView();
 });
 
+const loftModeEl = document.getElementById('loft-mode');
+loftModeEl.value = state.loftMode || 'smooth';
+loftModeEl.addEventListener('change', () => {
+  state.loftMode = loftModeEl.value;
+  rebuildHull();
+  renderSideView();
+  renderTopView();
+  renderSectionView();
+});
+
 // Spine radius — translates half-meshes ±r in Y.
 const spineRadiusEl  = document.getElementById('spine-radius');
 const spineRadiusOut = document.getElementById('spine-r-out');
@@ -4673,6 +4815,7 @@ function syncUIFromState() {
   beamOut.textContent    = fmtLength(currentBeam);
   loftResEl.value        = state.loftRes;
   xSubdivEl.value        = String(state.xSubdiv);
+  loftModeEl.value       = state.loftMode || 'smooth';
   spineRadiusEl.value    = String(state.spineRadius);
   spineRadiusOut.textContent = fmtR(state.spineRadius);
   showMeshEl.checked     = state.showLoftMesh;
