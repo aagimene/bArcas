@@ -58,7 +58,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0f172a); // Match CSS bg-color
 
 const camera = new THREE.PerspectiveCamera(45, host.clientWidth / host.clientHeight, 0.1, 100);
-camera.position.set(4, 3, -2.5); // Looking from starboard forward, slightly above
+camera.position.set(4, 3, -1.0); // Looking from starboard forward, lower altitude so Z points more straight down
 camera.up.set(0, 0, -1); // Z is down, so 'up' for the camera is -Z
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -146,18 +146,42 @@ const hullMat = new THREE.MeshPhongMaterial({
 });
 const diamondMesh = new THREE.Mesh(diamondGeo, hullMat);
 
-// Add wireframe over the shaded hull
-const wireframeGeo = new THREE.WireframeGeometry(diamondGeo);
-const wireframeMat = new THREE.LineBasicMaterial({ 
+// Add custom parametric grid over the shaded hull (no triangles)
+const gridLinesPts = [];
+for (let iz = 0; iz <= numZ; iz++) {
+  const z = (iz / numZ) * T;
+  const termZ = 1.0 - (z / T);
+  for (let ix = 0; ix < numX; ix++) {
+    const x1 = -L/2 + (ix / numX) * L;
+    const x2 = -L/2 + ((ix + 1) / numX) * L;
+    const y1 = (B / 2.0) * (1.0 - Math.abs(2.0 * x1 / L)) * termZ;
+    const y2 = (B / 2.0) * (1.0 - Math.abs(2.0 * x2 / L)) * termZ;
+    gridLinesPts.push(x1, y1, z, x2, y2, z);
+  }
+}
+for (let ix = 0; ix <= numX; ix++) {
+  const x = -L/2 + (ix / numX) * L;
+  const termX = 1.0 - Math.abs(2.0 * x / L);
+  for (let iz = 0; iz < numZ; iz++) {
+    const z1 = (iz / numZ) * T;
+    const z2 = ((iz + 1) / numZ) * T;
+    const y1 = (B / 2.0) * termX * (1.0 - (z1 / T));
+    const y2 = (B / 2.0) * termX * (1.0 - (z2 / T));
+    gridLinesPts.push(x, y1, z1, x, y2, z2);
+  }
+}
+const hullGridGeo = new THREE.BufferGeometry();
+hullGridGeo.setAttribute('position', new THREE.Float32BufferAttribute(gridLinesPts, 3));
+const hullGridMat = new THREE.LineBasicMaterial({ 
   color: 0x1e293b, 
   opacity: 0.5, 
   transparent: true,
   polygonOffset: true,
-  polygonOffsetFactor: -1, // Pull wireframe forward
+  polygonOffsetFactor: -1, // Pull grid forward
   polygonOffsetUnits: -1
 });
-const wireframe = new THREE.LineSegments(wireframeGeo, wireframeMat);
-diamondMesh.add(wireframe);
+const hullGrid = new THREE.LineSegments(hullGridGeo, hullGridMat);
+diamondMesh.add(hullGrid);
 
 gizmoGroup.add(diamondMesh);
 
@@ -179,6 +203,41 @@ gizmoGroup.add(intersectionLine);
 const gridHelper = new THREE.GridHelper(L * 1.5, 10, 0x444444, 0x222222);
 gridHelper.position.set(0, 0, T/2); // Center it on the draft
 gizmoGroup.add(gridHelper);
+
+// Waterplane (XY Plane at Z=0)
+const waterGeo = new THREE.PlaneGeometry(L * 1.5, B * 3);
+const waterMat = new THREE.MeshBasicMaterial({
+  color: 0x38bdf8,
+  transparent: true,
+  opacity: 0.15,
+  side: THREE.DoubleSide,
+  depthWrite: false
+});
+const waterPlane = new THREE.Mesh(waterGeo, waterMat);
+gizmoGroup.add(waterPlane);
+
+// Label for Waterplane
+const canvas = document.createElement('canvas');
+canvas.width = 256;
+canvas.height = 64;
+const ctx = canvas.getContext('2d');
+ctx.fillStyle = 'rgba(56, 189, 248, 0.8)';
+ctx.font = 'bold 28px sans-serif';
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
+ctx.fillText('WATER PLANE (Z=0)', 128, 32);
+
+const tex = new THREE.CanvasTexture(canvas);
+const labelGeo = new THREE.PlaneGeometry(2, 0.5);
+const labelMat = new THREE.MeshBasicMaterial({
+  map: tex,
+  transparent: true,
+  side: THREE.DoubleSide,
+  depthWrite: false
+});
+const labelMesh = new THREE.Mesh(labelGeo, labelMat);
+labelMesh.position.set(0, B * 1.0, 0); // Position on waterplane to the starboard side
+gizmoGroup.add(labelMesh);
 
 scene.add(gizmoGroup);
 
