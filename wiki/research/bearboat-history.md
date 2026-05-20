@@ -89,6 +89,17 @@ These will be extracted and placed in [../theory/](../theory/) pages with citati
 
 ---
 
+## Sources & Citations
+
+The history discussed here draws from primary software documentation and the archival records of the kayak design community:
+
+1. **BearBoat & BearBoatXL Official Site:** Robert Livingston's software releases, manuals, and mathematical overviews are maintained at [bearboat.net](http://www.bearboat.net/).
+2. **The Ursa Micro & Mariner Coaster History:** The direct lineage from Livingston's Ursa Micro to the Broze brothers' Coaster is documented by Mariner Kayaks in their [official Coaster history](http://www.marinerkayaks.com/mkhtml/coaster.html).
+3. **Mythological Origin:** The naming connection between Ursa (the Great Bear) and Arcas is drawn from [Greek Mythology (Callisto and Arcas)](https://en.wikipedia.org/wiki/Arcas).
+4. **Community Discussions:** Numerous threads on forums like [West Coast Paddler](https://www.westcoastpaddler.com/) preserve the oral history of BearBoatSP's use among amateur builders.
+
+---
+
 ## Related
 
 - [existing-hull-design-software.md](existing-hull-design-software.md)

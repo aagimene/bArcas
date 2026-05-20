@@ -2,7 +2,7 @@
 
 A research-and-design repository for **bArcas**: a browser-based, API-first, visual kayak hull design tool, and a modern spiritual successor to **BearBoatXL** (a port of Robert Livingston's BearBoatSP, the software used to design the Ursa kayaks that inspired the Mariner Coaster).
 
-> *Arcas was the son of Callisto (the Great Bear / Ursa constellation) and Zeus. He is the namesake we inherit from BearBoat, whose ancestor BearBoatSP was used to design the Ursa kayaks that inspired the Mariner Coaster.*
+> *[Arcas](https://en.wikipedia.org/wiki/Arcas) was the son of Callisto (the Great Bear / Ursa constellation) and Zeus. He is the namesake we inherit from [BearBoat](http://www.bearboat.net/), whose ancestor BearBoatSP was used to design the [Ursa kayaks that inspired the Mariner Coaster](http://www.marinerkayaks.com/mkhtml/coaster.html).*
 
 ## Status
 
