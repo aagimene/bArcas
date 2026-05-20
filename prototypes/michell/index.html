@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Michell — bArcas prototype</title>
+<link rel="stylesheet" href="styles.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<header>
+  <span class="build-tag" title="Build name. Refresh until this matches the name reported in chat for the last push.">build · michell-phase1</span>
+  <h1>Michell</h1>
+  <p class="subtitle">
+    Interactive explainogram for parametric hull design and wave resistance.
+    <span class="hint">Drag the 3D view to rotate · scroll to zoom · double-click to reset.</span>
+  </p>
+</header>
+
+<main>
+  <!-- Full screen 3D canvas -->
+  <div id="three-host"></div>
+
+  <!-- UI Overlay for slides -->
+  <div id="slide-overlay" class="slide-overlay">
+    <div class="slide-content">
+      <h2 id="slide-title">Slide Title</h2>
+      <div id="slide-body" class="slide-body">
+        Slide content goes here.
+      </div>
+    </div>
+    <div class="slide-controls">
+      <button type="button" id="btn-prev" aria-label="Previous slide">◀ Prev</button>
+      <span id="slide-indicator">1 / X</span>
+      <button type="button" id="btn-next" aria-label="Next slide">Next ▶</button>
+    </div>
+  </div>
+</main>
+
+<p class="footer">
+  Plan: <a href="../../wiki/project/michell-prototype.md">wiki/project/michell-prototype.md</a> ·
+  Source: <a href="https://github.com/aagimene/bArcas/tree/main/prototypes/michell" target="_blank" rel="noopener">github.com/aagimene/bArcas</a>.
+</p>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
