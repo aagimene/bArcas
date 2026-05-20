@@ -185,6 +185,11 @@ diamondMesh.add(hullGrid);
 
 gizmoGroup.add(diamondMesh);
 
+// Mirror to port side (negative Y)
+const portMesh = diamondMesh.clone();
+portMesh.scale.set(1, -1, 1); // Flip Y
+gizmoGroup.add(portMesh);
+
 // Centerplane intersection line (y=0 plane outline)
 const lineGeo = new THREE.BufferGeometry();
 const linePts = [
@@ -236,7 +241,11 @@ const labelMat = new THREE.MeshBasicMaterial({
   depthWrite: false
 });
 const labelMesh = new THREE.Mesh(labelGeo, labelMat);
-labelMesh.position.set(0, B * 1.0, 0); // Position on waterplane to the starboard side
+// Plane is on XY (facing Z). Since Z is down, the label faces 'up' visually.
+// Rotate it so it reads correctly when viewed from above (positive Z looking down).
+// The PlaneGeometry normal is +Z by default; we rotate -90deg around Z to flip text right-side up.
+labelMesh.rotation.set(0, 0, Math.PI); // Flip text so it reads correctly when viewed from camera
+labelMesh.position.set(0, B * 1.2, 0);
 gizmoGroup.add(labelMesh);
 
 scene.add(gizmoGroup);
