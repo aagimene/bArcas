@@ -20,7 +20,7 @@ Computed for each speed U in a user-chosen range (typically 0 to 3.5 m/s).
 
 ### Derived at reference speeds
 
-ArcasBoat picks a handful of "reference speeds" for headline comparison:
+bArcas picks a handful of "reference speeds" for headline comparison:
 
 | Speed | Use case |
 |---|---|

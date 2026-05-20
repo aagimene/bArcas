@@ -1,6 +1,6 @@
-# ArcasBoat Wiki
+# bArcas Wiki
 
-A research and design wiki for **ArcasBoat** — a browser-based, API-first, visual kayak hull design tool.
+A research and design wiki for **bArcas** — a browser-based, API-first, visual kayak hull design tool.
 
 > *Arcas was the son of Callisto (the Great Bear / Ursa constellation) and Zeus. He is the namesake we inherit from BearBoat, whose ancestor BearBoatSP was used to design the Ursa kayaks that inspired the Mariner Coaster.*
 

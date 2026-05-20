@@ -63,7 +63,7 @@ A detailed model of paddler-boat coupling is a research topic, not a design tool
 | Beam at seat | Affects paddle entry angle; too wide = awkward catch |
 | Deck shape behind paddler | Affects lay-back rolls (Greenland technique) |
 
-ArcasBoat's UI exposes these as designer variables; our modeling stays static.
+bArcas's UI exposes these as designer variables; our modeling stays static.
 
 ---
 

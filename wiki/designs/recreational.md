@@ -48,9 +48,9 @@ Many production kayak companies make these: Wilderness Systems Pungo/Aspire, Dag
 
 ## Why we support designing them anyway
 
-Even a recreational kayak is a hull. The same ArcasBoat primitives — NURBS surface, hydrostatics, stability, drag — apply. A designer should be able to build a 3.5 m × 0.72 m "entry-level hull" and look at its numbers the same way they look at a K1's.
+Even a recreational kayak is a hull. The same bArcas primitives — NURBS surface, hydrostatics, stability, drag — apply. A designer should be able to build a 3.5 m × 0.72 m "entry-level hull" and look at its numbers the same way they look at a K1's.
 
-If ArcasBoat is successful for pro designers, it'll also be a useful educational tool for understanding *why* recreational kayaks have the hydrostatic signatures they do.
+If bArcas is successful for pro designers, it'll also be a useful educational tool for understanding *why* recreational kayaks have the hydrostatic signatures they do.
 
 ---
 

@@ -88,13 +88,13 @@ The Greenland qajaq is the **ur-design** for modern sea kayaks. When you build a
 - **Thermoformed kayaks** (Eddyline, Delta) — an intermediate durability/weight between fiberglass and rotomolded poly.
 - **Rotomolded plastic** continues to dominate the entry-level market.
 - **3D CAD** widespread — Rhino is the workhorse for many small-shop designers.
-- **Small-run composite kayaks** increasingly use CNC-milled plugs. This is exactly the workflow ArcasBoat targets.
+- **Small-run composite kayaks** increasingly use CNC-milled plugs. This is exactly the workflow bArcas targets.
 
 ---
 
 ## Ethnographic sources and reference offsets
 
-For ArcasBoat's reference library, useful sources of offsets:
+For bArcas's reference library, useful sources of offsets:
 
 - **Harvey Golden** — *Kayaks of Greenland* (2006), *Kayaks of Alaska* (2015). Huge catalogs of traditional kayak measurements.
 - **Chris Cunningham / Sea Kayaker magazine** — ~300+ reviews with hydrostatic tables.

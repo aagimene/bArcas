@@ -264,7 +264,7 @@ could later replay or learn from. Two motivations:
 
 1. **Undo / redo and arbitrary-jump rewind.** A scrollable log lets the
    user step back through any number of edits, not just the last one.
-2. **Training corpus for a future ArcasBoat agent.** Each entry should
+2. **Training corpus for a future bArcas agent.** Each entry should
    describe a primitive action with enough information to reproduce it
    from a clean state — i.e. it should be the same shape as the API-call
    stream that a programmatic client / MCP agent would emit. This aligns

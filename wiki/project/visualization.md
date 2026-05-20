@@ -1,6 +1,6 @@
 # Visualization
 
-Kayak design is a visual activity. ArcasBoat should feel like a 3D CAD tool, not a spreadsheet with a hull preview.
+Kayak design is a visual activity. bArcas should feel like a 3D CAD tool, not a spreadsheet with a hull preview.
 
 ---
 

@@ -1,6 +1,6 @@
 # Design variables
 
-Variables the *designer* directly sets. In ArcasBoat every one of these is also an API parameter — see [../project/api-design.md](../project/api-design.md).
+Variables the *designer* directly sets. In bArcas every one of these is also an API parameter — see [../project/api-design.md](../project/api-design.md).
 
 ---
 

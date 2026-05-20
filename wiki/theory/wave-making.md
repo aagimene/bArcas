@@ -119,7 +119,7 @@ At sufficiently high $Fr$, bow waves can break — a nonlinear phenomenon not in
 
 ---
 
-## What ArcasBoat reports
+## What bArcas reports
 
 - **$R_W(U)$** curve.
 - **Humps and hollows** marked.

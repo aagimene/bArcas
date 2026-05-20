@@ -75,13 +75,13 @@ Hull/deck shape influences which rolling style the boat supports well.
 
 ---
 
-## Construction methods (for reference, not for ArcasBoat output)
+## Construction methods (for reference, not for bArcas output)
 
-ArcasBoat targets **CNC-milled plugs, 3D-printed plugs, and composite molds**. Other construction methods exist and are documented here for completeness:
+bArcas targets **CNC-milled plugs, 3D-printed plugs, and composite molds**. Other construction methods exist and are documented here for completeness:
 
-- **Strip-built** — wood strips over station molds. Out of ArcasBoat scope.
-- **Stitch-and-glue** — plywood panels stitched and glued. Out of ArcasBoat scope.
-- **Skin-on-frame (SOF)** — ribs + stringers + fabric skin; traditional Greenland/Aleutian. Out of ArcasBoat scope.
+- **Strip-built** — wood strips over station molds. Out of bArcas scope.
+- **Stitch-and-glue** — plywood panels stitched and glued. Out of bArcas scope.
+- **Skin-on-frame (SOF)** — ribs + stringers + fabric skin; traditional Greenland/Aleutian. Out of bArcas scope.
 - **Composite layup** — wet / prepreg / infusion over a mold. **In scope** (we produce the mold).
 - **Thermoforming** — heated plastic sheet formed over a mold. **Future in scope**.
 - **Rotomolding** — plastic powder rotated in a heated mold. **Future in scope**.

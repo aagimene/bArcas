@@ -1,6 +1,6 @@
 # Theory
 
-This section collects the math and physics ArcasBoat needs to implement. Each page aims to be honest about assumptions and validity ranges — we want the app to cite the same way this wiki does.
+This section collects the math and physics bArcas needs to implement. Each page aims to be honest about assumptions and validity ranges — we want the app to cite the same way this wiki does.
 
 ---
 
@@ -33,7 +33,7 @@ At kayak scale (LOA 3–7 m, Reynolds ~10⁶–10⁷, Froude ~0.2–0.6):
 
 ## Invariant we want to preserve
 
-Every quantity ArcasBoat shows has three attached fields:
+Every quantity bArcas shows has three attached fields:
 - **value** (with units)
 - **method** (the formula/algorithm used)
 - **assumptions** (what it takes for the number to be meaningful)

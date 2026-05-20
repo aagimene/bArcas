@@ -1,6 +1,6 @@
 # Existing hull design software
 
-A survey of prior art. Grouped by intended use. For each, we note: what it does well, what it lacks relative to ArcasBoat's goals, and what we should learn from it.
+A survey of prior art. Grouped by intended use. For each, we note: what it does well, what it lacks relative to bArcas's goals, and what we should learn from it.
 
 ---
 
@@ -33,7 +33,7 @@ A survey of prior art. Grouped by intended use. For each, we note: what it does 
 ### DELFTship (formerly FreeShip+)
 - **What it does well.** Free / open-source tiers. Subdivision-surface hull modeling (quad net refined to smooth surface — intuitive for beginners). Hydrostatics, stability, basic resistance. Large user community.
 - **What it lacks.** Desktop-only, Windows-centric, limited scripting.
-- **What to learn.** The subdivision-surface UX is genuinely friendly. Worth studying — it may be the right primary surface type for ArcasBoat, or at least a user-facing alternative to a raw B-spline net.
+- **What to learn.** The subdivision-surface UX is genuinely friendly. Worth studying — it may be the right primary surface type for bArcas, or at least a user-facing alternative to a raw B-spline net.
 - License note: DELFTship is proprietary freeware; **FreeShip** is its GPL ancestor. We should be careful about any direct code reuse.
 
 ### FreeShip (GPL ancestor of DELFTship)
@@ -49,11 +49,11 @@ A survey of prior art. Grouped by intended use. For each, we note: what it does 
 ### Maxsurf (Bentley)
 - **What it does well.** Professional naval-architecture suite. Relational Bezier hulls, resistance, seakeeping, structure.
 - **What it lacks.** Ship/yacht oriented, very expensive, desktop.
-- **What to learn.** Relational-geometry ideas (constraints between control points) — we may want similar in ArcasBoat.
+- **What to learn.** Relational-geometry ideas (constraints between control points) — we may want similar in bArcas.
 
 ### Michlet (Leo Lazauskas)
 - Not a full designer; a solver. Computes Michell's thin-ship wave resistance from an offset file.
-- **What to learn.** The offset-file format (input), and the Michell formulation itself, which we plan to re-implement inside ArcasBoat's drag estimator.
+- **What to learn.** The offset-file format (input), and the Michell formulation itself, which we plan to re-implement inside bArcas's drag estimator.
 
 ### SHIPFLOW, CAESES, NAPA, ShipConstructor
 - Heavyweight commercial tools — industrial ship design, not kayak-scale. Reference only.
@@ -64,10 +64,10 @@ A survey of prior art. Grouped by intended use. For each, we note: what it does 
 
 ### OpenFOAM
 - Open-source RANS / LES CFD framework. The standard "next step" when empirical resistance estimates aren't enough.
-- **What to learn.** Export paths from ArcasBoat to OpenFOAM (STL of hull + OpenFOAM case dictionary).
+- **What to learn.** Export paths from bArcas to OpenFOAM (STL of hull + OpenFOAM case dictionary).
 
 ### ANSYS Fluent, Star-CCM+
-- Commercial CFD. Way beyond ArcasBoat scope; may be relevant as export targets for professional users.
+- Commercial CFD. Way beyond bArcas scope; may be relevant as export targets for professional users.
 
 ---
 
@@ -84,7 +84,7 @@ A survey of prior art. Grouped by intended use. For each, we note: what it does 
 
 ---
 
-## What this tells us about ArcasBoat's position
+## What this tells us about bArcas's position
 
 Nothing in the market combines:
 1. Kayak-specific workflows (stem/sheer/keel design, station molds).

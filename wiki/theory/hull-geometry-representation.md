@@ -1,12 +1,12 @@
 # Hull geometry representation
 
-The conventional naval-architecture views of a hull, and how ArcasBoat's internal geometry (NURBS surfaces, lofted curves) maps onto them.
+The conventional naval-architecture views of a hull, and how bArcas's internal geometry (NURBS surfaces, lofted curves) maps onto them.
 
 ---
 
 ## Axes convention
 
-ArcasBoat uses:
+bArcas uses:
 - **x** — longitudinal, positive toward bow.
 - **y** — transverse, positive to starboard (right, looking from stern toward bow).
 - **z** — vertical, positive upward.
@@ -39,7 +39,7 @@ A hull's geometry is traditionally described by three orthogonal slicings:
 ### Together: the "lines plan"
 A classical lines plan combines all three views on one sheet — body plan (stations), half-breadth plan (waterlines), and profile (buttocks) — plus a few diagonals for fairing checks.
 
-ArcasBoat renders all three interactively and keeps them synchronized with the underlying NURBS surface.
+bArcas renders all three interactively and keeps them synchronized with the underlying NURBS surface.
 
 ---
 
@@ -61,7 +61,7 @@ A hull can be reconstructed by:
 2. Lofting transverse stations between them.
 3. Fitting a smooth surface through the stations.
 
-This "signature-curve-first" design mode is what BearBoat institutionalizes. ArcasBoat will offer it as one of two editing modes.
+This "signature-curve-first" design mode is what BearBoat institutionalizes. bArcas will offer it as one of two editing modes.
 
 ---
 
@@ -73,7 +73,7 @@ Typical rows of an offset table:
 - **Half-breadths** at each station × waterline — distance from center plane to hull.
 - **Heights** at each station × buttock — distance from baseline to hull.
 
-ArcasBoat exports offset tables as CSV; station molds as DXF.
+bArcas exports offset tables as CSV; station molds as DXF.
 
 ---
 
@@ -100,7 +100,7 @@ Kayaks have several quirks worth encoding:
 
 ---
 
-## ArcasBoat's internal representation
+## bArcas's internal representation
 
 ```
 Hull
@@ -121,7 +121,7 @@ Derived artifacts — stations, waterlines, buttocks, meshes — are computed on
 
 ## Body plan convention
 
-When ArcasBoat draws a body plan:
+When bArcas draws a body plan:
 - **Starboard side (right half of drawing) = forward half of the hull** (stations forward of midship).
 - **Port side (left half) = aft half of the hull.**
 - Centerline vertical, baseline horizontal.

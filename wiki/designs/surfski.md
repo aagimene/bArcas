@@ -120,7 +120,7 @@ Design diversity within the spec class is significant — Fenn, Epic, and Nelo h
 
 ---
 
-## ArcasBoat's surfski-style reference hull
+## bArcas's surfski-style reference hull
 
 - LOA: 6.40 m
 - Beam: 0.44 m

@@ -1,8 +1,8 @@
 # Hull terminology (naval architecture)
 
-General small-craft and naval-architecture vocabulary, as ArcasBoat uses it. Kayak-specific terms are in [kayak-anatomy.md](kayak-anatomy.md).
+General small-craft and naval-architecture vocabulary, as bArcas uses it. Kayak-specific terms are in [kayak-anatomy.md](kayak-anatomy.md).
 
-Where a term has multiple accepted names, the **bold** one is ArcasBoat's preferred.
+Where a term has multiple accepted names, the **bold** one is bArcas's preferred.
 
 ---
 

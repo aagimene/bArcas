@@ -184,11 +184,11 @@ When we want more than empirical formulas but less than full CFD:
 - **Thin-ship theory (Michell, 1898)** — further linearizes the free-surface boundary condition and assumes hull is a small perturbation to a flat plane. Closed-form integral for wave-making resistance. Fast. Accurate for slender hulls.
 - **Panel methods (boundary element)** — discretize hull with source/dipole panels, solve for flow. More general than thin-ship. Rankine or Havelock Green's functions.
 
-ArcasBoat's drag estimator starts with **ITTC friction + Michell thin-ship wave-making**, with a form factor for residual drag. See [drag-and-resistance.md](drag-and-resistance.md).
+bArcas's drag estimator starts with **ITTC friction + Michell thin-ship wave-making**, with a form factor for residual drag. See [drag-and-resistance.md](drag-and-resistance.md).
 
 ---
 
-## 9. What ArcasBoat does (and doesn't) simulate
+## 9. What bArcas does (and doesn't) simulate
 
 **Does:**
 - Empirical frictional drag (ITTC 1957).

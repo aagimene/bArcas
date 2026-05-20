@@ -1,6 +1,6 @@
 # Drag and resistance
 
-How ArcasBoat estimates the force required to push a kayak through still water at a given speed. This is the single most-requested performance number; it also encapsulates the app's commitment to honest physics.
+How bArcas estimates the force required to push a kayak through still water at a given speed. This is the single most-requested performance number; it also encapsulates the app's commitment to honest physics.
 
 ---
 
@@ -105,13 +105,13 @@ $$
 R_A \approx \tfrac{1}{2}\rho_\text{air} V_a^2 \cdot C_{D,\text{air}} \cdot A_\text{exposed}
 $$
 
-Tiny at calm-air kayak speeds (paddler exposes perhaps 0.3 m² frontal area; $R_A$ at 2 m/s water speed in still air is under 2 N). Becomes non-negligible in headwind. Optional in ArcasBoat.
+Tiny at calm-air kayak speeds (paddler exposes perhaps 0.3 m² frontal area; $R_A$ at 2 m/s water speed in still air is under 2 N). Becomes non-negligible in headwind. Optional in bArcas.
 
 ---
 
 ## The drag curve
 
-For a hull + condition, ArcasBoat computes:
+For a hull + condition, bArcas computes:
 
 $$
 R_T(U) \text{ for } U \in [0, U_\text{max}]
@@ -151,7 +151,7 @@ These are orders of magnitude — they vary wildly between paddlers.
 
 ## Sensitivity and what designers learn
 
-ArcasBoat will offer, for a given hull and target speed:
+bArcas will offer, for a given hull and target speed:
 
 - **Partial derivatives** of drag with respect to design variables (beam, rocker, Cp, …).
 - **Which component dominates** at this speed — friction or wave?
@@ -168,7 +168,7 @@ Rules of thumb from this analysis:
 
 ## Honesty guarantee
 
-Every drag number displayed in ArcasBoat must carry:
+Every drag number displayed in bArcas must carry:
 - **Value** (and units).
 - **Method** — e.g., "ITTC 1957 + Michell thin-ship + $k=0.12$."
 - **Assumptions** — flat water, no wind, no current, hull at static trim.
@@ -194,7 +194,7 @@ Where we calibrate:
 
 ## Alternative empirical models (selectable, citation-tracked)
 
-Per the wiki's commitment to surface the formula behind every reported number, ArcasBoat
+Per the wiki's commitment to surface the formula behind every reported number, bArcas
 should also expose the following empirical methods alongside the Michell-thin-ship default.
 Each runs from the same hydrostatic state and is selected by the user (or an agent) per
 hull:

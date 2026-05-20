@@ -1,6 +1,6 @@
-# bArcas — ArcasBoat
+# bArcas — bArcas
 
-A research-and-design repository for **ArcasBoat**: a browser-based, API-first, visual kayak hull design tool, and a modern spiritual successor to **BearBoatXL** (a port of Robert Livingston's BearBoatSP, the software used to design the Ursa kayaks that inspired the Mariner Coaster).
+A research-and-design repository for **bArcas**: a browser-based, API-first, visual kayak hull design tool, and a modern spiritual successor to **BearBoatXL** (a port of Robert Livingston's BearBoatSP, the software used to design the Ursa kayaks that inspired the Mariner Coaster).
 
 > *Arcas was the son of Callisto (the Great Bear / Ursa constellation) and Zeus. He is the namesake we inherit from BearBoat, whose ancestor BearBoatSP was used to design the Ursa kayaks that inspired the Mariner Coaster.*
 
@@ -38,4 +38,4 @@ See [wiki/project/roadmap.md](wiki/project/roadmap.md) for staged plans.
 
 ## Out of scope
 
-ArcasBoat is **not** a CFD package, a structural / FEA designer, a construction-planning tool, a strip-build or skin-on-frame planner, or a general-purpose boat designer. Hull shape only. See [wiki/project/overview.md](wiki/project/overview.md#what-arcasboat-is-not) for the full list.
+bArcas is **not** a CFD package, a structural / FEA designer, a construction-planning tool, a strip-build or skin-on-frame planner, or a general-purpose boat designer. Hull shape only. See [wiki/project/overview.md](wiki/project/overview.md#what-arcasboat-is-not) for the full list.

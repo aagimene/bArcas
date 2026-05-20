@@ -1,6 +1,6 @@
 # Export formats — CNC, 3D printing, and composite molds
 
-A core requirement: ArcasBoat designs must be exportable into the file formats needed by downstream CAM, 3D-printing, and mold-making workflows. We are **explicitly not** supporting skin-on-frame or strip-built construction as a downstream workflow. The target build paths are:
+A core requirement: bArcas designs must be exportable into the file formats needed by downstream CAM, 3D-printing, and mold-making workflows. We are **explicitly not** supporting skin-on-frame or strip-built construction as a downstream workflow. The target build paths are:
 
 1. **CNC-milled plugs** — cut from foam or tooling board, used to lay up a composite mold or as a male plug for composite layup.
 2. **3D-printed plugs or mold sections** — typically FDM or large-format SLA for plugs; smaller parts for prototypes and fixtures.
@@ -43,7 +43,7 @@ A core requirement: ArcasBoat designs must be exportable into the file formats n
 | Format | Ext | Purpose | Notes |
 |---|---|---|---|
 | **CSV offsets** | `.csv` | Tabular hull offsets (station × waterline × buttock) | Required. Classical naval-architecture interchange. |
-| **JSON hull document** | `.json` | ArcasBoat-native format — full control nets, parameters, history | Required. "Save / share a hull" format. |
+| **JSON hull document** | `.json` | bArcas-native format — full control nets, parameters, history | Required. "Save / share a hull" format. |
 | **Michlet `.in`** | `.in` | Michlet's offset input format | Nice-to-have. Handy for validating our Michell implementation against Lazauskas's. |
 
 ---
@@ -64,9 +64,9 @@ Each of these can be exported in one or more of the formats above.
 
 ## Plug workflow (CNC-milled composite plug)
 
-Designer's path from ArcasBoat → finished plug:
+Designer's path from bArcas → finished plug:
 
-1. Design hull in ArcasBoat. Iterate. Fix it at a specific version.
+1. Design hull in bArcas. Iterate. Fix it at a specific version.
 2. **Export hull as STEP** (as a solid body, trimmed at deck/sheer, with keel flat or pedestal added for machining).
 3. Import STEP into CAM (Fusion 360, Mastercam, RhinoCAM).
 4. Generate toolpaths for roughing + finishing on foam or MDF plug stock.
@@ -74,7 +74,7 @@ Designer's path from ArcasBoat → finished plug:
 6. Fair, prime, and polish the plug by hand.
 7. Lay up composite mold over the plug.
 
-ArcasBoat's job ends at step 2. Step 1 needs to produce a STEP that CAM can directly use — with sensible tolerances, single closed solid, proper units (mm or m declared in the STEP header).
+bArcas's job ends at step 2. Step 1 needs to produce a STEP that CAM can directly use — with sensible tolerances, single closed solid, proper units (mm or m declared in the STEP header).
 
 ---
 
@@ -82,8 +82,8 @@ ArcasBoat's job ends at step 2. Step 1 needs to produce a STEP that CAM can dire
 
 1. Design hull.
 2. **Export hull as 3MF or STL** — mesh at a tolerance matching the printer (typically 0.05–0.2 mm chord deviation).
-3. For large kayak plugs, the hull is much larger than any single printer → **split into sections along Y-planes** (typically 200–500 mm sections for FDM). ArcasBoat provides a built-in split operation.
-4. Add alignment features (dovetails, keyways) at the split planes — also an ArcasBoat operation.
+3. For large kayak plugs, the hull is much larger than any single printer → **split into sections along Y-planes** (typically 200–500 mm sections for FDM). bArcas provides a built-in split operation.
+4. Add alignment features (dovetails, keyways) at the split planes — also an bArcas operation.
 5. Print, assemble, fair, use as plug for composite mold *or* as a direct thermoformable buck.
 
 We should support STL and 3MF on equal footing. 3MF carries units and metadata; STL doesn't (ambiguous units is a real problem — always tell the user what they're exporting in).
@@ -100,7 +100,7 @@ If the designer prefers to skip the physical plug:
 4. Split into half-molds.
 5. Export each half as STEP or STL for CNC or 3D-printing.
 
-ArcasBoat needs to provide:
+bArcas needs to provide:
 - **Surface offsetting** with controllable thickness.
 - **Parting-line definition** (user-drawn curve on the surface, or automatic "widest point by heading" algorithm).
 - **Mold-split operation** producing two or more separate solids.
@@ -138,7 +138,7 @@ These constraints need validation tools in the app: "check mold-release feasibil
 | 3D printing (SLA) | 0.025–0.1 mm; STL/3MF |
 | Visual/web glTF | 0.5 mm or coarser |
 
-ArcasBoat's mesher must take a **target chord deviation** (not a fixed triangle count) so the user can match their downstream process.
+bArcas's mesher must take a **target chord deviation** (not a fixed triangle count) so the user can match their downstream process.
 
 ---
 

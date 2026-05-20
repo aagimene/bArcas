@@ -100,7 +100,7 @@ Design specifics vary, but all live within a very tight envelope set by ICF rule
 
 ---
 
-## What ArcasBoat's K1-style reference hull looks like
+## What bArcas's K1-style reference hull looks like
 
 A parametric starting point:
 - LOA: 5.20 m (at the rule cap)

@@ -63,7 +63,7 @@ agent:  [runs a bounded search — typically gradient-based on
         Show you a ghosted overlay comparing to baseline?
 ```
 
-The agent runs a numerical optimization using the ArcasBoat API as its cost-function evaluator. Each candidate is a real hull evaluated with real hydrostatics.
+The agent runs a numerical optimization using the bArcas API as its cost-function evaluator. Each candidate is a real hull evaluated with real hydrostatics.
 
 At phase 2 this is a **hosted service**; at phase 1 it's at least possible via scripted Python + SDK.
 
@@ -213,7 +213,7 @@ The agent is *not*:
 - The one who knows what kind of boat this should be.
 - The one who decides when it's "done."
 
-ArcasBoat's role is to make the agent maximally useful without displacing the human's judgment.
+bArcas's role is to make the agent maximally useful without displacing the human's judgment.
 
 ---
 

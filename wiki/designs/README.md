@@ -52,7 +52,7 @@ Each category page covers:
 
 ---
 
-## ArcasBoat reference library
+## bArcas reference library
 
 Phase 2 ships a **reference library** — parametric reconstructions (not exact copies) of iconic designs, usable as forking starting points:
 

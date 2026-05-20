@@ -1,6 +1,6 @@
 # Side-by-side comparison
 
-Comparison is an organizing principle of ArcasBoat, not a side feature. Most of the app's value accrues when you're looking at two or more hulls at once. This page describes the comparison UX.
+Comparison is an organizing principle of bArcas, not a side feature. Most of the app's value accrues when you're looking at two or more hulls at once. This page describes the comparison UX.
 
 The user's stated workflow — *"I plan to make an imitation Coaster and visualize its variables for drag, stability, etc., and when designing I want to compare different hulls side by side"* — is the primary driver for this feature.
 

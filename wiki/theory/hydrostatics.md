@@ -39,7 +39,7 @@ $$
 V = \iint_{\text{hull}_{<wl}} dV
 $$
 
-Computed in ArcasBoat either:
+Computed in bArcas either:
 - **Analytically from the parametric surface** via the divergence theorem (integrate $\frac{1}{3} \mathbf{r}\cdot\mathbf{n}\, dA$ over a closed region) — exact for the NURBS surface, fast.
 - **By Simpson's rule over sectional areas** — classic naval-architecture approach, also accurate if stations are dense enough.
 
@@ -187,11 +187,11 @@ Functions of waterline height (useful for displacement sensitivity):
 | $KB(z_{wl})$ | Height of buoyancy |
 | $BM_T(z_{wl})$, $BM_L(z_{wl})$ | Metacentric radii |
 
-Plotted together these are the classic **Bonjean / hydrostatic curves** sheet. ArcasBoat will generate these on demand.
+Plotted together these are the classic **Bonjean / hydrostatic curves** sheet. bArcas will generate these on demand.
 
 ---
 
-## What ArcasBoat reports at each load condition
+## What bArcas reports at each load condition
 
 For a given displacement condition (loaded mass, LCG, water density):
 

@@ -1,6 +1,6 @@
 # AI Agent Integration
 
-ArcasBoat treats AI agents as first-class users. The constraint "every design action has an API call" exists specifically so agents can drive the tool.
+bArcas treats AI agents as first-class users. The constraint "every design action has an API call" exists specifically so agents can drive the tool.
 
 ---
 

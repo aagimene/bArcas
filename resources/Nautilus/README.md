@@ -16,7 +16,7 @@ and ProChine are the three flagship hull-design programs in the Nautilus family.
 mid-size production kayak hulls of the 1990s–2000s were designed in this family of tools;
 the technique vocabulary (NURB rows/columns, edit-points-on-the-surface, Move%, K-curves,
 Gaussian curvature mapping, ruling-line plate development) is the standard most modern
-hull-design tools — including ArcasBoat — must reckon with.
+hull-design tools — including bArcas — must reckon with.
 
 ## Contents
 

@@ -2,7 +2,7 @@
 
 A detailed look at the **Mariner Coaster**, our canonical comparison target. The user has identified this as the specific boat they want to reproduce parametrically and compare against.
 
-This page documents what we know about the Coaster's dimensions and design decisions, and lays out the variables ArcasBoat should visualize for a "Coaster-style" hull.
+This page documents what we know about the Coaster's dimensions and design decisions, and lays out the variables bArcas should visualize for a "Coaster-style" hull.
 
 > **Caveat.** Mariner Kayaks has been quiet about detailed geometry; published specs are limited. Specific numbers below are from memory of Mariner's public materials and Sea Kayaker magazine coverage — they should be verified against primary sources before we ship a reference hull. Where precise numbers are uncertain, the *direction* (long/short, high/low, more/less than typical) is usually clear.
 
@@ -96,7 +96,7 @@ From paddler reports (Sea Kayaker reviews, forum posts):
 
 ---
 
-## What ArcasBoat's "Coaster-style" reference looks like
+## What bArcas's "Coaster-style" reference looks like
 
 A parametric reconstruction:
 
@@ -122,7 +122,7 @@ This is a starting point; the user is expected to tune it.
 
 ---
 
-## Metrics ArcasBoat should visualize when comparing a Coaster-style to other boats
+## Metrics bArcas should visualize when comparing a Coaster-style to other boats
 
 - **Drag curves** — side-by-side with a K1, a Nordkapp, a surfski. The Coaster's short LWL shows up as rising drag above ~2 m/s.
 - **GZ curves** — Coaster's flared topsides give a characteristic "late peak, late AVS" shape versus a narrower touring boat.
@@ -137,10 +137,10 @@ This is a starting point; the user is expected to tune it.
 1. **Short and distinctive** — visually differentiated from longer hulls, so comparisons are easy to see.
 2. **Well-known** — lots of community discussion to validate against.
 3. **Deliberately non-optimized-for-speed** — a good case study of "design for the *real* use case, not for maximum paper speed."
-4. **Family connection** — directly in the BearBoat/Ursa/Mariner lineage that ArcasBoat honors.
+4. **Family connection** — directly in the BearBoat/Ursa/Mariner lineage that bArcas honors.
 5. **Teaches the tradeoff lattice** — every design decision is visibly a trade. Length for maneuverability; beam for stability; soft chine for forgiveness; no skeg for simplicity.
 
-This is *the* reference hull for testing ArcasBoat's comparison UX.
+This is *the* reference hull for testing bArcas's comparison UX.
 
 ---
 

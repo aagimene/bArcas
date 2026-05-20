@@ -1,6 +1,6 @@
 # Ursa and Mariner — Livingston and the Broze brothers
 
-The design family directly upstream of ArcasBoat's name. This page sets out what's known about the Ursa kayaks (Robert Livingston) and the Mariner Kayaks line that descended from them. See also [../research/bearboat-history.md](../research/bearboat-history.md) for Livingston's software.
+The design family directly upstream of bArcas's name. This page sets out what's known about the Ursa kayaks (Robert Livingston) and the Mariner Kayaks line that descended from them. See also [../research/bearboat-history.md](../research/bearboat-history.md) for Livingston's software.
 
 > **Caveat.** Primary sources for Ursa/Mariner design decisions are scattered across forum posts, Sea Kayaker magazine back-issues, and the Mariner Kayaks website/archives. Where a claim here is a synthesis, not a direct quote, we mark it. This page should grow more precise over time.
 
@@ -18,7 +18,7 @@ The **Ursa** kayaks were his flagship designs. Characteristics (synthesis; to be
 - Built in fiberglass, often one-off or small production.
 - Design intent: a boat you could paddle all day in real Pacific-Northwest conditions without fighting it.
 
-The name "Ursa" (Latin for "she-bear") connects to the constellation and myth that give BearBoat and, now, ArcasBoat their names.
+The name "Ursa" (Latin for "she-bear") connects to the constellation and myth that give BearBoat and, now, bArcas their names.
 
 ---
 
@@ -71,13 +71,13 @@ The soft chine + flared topsides combination is characteristic: it gives a livel
 
 ---
 
-## Why this lineage matters to ArcasBoat
+## Why this lineage matters to bArcas
 
 Three reasons.
 
-1. **Software lineage.** BearBoatSP → BearBoatXL → ArcasBoat. The control-curve lofting approach is inherited.
+1. **Software lineage.** BearBoatSP → BearBoatXL → bArcas. The control-curve lofting approach is inherited.
 
-2. **Design philosophy.** Mariner/Ursa designs value **honest** handling — the boat does what it says on the box, in real conditions. This aligns with ArcasBoat's "honest physics" commitment.
+2. **Design philosophy.** Mariner/Ursa designs value **honest** handling — the boat does what it says on the box, in real conditions. This aligns with bArcas's "honest physics" commitment.
 
 3. **Reference target.** The Coaster is a specific, well-known, short sea kayak that makes a perfect first comparison target for the app (the user has explicitly picked it). See [coaster-analysis.md](coaster-analysis.md).
 
@@ -87,7 +87,7 @@ Three reasons.
 
 We do **not** plan to:
 - Reverse-engineer any specific Mariner or Ursa hull from photos or measurements.
-- Ship exact copies of proprietary designs in the ArcasBoat reference library.
+- Ship exact copies of proprietary designs in the bArcas reference library.
 - Publish hull measurements that Mariner Kayaks has not publicly released.
 
 We *do* plan to:

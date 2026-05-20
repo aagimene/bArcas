@@ -8,11 +8,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project identity
 
-- **Product name:** ArcasBoat (used throughout the wiki and any user-facing copy).
+- **Product name:** bArcas (used throughout the wiki and any user-facing copy).
 - **Repository / package name:** `bArcas`.
 - These are intentionally different. Don't "fix" one to match the other.
 
-ArcasBoat is a browser-based, API-first, visual kayak hull design tool — a modern spiritual successor to **BearBoatXL** (which is itself a port of Robert Livingston's **BearBoatSP**, the software used to design the Ursa kayaks that inspired the Mariner Coaster). The lineage is load-bearing: the project is named for it and cites it explicitly.
+bArcas is a browser-based, API-first, visual kayak hull design tool — a modern spiritual successor to **BearBoatXL** (which is itself a port of Robert Livingston's **BearBoatSP**, the software used to design the Ursa kayaks that inspired the Mariner Coaster). The lineage is load-bearing: the project is named for it and cites it explicitly.
 
 ## Repository layout
 
@@ -34,7 +34,7 @@ resources/   Read-only reference material from prior art.
 
 The wiki is organized into seven sections — start at [wiki/README.md](wiki/README.md) for the index. The most load-bearing pages for any future engineering work are:
 
-- [wiki/project/overview.md](wiki/project/overview.md) — what ArcasBoat is (and isn't).
+- [wiki/project/overview.md](wiki/project/overview.md) — what bArcas is (and isn't).
 - [wiki/project/architecture.md](wiki/project/architecture.md) — layered system sketch, candidate tech, data model.
 - [wiki/project/api-design.md](wiki/project/api-design.md) — resource model, verb conventions, the "every design action is an API call" rule.
 - [wiki/project/export-formats.md](wiki/project/export-formats.md) — required CAD/CAM/3D-printing formats and the downstream workflows they feed.

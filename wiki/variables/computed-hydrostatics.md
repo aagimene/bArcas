@@ -63,13 +63,13 @@ Useful for exploring how the hull behaves under different load conditions.
 
 A(x) — cross-sectional area at each station x, at current waterplane. This is the input to Michell's integral for wave-making (see [../theory/wave-making.md](../theory/wave-making.md)) and is visually informative in its own right.
 
-ArcasBoat renders it as a live chart below the 3D view.
+bArcas renders it as a live chart below the 3D view.
 
 ---
 
 ## Numerical method
 
-ArcasBoat computes hydrostatic integrals from the NURBS surface analytically where possible:
+bArcas computes hydrostatic integrals from the NURBS surface analytically where possible:
 
 - **Volume / moments**: divergence theorem on the trimmed hull surface below the waterplane. Uses Gaussian quadrature on the parametric surface. Error bounded analytically.
 - **Waterplane area / LCF / I_T / I_L**: integrate over the waterline loop (a closed curve on the hull at height z_wl).

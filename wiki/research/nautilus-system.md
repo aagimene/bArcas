@@ -2,14 +2,14 @@
 
 The **Nautilus System** is a family of hull-design programs by **New Wave Systems, Inc.**
 (Jamestown, Rhode Island), authored by **Stephen M. Hollister**. It is the second of the two
-prior-art codebases ArcasBoat treats as foundational reference — alongside Robert Livingston's
+prior-art codebases bArcas treats as foundational reference — alongside Robert Livingston's
 **BearBoatSP / BearBoatXL** (see [bearboat-history.md](bearboat-history.md)).
 
 Most of the technique vocabulary modern interactive hull-design tools depend on — *edit
 points on the surface*, *Move% / Ooch Point fine-fairing*, *K-curves* (dynamic curvature
 overlays), *Gaussian-curvature color mapping*, *ruling-line plate development*, *automatic
 hull variation under prismatic/LCB constraint* — was either invented or popularized inside
-this family of programs. ArcasBoat aims to be **a superset of the capabilities of both
+this family of programs. bArcas aims to be **a superset of the capabilities of both
 Nautilus and BearBoat**, in a browser-native, API-first form.
 
 > The primary archived sources for this page are the three Nautilus installers and their
@@ -73,7 +73,7 @@ lies on the surface**, and back-solves for the vertex move. Two flavors are expo
   best for matching existing offsets.
 
 The two payoffs are (a) you can dial in offsets directly and (b) you stop staring at a vertex
-mesh that obscures the hull. ArcasBoat should expose both modes — `local` is what most users
+mesh that obscures the hull. bArcas should expose both modes — `local` is what most users
 expect, `global` is essential for reverse-engineering from offset tables.
 
 ### Combined polyline / NURB curve entity
@@ -83,7 +83,7 @@ between *smooth* and *knuckle* with one command (`Knuckle Pnt`), converting a st
 into a polyline corner or vice versa without splitting and rejoining
 (`Entities3 §Curve Entities`).
 
-ArcasBoat already plans curve entities; we should make the same call — *one* "polycurve" type
+bArcas already plans curve entities; we should make the same call — *one* "polycurve" type
 with per-vertex smooth/knuckle flags.
 
 ### Surface knuckle / split
@@ -115,7 +115,7 @@ The deeper reason is in `DirtyLittleSecrets §Spacing of Rows and Columns`: unif
 vectors stay valid only when control-net spacing stays near-uniform; non-uniform knots
 break edge-matching with adjoining surfaces.
 
-ArcasBoat note: if we expose row/col insertion in the editor, the API should default to
+bArcas note: if we expose row/col insertion in the editor, the API should default to
 "insert at midpoint between selected neighbors" and we should compute and warn when the
 2:1 ratio is violated.
 
@@ -140,7 +140,7 @@ Coordinate convention: `X` toward the stern from FP at 0, `Y` to starboard (half
 `Z` upward from baseline at 0. The user is free to depart from these values in editing —
 they are explicitly "target" values for the initial shape only.
 
-ArcasBoat parallel: this is the same pattern as BearBoatSP's signature-curve form. A
+bArcas parallel: this is the same pattern as BearBoatSP's signature-curve form. A
 `hull.create_from_principal_dimensions(...)` API call is the natural primitive.
 
 ### Other hull-input paths
@@ -158,7 +158,7 @@ Per `NewBoat3`, ProSurf accepts:
 7. **Skin/Loft** — fit a NURB surface through a set of station curves (ProSurf only; this
    is the feature ProBasic/ProChine lack).
 
-ArcasBoat should support 1, 2, 3, 6, and 7 from day one; 4 and 5 are nice-to-have.
+bArcas should support 1, 2, 3, 6, and 7 from day one; 4 and 5 are nice-to-have.
 
 ---
 
@@ -208,7 +208,7 @@ From `HullDesign3 §detailed fairing process`:
 4. Repeat. Use plane-cut overlays (selectively, 1–2 at a time) to watch derived waterlines change live as you drag.
 5. Verify with the full lines drawing + Gaussian curvature color map.
 
-This sequence is what ArcasBoat's "fairing mode" should walk a user through. We can do
+This sequence is what bArcas's "fairing mode" should walk a user through. We can do
 *much* better visually (web-GL, GPU curvature mapping), but the workflow is right.
 
 ---
@@ -246,7 +246,7 @@ adds:
   moment, hog/sag deflection**.
 - I/O: `NWS`, `SHCP`, `GHS`, `OFF`, DXF.
 
-ArcasBoat already commits to LCB / GM / Cp / wetted-surface / waterplane-area reporting
+bArcas already commits to LCB / GM / Cp / wetted-surface / waterplane-area reporting
 ([../theory/hydrostatics.md](../theory/hydrostatics.md)); the cross-curves visualization
 and large-heel free-surface correction are good targets for Phase 2.
 
@@ -260,7 +260,7 @@ Per the **ProSurf 3** product page (`prod01.htm`), four resistance methods are b
 |---|---|---|
 | **Holtrop & Mennen** | Displacement ships | Holtrop & Mennen, "An Approximate Power Prediction Method," *Int. Shipbuilding Progress* Vol 29, July 1982; Holtrop, "A Statistical Re-Analysis of Resistance and Propulsion Data," ISP Vol 31, Nov 1984. Citations from `HullVary §References`. |
 | **Delft 3** | Sailboats | Delft Series III sailboat regression. |
-| **Kaper** | **Canoes / kayaks** | John Winters / Steve Killing's small-craft regression, the one ArcasBoat already plans to use as a sanity check against Michell. |
+| **Kaper** | **Canoes / kayaks** | John Winters / Steve Killing's small-craft regression, the one bArcas already plans to use as a sanity check against Michell. |
 | **DispMode** | Planing powerboats | Savitsky-style planing analysis. |
 
 The internal **Geosim decomposition** (from `HullVary §Geosim Coefficient Resistance Evaluation`)
@@ -271,12 +271,12 @@ R_tot = R_visc + R_resid + R_corr + R_app + R_bulb + R_trans + R_air
 ```
 
 with `R_visc = (1+k) · ½ρ U² S · Cf`, `Cf` from **ATTC** or **ITTC 1957** friction lines,
-`k` the 3D viscous form factor. This is structurally identical to ArcasBoat's plan in
+`k` the 3D viscous form factor. This is structurally identical to bArcas's plan in
 [../theory/drag-and-resistance.md](../theory/drag-and-resistance.md); we add Michell's
 thin-ship as the wave-making term where Nautilus uses Holtrop/Delft regressions.
 
 The **`Kaper`** entry is the one we should pay closest attention to — it is the empirical
-fallback ArcasBoat needs for short, beamy kayaks that violate Michell's slenderness
+fallback bArcas needs for short, beamy kayaks that violate Michell's slenderness
 assumption.
 
 ---
@@ -284,7 +284,7 @@ assumption.
 ## Automatic hull variation — the `HullVary` paper
 
 The `HullVary.txt` document is Hollister's SNAME-presented paper on **automatic, constrained
-hull variation**. It is directly relevant to ArcasBoat's parametric-design plans.
+hull variation**. It is directly relevant to bArcas's parametric-design plans.
 
 The problem: parametric studies want you to change *one* hull variable (length, beam, Cp,
 LCB, draft, displacement, Cm) while holding the others constant. But these variables are
@@ -303,7 +303,7 @@ some variables and lets others float:
 A search loop drives any combination of these to a target, then runs the resistance
 calculation, then graphs / contours results over a single variable or 2D matrix.
 
-ArcasBoat's plan calls for similar parametric primitives — `hull.stretch(...)`,
+bArcas's plan calls for similar parametric primitives — `hull.stretch(...)`,
 `hull.lackenby_shift(target_cp, target_lcb)`, `hull.adjust_cm(...)`. The Lackenby shift in
 particular is a known, citable, **non-fairness-destroying** transform and a strong candidate
 for the first parametric verb we expose.
@@ -336,14 +336,14 @@ The algorithm:
    is zero. For expandables, sum of strains is what you minimize over an edge-stretch
    percentage input.
 
-This is **out of scope** for ArcasBoat per `CLAUDE.md` (strip-built / plywood-stitch-and-glue
+This is **out of scope** for bArcas per `CLAUDE.md` (strip-built / plywood-stitch-and-glue
 workflows are explicit non-goals); we record the algorithm here for reference but do not
 plan to implement it. STL/STEP export drives our CNC-plug / 3D-printed-plug / composite-mold
 pipeline instead.
 
 ---
 
-## Geometric entities — the inventory ArcasBoat needs to match
+## Geometric entities — the inventory bArcas needs to match
 
 From `Entities3.txt`, the program's six top-level entity types:
 
@@ -356,7 +356,7 @@ From `Entities3.txt`, the program's six top-level entity types:
 | **NURB Surface** | Row/column net, on-surface or vertex edit modes, knuckle-row splitting, symmetry flag. |
 | **3D Solid** | Triangles, boxes, wedges, cylinders, cones, spheres, ellipsoids — with optional hollow variants and partial-angle rotational solids. (Mostly used for fitting context geometry around the hull.) |
 
-ArcasBoat's geometry kernel (planned: OpenCASCADE via WASM) covers all of these natively;
+bArcas's geometry kernel (planned: OpenCASCADE via WASM) covers all of these natively;
 the only one worth singling out is the **combo curve / knuckle toggle**, which is a UI
 convention we should emulate even though OCCT internally separates `BSplineCurve` and
 `Polyline`.
@@ -374,10 +374,10 @@ convention we should emulate even though OCCT internally separates `BSplineCurve
 - **Manufacturing:** **STL**.
 - **Naval architecture stations:** **NWS**, **GHS**, **SHCP**, **OFF**.
 - **Hydrodynamics:** **Michlet** offsets (the same format Leo Lazauskas's Michlet expects;
-  ArcasBoat already plans to support this).
+  bArcas already plans to support this).
 - **Plain text** (spreadsheet-importable).
 
-ArcasBoat's [export-formats](../project/export-formats.md) plan already lists STEP, IGES,
+bArcas's [export-formats](../project/export-formats.md) plan already lists STEP, IGES,
 STL, DXF as Phase-1 must-haves. We should add **Michlet offset import/export** since it's a
 well-defined format already used by the open hull-design community, and **NWS/GHS/SHCP/OFF
 import** is the cheapest way to ingest most existing kayak station tables.
@@ -401,7 +401,7 @@ kayak focus pre-dates BearBoatSP's known public releases.
 
 ---
 
-## What ArcasBoat takes from Nautilus
+## What bArcas takes from Nautilus
 
 Concrete commitments for the wiki and the eventual implementation:
 
@@ -494,7 +494,7 @@ Citations from `HullVary §References` worth pulling forward into our theory pag
 - [../theory/hull-geometry-representation.md](../theory/hull-geometry-representation.md)
   — where NURB row/column conventions land in our internal model.
 - [../theory/drag-and-resistance.md](../theory/drag-and-resistance.md) — where Holtrop /
-  Kaper / Delft / Savitsky options would slot into ArcasBoat's drag stack.
+  Kaper / Delft / Savitsky options would slot into bArcas's drag stack.
 - [../theory/hydrostatics.md](../theory/hydrostatics.md) — where `PlaneCuts` and the
   cross-curves visualization plan live.
 - [../project/export-formats.md](../project/export-formats.md) — adds Michlet and NWS/GHS/SHCP/OFF

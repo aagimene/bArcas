@@ -1,6 +1,6 @@
 # Showcase gallery
 
-A public, browsable gallery of hulls — reference designs shipped with ArcasBoat, plus user-shared designs.
+A public, browsable gallery of hulls — reference designs shipped with bArcas, plus user-shared designs.
 
 ---
 
@@ -55,7 +55,7 @@ Not just individual hulls — curated *comparison* pages. Example:
 - "K1 evolution 1990–2020" — how the ICF rule changes reshaped hulls.
 - "Greenland qajaq replicas" — ethnographic measurements rendered.
 
-Curated comparison pages are essentially structured blog posts backed by live ArcasBoat data.
+Curated comparison pages are essentially structured blog posts backed by live bArcas data.
 
 ---
 
@@ -95,7 +95,7 @@ Each reference hull ships as a **versioned, citable artifact**:
 reference-library/
 ├── coaster-style/
 │   ├── v1/
-│   │   ├── hull.json           # ArcasBoat-native
+│   │   ├── hull.json           # bArcas-native
 │   │   ├── hull.step           # CAD export
 │   │   ├── hull.stl            # mesh
 │   │   ├── metadata.yml        # provenance, citations, versions
@@ -107,7 +107,7 @@ reference-library/
 └── ...
 ```
 
-Users can cite "ArcasBoat reference hull coaster-style v1.2" in papers and forum posts.
+Users can cite "bArcas reference hull coaster-style v1.2" in papers and forum posts.
 
 ---
 

@@ -56,7 +56,7 @@ For kayaks, paddler body motion swamps hull roll dynamics. A full kayak seakeepi
 
 ---
 
-## What ArcasBoat will eventually compute (phase 3+)
+## What bArcas will eventually compute (phase 3+)
 
 - **Motion RAOs** (response amplitude operators) in regular waves of frequency $\omega$ and heading $\mu$.
 - **Short-term statistics** in a sea state (significant wave height, spectrum shape).

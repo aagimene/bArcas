@@ -1,6 +1,6 @@
 # BearBoat, BearBoatSP, BearBoatXL — history and lineage
 
-ArcasBoat descends directly from the BearBoat family of kayak-design programs. This page captures what we know about that lineage and why it matters.
+bArcas descends directly from the BearBoat family of kayak-design programs. This page captures what we know about that lineage and why it matters.
 
 > **Caveat.** Much of the public record for BearBoatSP lives in kayak-builder forums (Kayak Building Bulletin Board, paddling.com archives, Sea Kayaker magazine back-issues) and on personal builder sites. Where a claim here needs a citation and we don't have one, we say so inline. This page will grow more precise as we work through the PDF manual at `resources/bearboatxl/260116BearboatXL_Manual.pdf`.
 
@@ -22,7 +22,7 @@ Livingston's approach was mathematically careful: instead of carving out a hull 
 - Workflow: define a hull as a set of longitudinal control curves; software lofts transverse stations; computes hydrostatics, stability, and resistance estimates.
 - Output: offset tables, station molds (for strip-built or stitch-and-glue construction), displacement curves.
 
-The design loop that BearBoatSP institutionalized — parametric control curves → lofted stations → hydrostatic readout — is the template ArcasBoat inherits.
+The design loop that BearBoatSP institutionalized — parametric control curves → lofted stations → hydrostatic readout — is the template bArcas inherits.
 
 ---
 
@@ -63,13 +63,13 @@ generation:
 
 ---
 
-## Why ArcasBoat cites this lineage explicitly
+## Why bArcas cites this lineage explicitly
 
 Three reasons.
 
 1. **Technical.** BearBoatSP's control-curve lofting is a proven formalism for kayak hulls. It is more opinionated (and more appropriate) than a general-purpose NURBS modeler like Rhino. We should understand *why* before we replace it.
-2. **Cultural.** The kayak-building community takes provenance seriously — builders know which design inspired which, and who designed what. A tool that erases that history is a tool they won't trust. ArcasBoat explicitly surfaces "forked from" relationships on every hull.
-3. **Greek-myth-cute.** Ursa is Callisto (the Great Bear). Arcas is her son. "ArcasBoat descends from BearBoat" is both accurate and a nice naming story.
+2. **Cultural.** The kayak-building community takes provenance seriously — builders know which design inspired which, and who designed what. A tool that erases that history is a tool they won't trust. bArcas explicitly surfaces "forked from" relationships on every hull.
+3. **Greek-myth-cute.** Ursa is Callisto (the Great Bear). Arcas is her son. "bArcas descends from BearBoat" is both accurate and a nice naming story.
 
 ---
 

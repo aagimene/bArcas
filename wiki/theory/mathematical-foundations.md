@@ -1,6 +1,6 @@
 # Mathematical foundations
 
-The core mathematics ArcasBoat uses to represent a hull surface. This page is a concise reference, not a textbook — we cite where deeper treatments live.
+The core mathematics bArcas uses to represent a hull surface. This page is a concise reference, not a textbook — we cite where deeper treatments live.
 
 ---
 
@@ -94,7 +94,7 @@ Alternative: define a coarse polygon mesh ("control cage"), then apply a subdivi
 - **Con:** not exact NURBS; hydrostatic integration on subdivided meshes introduces sampling error.
 - **Con:** less standard in naval-architecture interchange.
 
-Likely approach for ArcasBoat: **NURBS as the canonical representation**, with a subdivision-surface UX layer as an option for less-technical users.
+Likely approach for bArcas: **NURBS as the canonical representation**, with a subdivision-surface UX layer as an option for less-technical users.
 
 ---
 
@@ -108,7 +108,7 @@ Rather than directly manipulating a 2D control-point grid, BearBoat-style design
 
 Mentally: you sketch the "silhouettes" in plan and profile, and the hull surface is derived. This is closer to how kayak designers actually think.
 
-The ArcasBoat API will expose **both**:
+The bArcas API will expose **both**:
 - Raw NURBS control nets for CAD-minded users and agents.
 - Longitudinal-curve lofting for kayak-native workflows.
 
@@ -129,7 +129,7 @@ A "fair" hull has smoothly varying curvature — no humps, bumps, or inflection 
 - **Energy functionals** — integrate (κ₁² + κ₂²) over the surface; lower is fairer.
 - **Second-derivative continuity** at knot boundaries.
 
-ArcasBoat's editor renders curvature combs live. The [visualization.md](../project/visualization.md) page describes the UI surface.
+bArcas's editor renders curvature combs live. The [visualization.md](../project/visualization.md) page describes the UI surface.
 
 ### How we enforce fairness
 

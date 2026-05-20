@@ -102,7 +102,7 @@ GM, GZ, and AVS all depend on load:
 - **Heavier paddler + gear** → lower waterplane, different $I_T$, different $KG$. Usually more initial stability (more waterplane width at the heavier waterline) but lower AVS.
 - **Lighter load** → higher riding, less initial stability, more AVS headroom.
 
-ArcasBoat reports stability at the user's configured displacement condition, and can plot the stability curve for a sweep of conditions.
+bArcas reports stability at the user's configured displacement condition, and can plot the stability curve for a sweep of conditions.
 
 ---
 
@@ -140,7 +140,7 @@ Note the tension: wider waterplane helps initial stability but costs drag; flare
 
 ---
 
-## What ArcasBoat computes and displays
+## What bArcas computes and displays
 
 - **Initial metric:** $GM_T$ at the user's displacement condition.
 - **Curve:** $GZ(\phi)$ for $\phi \in [0°, 120°]$ (configurable).

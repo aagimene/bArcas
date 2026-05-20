@@ -1,17 +1,17 @@
 # Project Overview
 
-**ArcasBoat** is a browser-based, visual, API-first kayak hull design app. It is a modern spiritual successor to BearBoatXL, which is itself a port of Robert Livingston's **BearBoatSP** — the software Livingston used to design the Ursa kayaks, which in turn inspired the Mariner Kayaks family (including the **Coaster**).
+**bArcas** is a browser-based, visual, API-first kayak hull design app. It is a modern spiritual successor to BearBoatXL, which is itself a port of Robert Livingston's **BearBoatSP** — the software Livingston used to design the Ursa kayaks, which in turn inspired the Mariner Kayaks family (including the **Coaster**).
 
 ---
 
-## Why the name "ArcasBoat"
+## Why the name "bArcas"
 
 | Name | Who | Relation |
 |---|---|---|
 | Callisto | Greek mythological figure, transformed into the Great Bear | The constellation **Ursa** |
 | Arcas | Callisto's son (father: Zeus), later the constellation Ursa Minor | The descendant of Ursa |
 | BearBoat | Robert Livingston's software | Named for "Ursa"/bear; produced the Ursa kayaks |
-| **ArcasBoat** | This project | Descendant of BearBoat — the "Arcas" to BearBoat's "Ursa" |
+| **bArcas** | This project | Descendant of BearBoat — the "Arcas" to BearBoat's "Ursa" |
 
 The name is an explicit homage to the lineage. See [research/bearboat-history.md](../research/bearboat-history.md).
 
@@ -27,7 +27,7 @@ BearBoatXL is a real, working piece of software. But:
 4. **No programmatic interface.** Every action is manual. An AI agent cannot drive it.
 5. **Limited comparison.** You generally work on one hull at a time.
 
-ArcasBoat addresses all five:
+bArcas addresses all five:
 
 1. **Browser-native.** Hulls live in the cloud; sharing is a URL.
 2. **CAD-like UX.** Interaction modeled on modern 3D CAD (Fusion 360, Onshape, Rhino).
@@ -39,7 +39,7 @@ See [project/vision-and-goals.md](vision-and-goals.md) for the deeper "what succ
 
 ---
 
-## What ArcasBoat is NOT
+## What bArcas is NOT
 
 - **Not a CFD package.** We estimate drag using empirical formulas (Savitsky, ITTC, Michell) plus optional thin-ship / strip-theory solvers. If you need RANS CFD, export to OpenFOAM.
 - **Not a structural designer.** No stringer/frame layout, no laminate schedule, no finite-element stress analysis. Hull shape only (for now).
