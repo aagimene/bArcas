@@ -67,7 +67,7 @@ const state = {
   // points (instead of plain section control points), tagged with the
   // currently-selected chine index. Each chine point owns 3D Bezier handles
   // (aft + fore) used to draw the longitudinal chine line through space.
-  chineEditor: { enabled: false, currentChine: 1 },
+  chineEditor: { currentChine: 1 },
   beamLine: {
     sternHandle: {dx: 1.0, dy: 0.1},
     bowHandle:   {dx: -1.0, dy: 0.1},
@@ -228,7 +228,8 @@ function migrateChineFields(state) {
       }
     }
   }
-  if (!state.chineEditor) state.chineEditor = { enabled: false, currentChine: 1 };
+  if (!state.chineEditor) state.chineEditor = { currentChine: 1 };
+  if (state.chineEditor.enabled !== undefined) delete state.chineEditor.enabled;
   if (!state.layers.side.chines)    state.layers.side.chines    = true;
   if (!state.layers.top.chines)     state.layers.top.chines     = true;
   if (!state.layers.section.chines) state.layers.section.chines = true;
@@ -2093,7 +2094,7 @@ function renderTopView() {
   // ── Chines (loft-derived line + influence tube + anchor markers + feather handles) ─
   {
     const shapes = collectChineInfluenceShapes(state, lastLoft);
-    const editor = state.chineEditor && state.chineEditor.enabled;
+    const editor = !!state.layers?.top?.chines;
 
     // Ghost preview while drawing.
     if (chineDraw) {
@@ -2141,12 +2142,30 @@ function renderTopView() {
         topSvg.appendChild(el('path', { d, class: 'chine-line', stroke: col, fill: 'none', style: `stroke-width:${1.8/tf}`, opacity: sign > 0 ? 1 : 0.4 }));
       }
     }
-    // Anchor markers (stbd only — port mirror is read-only).
+    // Anchor markers (stbd only — port mirror is read-only) + hover ghost.
+    if (editor && !chineDraw && chineHoverCursor) {
+      const hst = state.stations[chineHoverCursor.stationIdx];
+      if (hst) {
+        const frame = stationFrame(state, hst);
+        const hw = chineBNToWorld(frame, chineHoverCursor.b, chineHoverCursor.n);
+        const col = chineColor(state.chineEditor.currentChine);
+        topSvg.appendChild(el('circle', {
+          cx: xOfT(hw.y), cy: yOfT(hw.x), r: 5/tf,
+          class: 'chine-ghost-anchor', fill: col, stroke: 'white',
+          'stroke-width': 1.2/tf, opacity: 0.7, 'pointer-events': 'none',
+        }));
+      }
+    }
     for (const sh of shapes) {
       const col = chineColor(sh.chineIdx);
       sh.anchors.forEach((a) => {
         const cx = xOfT(a.world.y), cy = yOfT(a.world.x);
-        topSvg.appendChild(el('circle', { cx, cy, r: 4.5/tf, class: 'chine-anchor', fill: col, stroke: 'white', 'stroke-width': 1.2/tf }));
+        topSvg.appendChild(el('circle', { cx, cy, r: 12/tf, fill: 'transparent',
+          'data-drag': 'chine-anchor-top',
+          'data-station-idx': String(a.stationIdx), 'data-point-idx': String(a.pointIdx) }));
+        topSvg.appendChild(el('circle', { cx, cy, r: 4.5/tf, class: 'chine-anchor', fill: col, stroke: 'white', 'stroke-width': 1.2/tf,
+          'data-drag': 'chine-anchor-top',
+          'data-station-idx': String(a.stationIdx), 'data-point-idx': String(a.pointIdx) }));
         topSvg.appendChild(el('text', {
           x: cx + 7/tf, y: cy + 4/tf,
           fill: col, class: 'chine-id-label',
@@ -2467,6 +2486,13 @@ function renderSideView() {
     sideSvg.appendChild(el('text', { x: xOf(kp.x), y: yOf(dz) - 8/sf, class: 'station-label', 'font-size': 9/sf, 'text-anchor': 'middle' }, String(i + 1)));
   });
 
+  // ── Add-knot preview circle (positioned by pointermove, hidden by default) ─
+  sideSvg.appendChild(el('circle', {
+    id: 'side-add-knot-preview', r: 5/sf,
+    fill: 'none', stroke: '#2563eb', 'stroke-width': 1.5/sf,
+    style: 'display:none; pointer-events:none',
+  }));
+
   // ── Loft mesh overlay (if enabled) ───────────────────────────────────
   if (state.showLoftMesh && lastLoft) {
     const opacity = state.meshOpacity / 100;
@@ -2510,7 +2536,7 @@ function renderSideView() {
   // ── Chines (loft-derived line + influence tube + anchor markers + feather handles) ─
   {
     const shapes = collectChineInfluenceShapes(state, lastLoft);
-    const editor = state.chineEditor && state.chineEditor.enabled;
+    const editor = !!state.layers?.side?.chines;
 
     // Ghost while drawing — bezier through anchors + cursor (not loft-derived
     // because the cursor's anchor isn't placed yet so the loft doesn't have it).
@@ -2554,12 +2580,30 @@ function renderSideView() {
       const d = 'M ' + sh.samples.map(s => `${xOf(s.pos.x).toFixed(2)} ${yOf(s.pos.z).toFixed(2)}`).join(' L ');
       sideSvg.appendChild(el('path', { d, class: 'chine-line', stroke: col, fill: 'none', style: `stroke-width:${1.8/sf}` }));
     }
-    // Anchor markers (non-interactive) + chine id label.
+    // Anchor markers + hover ghost.
+    if (editor && !chineDraw && chineHoverCursor) {
+      const hst = state.stations[chineHoverCursor.stationIdx];
+      if (hst) {
+        const frame = stationFrame(state, hst);
+        const hw = chineBNToWorld(frame, chineHoverCursor.b, chineHoverCursor.n);
+        const col = chineColor(state.chineEditor.currentChine);
+        sideSvg.appendChild(el('circle', {
+          cx: xOf(hw.x), cy: yOf(hw.z), r: 5/sf,
+          class: 'chine-ghost-anchor', fill: col, stroke: 'white',
+          'stroke-width': 1.2/sf, opacity: 0.7, 'pointer-events': 'none',
+        }));
+      }
+    }
     for (const sh of shapes) {
       const col = chineColor(sh.chineIdx);
       sh.anchors.forEach((a) => {
         const cx = xOf(a.world.x), cy = yOf(a.world.z);
-        sideSvg.appendChild(el('circle', { cx, cy, r: 4.5/sf, class: 'chine-anchor', fill: col, stroke: 'white', 'stroke-width': 1.2/sf }));
+        sideSvg.appendChild(el('circle', { cx, cy, r: 12/sf, fill: 'transparent',
+          'data-drag': 'chine-anchor-side',
+          'data-station-idx': String(a.stationIdx), 'data-point-idx': String(a.pointIdx) }));
+        sideSvg.appendChild(el('circle', { cx, cy, r: 4.5/sf, class: 'chine-anchor', fill: col, stroke: 'white', 'stroke-width': 1.2/sf,
+          'data-drag': 'chine-anchor-side',
+          'data-station-idx': String(a.stationIdx), 'data-point-idx': String(a.pointIdx) }));
         sideSvg.appendChild(el('text', {
           x: cx + 7/sf, y: cy - 6/sf,
           fill: col, class: 'chine-id-label',
@@ -2916,9 +2960,25 @@ function parseUnitM(str) {
 // ── Controls panel (Phase A: read-only-ish) ──────────────────────────────
 
 const lengthEl   = document.getElementById('length');
-const lengthOut  = document.getElementById('length-out');
 const beamEl     = document.getElementById('beam');
-const beamOut    = document.getElementById('beam-out');
+const lengthFtEl = document.getElementById('length-ft');
+const lengthInEl = document.getElementById('length-in');
+const lengthMEl  = document.getElementById('length-m');
+const beamInEl   = document.getElementById('beam-in');
+const beamCmEl   = document.getElementById('beam-cm');
+
+function updateLengthDisplay(m) {
+  const totalIn = m / 0.0254;
+  const ft = Math.floor(totalIn / 12);
+  const inch = Math.round((totalIn - ft * 12) * 10) / 10;
+  lengthFtEl.value = ft;
+  lengthInEl.value = inch;
+  lengthMEl.value  = m.toFixed(2);
+}
+function updateBeamDisplay(m) {
+  beamInEl.value = (m / 0.0254).toFixed(1);
+  beamCmEl.value = (m * 100).toFixed(1);
+}
 const loftResEl  = document.getElementById('loft-res');
 const stationsOl = document.getElementById('stations');
 const stationLabel = document.getElementById('station-label');
@@ -3089,21 +3149,24 @@ lengthEl.addEventListener('input', () => {
     bl.peaks.forEach(pk => { pk.x = sx(pk.x); pk.hdx *= r; });
   }
   state.length = newL;
-  lengthOut.textContent = fmtLength(newL);
+  updateLengthDisplay(newL);
   rebuildHull();
   renderSideView();
   renderTopView();
   renderSectionView();
 });
 
-const lengthTextEl = document.getElementById('length-text');
-lengthTextEl.addEventListener('change', () => {
-  const v = parseUnitM(lengthTextEl.value);
-  if (v == null || v < 0.3 || v > 13) { lengthTextEl.classList.add('error'); return; }
-  lengthTextEl.classList.remove('error');
-  lengthEl.value = v.toFixed(3);
+function applyLengthM(m) {
+  m = Math.max(0.305, Math.min(12.192, m));
+  lengthEl.value = m.toFixed(3);
   lengthEl.dispatchEvent(new Event('input'));
-});
+}
+lengthFtEl.addEventListener('change', () =>
+  applyLengthM((+(lengthFtEl.value) + +(lengthInEl.value) / 12) * 0.3048));
+lengthInEl.addEventListener('change', () =>
+  applyLengthM((+(lengthFtEl.value) + +(lengthInEl.value) / 12) * 0.3048));
+lengthMEl.addEventListener('change', () =>
+  applyLengthM(+(lengthMEl.value) || state.length));
 
 // Beam slider — proportionally rescales all Y coordinates (overall beam width).
 beamEl.addEventListener('input', () => {
@@ -3119,14 +3182,13 @@ beamEl.addEventListener('input', () => {
   }
 });
 
-const beamTextEl = document.getElementById('beam-text');
-beamTextEl.addEventListener('change', () => {
-  const v = parseUnitM(beamTextEl.value);
-  if (v == null || v < 0.02 || v > 1.6) { beamTextEl.classList.add('error'); return; }
-  beamTextEl.classList.remove('error');
-  beamEl.value = v.toFixed(3);
+function applyBeamM(m) {
+  m = Math.max(0.0254, Math.min(1.524, m));
+  beamEl.value = m.toFixed(3);
   beamEl.dispatchEvent(new Event('input'));
-});
+}
+beamInEl.addEventListener('change', () => applyBeamM(+(beamInEl.value) * 0.0254));
+beamCmEl.addEventListener('change', () => applyBeamM(+(beamCmEl.value) / 100));
 
 loftResEl.addEventListener('change', () => {
   state.loftRes = loftResEl.value;
@@ -3168,32 +3230,8 @@ spineRadiusEl.addEventListener('input', () => {
   rebuildHull();
 });
 
-// ── Chine editor controls ────────────────────────────────────────────────
-const chineToggleEl   = document.getElementById('chine-editor-enabled');
-const chineCurrentEl  = document.getElementById('chine-current');
-const chineSwatchEl   = document.getElementById('chine-current-swatch');
-function applyChineSwatch() {
-  if (chineSwatchEl) chineSwatchEl.style.background = chineColor(state.chineEditor.currentChine);
-}
-function syncChineEditorUI() {
-  chineToggleEl.checked = !!state.chineEditor.enabled;
-  chineCurrentEl.value  = String(state.chineEditor.currentChine);
-  document.body.classList.toggle('chine-editor-active', !!state.chineEditor.enabled);
-  applyChineSwatch();
-}
-chineToggleEl.addEventListener('change', () => {
-  state.chineEditor.enabled = chineToggleEl.checked;
-  document.body.classList.toggle('chine-editor-active', state.chineEditor.enabled);
-  if (!state.chineEditor.enabled) finishChineDraw(true);
-  renderSideView(); renderTopView(); renderSectionView();
-  updateChineDrawHint();
-});
-chineCurrentEl.addEventListener('input', () => {
-  const v = Math.max(1, Math.min(99, parseInt(chineCurrentEl.value, 10) || 1));
-  state.chineEditor.currentChine = v;
-  applyChineSwatch();
-});
-syncChineEditorUI();
+// ── Chine editor — no panel UI; chines layer toggle is the sole gate ─────
+// state.chineEditor.currentChine auto-increments on each successful draw finish.
 
 // ── Chine draw flow ──────────────────────────────────────────────────────
 //
@@ -3209,7 +3247,8 @@ syncChineEditorUI();
 // The cursor's snapped station gives a tentative anchor while drawing —
 // rendered as a dashed "ghost" line in side and top views so the user
 // sees where the chine will sweep before clicking.
-let chineDraw = null;  // { chineIdx, stationIdxs:[], cursor:{view,stationIdx,b,n}|null }
+let chineDraw = null;       // { chineIdx, stationIdxs:[], cursor, extending?, originalStationIdxs? }
+let chineHoverCursor = null; // { stationIdx, b, n } — hover preview when not drawing
 
 // Set of station indices that are valid extensions of the current chine
 // draw range — i.e. the stations immediately before the lowest-s and after
@@ -3230,7 +3269,6 @@ function chineDrawNeighbors() {
 
 // Returns true if the click was consumed as a chine-draw action.
 function startOrContinueChineDraw(view, stationIdx, b, n) {
-  if (!state.chineEditor?.enabled) return false;
   if (stationIdx == null || !state.stations[stationIdx]) return false;
   if (chineDraw) {
     if (chineDraw.stationIdxs.includes(stationIdx)) return true; // ignore re-click on same station
@@ -3245,6 +3283,8 @@ function startOrContinueChineDraw(view, stationIdx, b, n) {
     if (insertSectionPoint(st, b, n, chineIdx) < 0) return true;
     chineDraw = { chineIdx, stationIdxs: [stationIdx], cursor: null };
   }
+  chineHoverCursor = null;
+  document.body.classList.add('chine-editor-active');
   // Auto-select the station whose section we just edited so the user sees it.
   state.selectedStation = listAllStations(state).findIndex(u => u.ref === state.stations[stationIdx]);
   if (state.selectedStation < 0) state.selectedStation = 0;
@@ -3269,13 +3309,20 @@ function finishChineDraw(discard = false) {
     const i = st.points.findIndex(p => p.chineIdx === chineDraw.chineIdx);
     if (i > 0 && i < st.points.length - 1) st.points.splice(i, 1);
   };
-  if (discard || chineDraw.stationIdxs.length < 2) {
+  const isExtending = !!chineDraw.extending;
+  const origSet = new Set(chineDraw.originalStationIdxs || []);
+  if (discard) {
+    const toRemove = isExtending
+      ? chineDraw.stationIdxs.filter(i => !origSet.has(i))
+      : chineDraw.stationIdxs;
+    for (const stIdx of toRemove) removeAnchor(stIdx);
+  } else if (chineDraw.stationIdxs.length < 2) {
     for (const stIdx of chineDraw.stationIdxs) removeAnchor(stIdx);
-  } else {
+  } else if (!isExtending) {
     state.chineEditor.currentChine = Math.min(99, state.chineEditor.currentChine + 1);
-    syncChineEditorUI();
   }
   chineDraw = null;
+  document.body.classList.remove('chine-editor-active');
   rebuildHull();
   renderSideView(); renderTopView(); renderSectionView();
   updateChineDrawHint();
@@ -3286,7 +3333,7 @@ const chineHintEl = document.getElementById('chine-draw-hint');
 let lastChineHintMouse = { x: 0, y: 0 };
 function updateChineDrawHint(event) {
   if (!chineHintEl) return;
-  if (!state.chineEditor?.enabled || !chineDraw) {
+  if (!chineDraw) {
     chineHintEl.style.display = 'none';
     return;
   }
@@ -3719,20 +3766,34 @@ topSvg.addEventListener('pointermove', (e) => {
     p.chineHandles[which].dx = dx;
     p.chineHandles[which].dy = 0;
     p.chineHandles[which].dz = 0;
+  } else if (topDrag.kind === 'chine-anchor-top') {
+    // Move chine anchor: update b from |wy|, recalc n from section curve.
+    const st = state.stations[topDrag.stationIdx];
+    if (!st) return;
+    const frame = stationFrame(state, st);
+    const bWorld = Math.abs(wy);
+    const b = Math.max(0, Math.min(frame.maxB, (bWorld / frame.halfB) * frame.maxB));
+    const n = sectionNAtB(st.points, b, true);
+    const p = st.points[topDrag.pointIdx];
+    if (p) { p.b = b; p.n = n; }
+    rebuildHull(); renderSideView(); renderTopView(); renderSectionView();
+    return; // skip beam display update below
   }
   const currentBeam = 2 * Math.max(...bl.peaks.map(p => p.y));
   beamEl.value = currentBeam.toFixed(2);
-  beamOut.textContent = fmtLength(currentBeam);
+  updateBeamDisplay(currentBeam);
   rebuildHull();
   renderSideView();
   renderTopView();
-  // Beam-line and station drags shift the live H/B aspect at the selected
-  // station — keep the cross-section view in sync so its apparent height
-  // tracks the new beam width in real time.
   renderSectionView();
 });
 
-topSvg.addEventListener('pointerup',     () => { topDrag = null; });
+topSvg.addEventListener('pointerup', (e) => {
+  if (topDrag && topDrag.kind === 'chine-anchor-top' && !topDrag.moved) {
+    enterChineExtendMode(topDrag.stationIdx, topDrag.pointIdx);
+  }
+  topDrag = null;
+});
 topSvg.addEventListener('pointercancel', () => { topDrag = null; });
 
 // ── Top-view zoom (wheel) and pan (middle-button or alt+left drag) ────────
@@ -3794,7 +3855,7 @@ topSvg.addEventListener('click', (e) => {
   // Chine editor takes priority — same reason as the side view: clicks on
   // the dashed station-add line shouldn't add a whole new station when
   // the editor is on.
-  if (state.chineEditor?.enabled && state.layers.top.chines) {
+  if (state.layers.top.chines) {
     const sIdx = nearestStationIdxByX(state, wx);
     if (sIdx == null) return;
     const station = state.stations[sIdx];
@@ -3843,6 +3904,15 @@ topSvg.addEventListener('click', (e) => {
 // Right-click handler: delete a beam peak OR a station, depending on the target.
 function tryTopDelete(e) {
   if (chineDraw) { e.preventDefault(); finishChineDraw(); return; }
+  const chineAnchor = e.target.closest('[data-drag="chine-anchor-top"]');
+  if (chineAnchor) {
+    e.preventDefault();
+    const sIdx = +chineAnchor.dataset.stationIdx, pIdx = +chineAnchor.dataset.pointIdx;
+    if (deleteChinePointWithConfirmation(sIdx, pIdx)) {
+      renderStationList(); renderSectionView(); rebuildHull(); renderSideView(); renderTopView();
+    }
+    return;
+  }
   const peak = e.target.closest('[data-drag="beam-peak"]');
   if (peak) {
     e.preventDefault();
@@ -3916,7 +3986,7 @@ function applyScaleX(r) {
   bl.peaks.forEach(pk => { pk.x = cx + (pk.x - cx) * r; pk.hdx *= r; });
   state.length *= r;
   lengthEl.value        = state.length.toFixed(2);
-  lengthOut.textContent = fmtLength(state.length);
+  updateLengthDisplay(state.length);
 }
 
 function applyScaleY(r) {
@@ -3930,7 +4000,7 @@ function applyScaleY(r) {
   bl.peaks.forEach(pk => { pk.y *= r; pk.hdy *= r; });
   const currentBeam = 2 * Math.max(...bl.peaks.map(p => p.y));
   beamEl.value = currentBeam.toFixed(2);
-  beamOut.textContent = fmtLength(currentBeam);
+  updateBeamDisplay(currentBeam);
 }
 
 function applyScaleZ(r) {
@@ -4038,7 +4108,7 @@ sideSvg.addEventListener('pointermove', (e) => {
     if (drag.idx === knots.length-1) dkKnots[dkKnots.length-1].x = wx;
     state.length = knots[knots.length-1].x - knots[0].x;
     lengthEl.value = state.length.toFixed(2);
-    lengthOut.textContent = fmtLength(state.length);
+    updateLengthDisplay(state.length);
     rebuildHull(); renderSideView(); renderTopView();
   } else if (drag.kind === 'knot-fore') {
     // Drag outgoing handle — updates angle and foreLen; aftLen stays.
@@ -4067,7 +4137,7 @@ sideSvg.addEventListener('pointermove', (e) => {
     if (drag.idx === dkKnots.length-1) k.x = spKnots[spKnots.length-1].x = wx;
     state.length = spKnots[spKnots.length-1].x - spKnots[0].x;
     lengthEl.value = state.length.toFixed(2);
-    lengthOut.textContent = fmtLength(state.length);
+    updateLengthDisplay(state.length);
     rebuildHull(); renderSideView(); renderTopView();
   } else if (drag.kind === 'deck-fore') {
     const k = state.deckLine.knots[drag.idx];
@@ -4119,14 +4189,47 @@ sideSvg.addEventListener('pointermove', (e) => {
     p.chineHandles[which].dz = 0;
     rebuildChineLines3D();
     renderSideView(); renderTopView();
+  } else if (drag.kind === 'chine-anchor-side') {
+    // Move chine anchor along its station: update n from wz, recalc b from section curve.
+    const st = state.stations[drag.stationIdx];
+    if (!st) return;
+    const frame = stationFrame(state, st);
+    const n = Math.max(0, Math.min(1, (wz - frame.keelZ) / frame.height));
+    const b = sectionBAtN(st.points, n);
+    const p = st.points[drag.pointIdx];
+    if (p) { p.n = n; p.b = b; }
+    rebuildHull(); renderSideView(); renderTopView(); renderSectionView();
   }
-  // Section view depends on the live H/B aspect at the selected station —
-  // re-render so the cross-section's apparent height tracks Z/beam edits.
-  renderSectionView();
+  // Section view depends on the live H/B aspect at the selected station.
+  if (drag.kind !== 'chine-anchor-side') renderSectionView();
 });
+
+function enterChineExtendMode(stationIdx, pointIdx) {
+  const st = state.stations[stationIdx];
+  if (!st) return;
+  const p = st.points[pointIdx];
+  if (!p || p.chineIdx == null) return;
+  const byIdx = collectChinesByIdx(state);
+  const anchors = byIdx.get(p.chineIdx) || [];
+  const idxs = anchors.map(a => a.stationIdx);
+  chineDraw = {
+    chineIdx: p.chineIdx,
+    stationIdxs: [...idxs],
+    originalStationIdxs: [...idxs],
+    cursor: null,
+    extending: true,
+  };
+  chineHoverCursor = null;
+  document.body.classList.add('chine-editor-active');
+  renderSideView(); renderTopView(); renderSectionView();
+  updateChineDrawHint();
+}
 
 function endDrag(e) {
   if (!drag) return;
+  if (drag.kind === 'chine-anchor-side' && !drag.moved) {
+    enterChineExtendMode(drag.stationIdx, drag.pointIdx);
+  }
   if (drag.pointerId != null && sideSvg.hasPointerCapture(drag.pointerId)) {
     sideSvg.releasePointerCapture(drag.pointerId);
   }
@@ -4785,13 +4888,11 @@ document.getElementById('import-state').addEventListener('change', (e) => {
 // canonical source of truth.
 function syncUIFromState() {
   // Sliders / dropdowns
-  lengthEl.value         = state.length.toFixed(2);
-  lengthOut.textContent  = fmtLength(state.length);
-  lengthTextEl.value = '';
+  lengthEl.value = state.length.toFixed(2);
+  updateLengthDisplay(state.length);
   const currentBeam = 2 * Math.max(...state.beamLine.peaks.map(p => p.y));
-  beamEl.value           = currentBeam.toFixed(2);
-  beamOut.textContent    = fmtLength(currentBeam);
-  beamTextEl.value = '';
+  beamEl.value = currentBeam.toFixed(2);
+  updateBeamDisplay(currentBeam);
   loftResEl.value        = state.loftRes;
   xSubdivEl.value        = String(state.xSubdiv);
   loftModeEl.value       = state.loftMode || 'smooth';
@@ -4846,18 +4947,69 @@ sideSvg.addEventListener('pointermove', (e) => {
   preview.style.display = 'block';
 });
 
-sideSvg.addEventListener('pointerleave', () => {
-  const preview = document.getElementById('side-station-preview');
-  if (preview) preview.style.display = 'none';
-  if (chineDraw && chineDraw.cursor) {
-    chineDraw.cursor = null;
-    renderSideView(); renderTopView();
+// Keel/deck add-cursor: crosshair + preview circle when near a curve.
+sideSvg.addEventListener('pointermove', (e) => {
+  if (drag || state.layers?.side?.chines) return; // chine or drag mode takes over
+  const { x, y } = svgToLocal(sideSvg, e);
+  const wx = x / SIDE_SCALE, wz = -y / SIDE_SCALE;
+  const knots = state.spine.knots, dkKnots = state.deckLine.knots;
+  let rDist = Infinity, rPt = null, dDist = Infinity, dPt = null;
+  const scanCurve = (ks) => {
+    let best = Infinity, bestPt = null;
+    for (let i = 0; i < ks.length - 1; i++) {
+      const k0 = ks[i], k1 = ks[i + 1];
+      const P1 = knotHandles(k0).fore, P2 = knotHandles(k1).aft;
+      for (let j = 0; j < 32; j++) {
+        const t0 = j / 32;
+        const p0 = cubicBezierPt(k0, P1, P2, k1, t0);
+        const p1 = cubicBezierPt(k0, P1, P2, k1, (j + 1) / 32);
+        const dx = p1.x - p0.x, dz = p1.y - p0.y;
+        const ll = dx * dx + dz * dz;
+        const tt = ll > 0 ? Math.max(0, Math.min(1, ((wx - p0.x) * dx + (wz - p0.y) * dz) / ll)) : 0;
+        const px = p0.x + tt * dx, pz = p0.y + tt * dz;
+        const d = Math.hypot(wx - px, wz - pz);
+        if (d < best) { best = d; bestPt = { x: px, z: pz }; }
+      }
+    }
+    return { best, bestPt };
+  };
+  const keelOn = !!state.layers?.side?.keel, deckOn = !!state.layers?.side?.deck;
+  if (keelOn) { const r = scanCurve(knots); rDist = r.best; rPt = r.bestPt; }
+  if (deckOn) { const r = scanCurve(dkKnots); dDist = r.best; dPt = r.bestPt; }
+  const THRESH = 0.12;
+  const near = (keelOn && rDist <= THRESH) || (deckOn && dDist <= THRESH);
+  sideSvg.classList.toggle('can-add-knot', near);
+  const preview = document.getElementById('side-add-knot-preview');
+  if (preview) {
+    if (near) {
+      const pt = (keelOn && rDist <= THRESH && rDist <= dDist) ? rPt : dPt;
+      const sf = sideVP.zoom;
+      preview.setAttribute('cx', String(xOf(pt.x)));
+      preview.setAttribute('cy', String(yOf(pt.z)));
+      preview.setAttribute('r', String(5 / sf));
+      preview.setAttribute('stroke-width', String(1.5 / sf));
+      preview.style.display = '';
+    } else {
+      preview.style.display = 'none';
+    }
   }
 });
 
-// Chine draw: track cursor in side view to drive the ghost-line preview.
+sideSvg.addEventListener('pointerleave', () => {
+  const preview = document.getElementById('side-station-preview');
+  if (preview) preview.style.display = 'none';
+  let needRender = false;
+  if (chineDraw && chineDraw.cursor) { chineDraw.cursor = null; needRender = true; }
+  if (chineHoverCursor) { chineHoverCursor = null; needRender = true; }
+  if (needRender) { renderSideView(); renderTopView(); }
+  sideSvg.classList.remove('can-add-knot');
+  const addPreview = document.getElementById('side-add-knot-preview');
+  if (addPreview) addPreview.style.display = 'none';
+});
+
+// Chine: track cursor in side view for draw-ghost and hover-ghost.
 sideSvg.addEventListener('pointermove', (e) => {
-  if (!chineDraw || !state.chineEditor?.enabled) return;
+  if (!state.layers?.side?.chines) return;
   const { x, y } = svgToLocal(sideSvg, e);
   const wx = x / SIDE_SCALE, wz = -y / SIDE_SCALE;
   const sIdx = nearestStationIdxByX(state, wx);
@@ -4866,9 +5018,14 @@ sideSvg.addEventListener('pointermove', (e) => {
   const frame = stationFrame(state, st);
   const n = Math.max(0, Math.min(1, (wz - frame.keelZ) / frame.height));
   const b = sectionBAtN(st.points, n);
-  const c = chineDraw.cursor;
-  if (c && c.stationIdx === sIdx && Math.abs(c.b - b) < 1e-4 && Math.abs(c.n - n) < 1e-4) return;
-  chineDraw.cursor = { view: 'side', stationIdx: sIdx, b, n };
+  if (chineDraw) {
+    const c = chineDraw.cursor;
+    if (c && c.stationIdx === sIdx && Math.abs(c.b - b) < 1e-4 && Math.abs(c.n - n) < 1e-4) return;
+    chineDraw.cursor = { view: 'side', stationIdx: sIdx, b, n };
+  } else {
+    if (chineHoverCursor && chineHoverCursor.stationIdx === sIdx && Math.abs(chineHoverCursor.b - b) < 1e-4) return;
+    chineHoverCursor = { stationIdx: sIdx, b, n };
+  }
   renderSideView(); renderTopView();
 });
 
@@ -4894,15 +5051,15 @@ topSvg.addEventListener('pointermove', (e) => {
 topSvg.addEventListener('pointerleave', () => {
   const preview = document.getElementById('top-station-preview');
   if (preview) preview.style.display = 'none';
-  if (chineDraw && chineDraw.cursor) {
-    chineDraw.cursor = null;
-    renderSideView(); renderTopView();
-  }
+  let needRender = false;
+  if (chineDraw && chineDraw.cursor) { chineDraw.cursor = null; needRender = true; }
+  if (chineHoverCursor) { chineHoverCursor = null; needRender = true; }
+  if (needRender) { renderSideView(); renderTopView(); }
 });
 
-// Chine draw: track cursor in top view for the ghost-line preview.
+// Chine: track cursor in top view for draw-ghost and hover-ghost.
 topSvg.addEventListener('pointermove', (e) => {
-  if (!chineDraw || !state.chineEditor?.enabled) return;
+  if (!state.layers?.top?.chines) return;
   const { wx, wy } = svgToLocalTop(e);
   const sIdx = nearestStationIdxByX(state, wx);
   if (sIdx == null) return;
@@ -4911,9 +5068,14 @@ topSvg.addEventListener('pointermove', (e) => {
   const bWorld = Math.abs(wy);
   const bFrac  = Math.max(0, Math.min(frame.maxB, (bWorld / frame.halfB) * frame.maxB));
   const n = sectionNAtB(st.points, bFrac, true);
-  const c = chineDraw.cursor;
-  if (c && c.stationIdx === sIdx && Math.abs(c.b - bFrac) < 1e-4 && Math.abs(c.n - n) < 1e-4) return;
-  chineDraw.cursor = { view: 'top', stationIdx: sIdx, b: bFrac, n };
+  if (chineDraw) {
+    const c = chineDraw.cursor;
+    if (c && c.stationIdx === sIdx && Math.abs(c.b - bFrac) < 1e-4 && Math.abs(c.n - n) < 1e-4) return;
+    chineDraw.cursor = { view: 'top', stationIdx: sIdx, b: bFrac, n };
+  } else {
+    if (chineHoverCursor && chineHoverCursor.stationIdx === sIdx && Math.abs(chineHoverCursor.b - bFrac) < 1e-4) return;
+    chineHoverCursor = { stationIdx: sIdx, b: bFrac, n };
+  }
   renderSideView(); renderTopView();
 });
 
@@ -4929,7 +5091,7 @@ sideSvg.addEventListener('click', (e) => {
   // editor is on, so we don't accidentally insert a whole new station with
   // its full set of seed control points just because the click landed near
   // the centerline.
-  if (state.chineEditor?.enabled && state.layers.side.chines) {
+  if (state.layers.side.chines) {
     const sIdx = nearestStationIdxByX(state, wx);
     if (sIdx == null) return;
     const station = state.stations[sIdx];
@@ -5002,6 +5164,14 @@ function trySideDelete(e) {
   if (chineDraw) { e.preventDefault(); finishChineDraw(); return; }
   const t = e.target.closest('[data-drag]');
   if (!t) return;
+  if (t.dataset.drag === 'chine-anchor-side') {
+    e.preventDefault();
+    const sIdx = +t.dataset.stationIdx, pIdx = +t.dataset.pointIdx;
+    if (deleteChinePointWithConfirmation(sIdx, pIdx)) {
+      renderStationList(); renderSectionView(); rebuildHull(); renderSideView(); renderTopView();
+    }
+    return;
+  }
   const idx = +t.dataset.idx;
   if (t.dataset.drag === 'knot') {
     const knots = state.spine.knots;
@@ -5129,9 +5299,8 @@ sectionSvg.addEventListener('click', (e) => {
   const b = x / SECTION_SCALE_B;
   const n = -y / SECTION_SCALE_N;
   if (b < 0) return;
-  if (state.chineEditor?.enabled) {
-    if (state.layers.section.chines)
-      startOrContinueChineDraw('section', sel.stationIdx, b, n);
+  if (state.layers.section.chines) {
+    startOrContinueChineDraw('section', sel.stationIdx, b, n);
     return;
   }
   insertSectionPoint(station, b, n, null);

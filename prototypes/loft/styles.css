@@ -1087,17 +1087,31 @@ body.chine-editor-active #section-view {
 .viz-opacity-row input[type="range"] { flex: 1; }
 .viz-opacity-row output { min-width: 2.5rem; text-align: right; }
 
-/* Unit text input beside slider */
-.unit-input {
-  display: block;
-  width: 100%;
-  margin-top: 0.2rem;
-  padding: 0.15rem 0.35rem;
+/* ── Inline unit number editors ─────────────────────────────── */
+.unit-editors {
+  display: flex;
+  align-items: baseline;
+  gap: 0.18rem;
+  margin-bottom: 0.25rem;
+  flex-wrap: nowrap;
+}
+.unit-num {
+  width: 3rem;
+  padding: 0.1rem 0.2rem;
   border: 1px solid #cbd5e1;
   border-radius: 3px;
-  font-size: 0.78rem;
-  color: #1f2937;
+  font-size: 0.82rem;
+  text-align: right;
   background: #f8fafc;
+  -moz-appearance: textfield;
 }
-.unit-input:focus { outline: none; border-color: #2563eb; background: white; }
-.unit-input.error { border-color: #ef4444; background: #fff1f2; }
+.unit-num::-webkit-inner-spin-button,
+.unit-num::-webkit-outer-spin-button { opacity: 0.4; }
+.unit-num:focus { outline: none; border-color: #2563eb; background: white; }
+.unit-num-in  { width: 2.6rem; }
+.unit-num-wide { width: 3.4rem; }
+.unit-label { font-size: 0.74rem; color: #64748b; }
+.unit-sep   { font-size: 0.74rem; color: #cbd5e1; margin: 0 0.1rem; }
+
+/* Keel/deck add-point cursor and preview dot */
+#side-view.can-add-knot { cursor: crosshair; }
