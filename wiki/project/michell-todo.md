@@ -9,8 +9,8 @@ This is a VERY high-level task list for building the `michell` prototype. The pl
 - [ ] **HUMAN QA CHECKPOINT**: Verify that the slide transitions work, the 3D scene renders smoothly, and the XYZ vector colors (RGB) look bold and correct.
 
 ## Phase 2: Geometry and Parameterization Basics
-- [ ] Implement the mathematical generation for the basic ELI5 math surface, the Wigley hull, and thin primitive shapes (Diamond, Wedge).
-- [ ] Implement the sphere/rectangle purely as "broken math" visual examples for the Thiccness slide.
+- [ ] Implement the mathematical generation for the basic ELI5 math surface, the Wigley hull, and a scalable thin Diamond.
+- [ ] Implement the "Final Form" symmetric Bezier hull (C1 with handles, mimicking loft top view).
 - [ ] Implement the half-hull rendering technique so the $f(x,z)$ curve can be boldly outlined.
 - [ ] Add the 3D Gizmo for scaling Width, Height, and Depth.
 - [ ] **HUMAN QA CHECKPOINT**: Visually inspect the half-hull rendering. Ensure the bold $f(x,z)$ line is prominent and that the 3D scaling gizmo is intuitive and functional.

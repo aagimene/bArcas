@@ -33,7 +33,7 @@ In 1898, J.H. Michell published the analytical integral for the wave resistance 
 ### Slide 3: Defining an Underwater Boat Hull
 - **Concept**: Applying $y = f(x, z)$ to make a boat hull.
 - **3D Visualization**: Interactive (camera rotation) showing the **Wigley hull** (a standard mathematical benchmark hull form).
-- **Interaction**: Switch between the Wigley hull and basic geometric forms (like thin Diamond or Wedge prisms).
+- **Interaction**: Switch between the Wigley hull and a scalable thin Diamond. Eventually introduce the "Final Form": a symmetric Bezier hull (similar to the starting state of the `loft` prototype).
 - **Controls**: A 3D gizmo to change width, height, and depth.
 - **Geometry**: The hull should only show one half, allowing the actual $f(x,z)$ curve to be boldly and solidly drawn.
 
