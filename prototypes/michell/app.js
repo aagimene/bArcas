@@ -58,7 +58,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0f172a); // Match CSS bg-color
 
 const camera = new THREE.PerspectiveCamera(45, host.clientWidth / host.clientHeight, 0.1, 100);
-camera.position.set(4, -3, -4); // Looking from starboard, aft, slightly above (since Z is down)
+camera.position.set(4, 3, -2.5); // Looking from starboard forward, slightly above
 camera.up.set(0, 0, -1); // Z is down, so 'up' for the camera is -Z
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -78,7 +78,7 @@ const ambientLight = new THREE.AmbientLight(0x404040, 1.5);
 scene.add(ambientLight);
 
 const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
-dirLight.position.set(5, 5, -5); // Light from above
+dirLight.position.set(5, 5, 5); // Light from below (positive Z) and starboard (positive Y) to illuminate the hull
 scene.add(dirLight);
 
 // --- Objects ---
@@ -142,9 +142,19 @@ const hullMat = new THREE.MeshPhongMaterial({
   color: 0x94a3b8, 
   side: THREE.DoubleSide,
   transparent: true,
-  opacity: 0.8
+  opacity: 0.9,
+  polygonOffset: true,
+  polygonOffsetFactor: 1, // Push mesh back a bit so wireframe renders cleanly
+  polygonOffsetUnits: 1
 });
 const diamondMesh = new THREE.Mesh(diamondGeo, hullMat);
+
+// Add wireframe over the shaded hull
+const wireframeGeo = new THREE.WireframeGeometry(diamondGeo);
+const wireframeMat = new THREE.LineBasicMaterial({ color: 0x1e293b, opacity: 0.5, transparent: true });
+const wireframe = new THREE.LineSegments(wireframeGeo, wireframeMat);
+diamondMesh.add(wireframe);
+
 gizmoGroup.add(diamondMesh);
 
 // Centerplane intersection line (y=0 plane outline)
