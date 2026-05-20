@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 const slides = [
   {
     title: "1. History",
-    content: "<p>In 1867, William Froude tested two model hulls: the sharp <strong>Raven</strong> and the blunt <strong>Swan</strong>.</p><p>He proved that wave resistance doesn't follow a simple 'sharp is better' rule, paving the way for mathematical optimization.</p><div style='text-align:center; padding: 10px; border: 1px dashed var(--text-muted); color: var(--text-muted); margin-top: 1rem;'><em>[Placeholder: Please provide the Swan/Raven picture URLs!]</em></div>"
+    content: "<p>In 1867, William Froude tested two model hulls: the sharp <strong>Raven</strong> and the blunt <strong>Swan</strong>.</p><p>He proved that wave resistance doesn't follow a simple 'sharp is better' rule, paving the way for mathematical optimization.</p><div style='text-align:center; margin-top:1rem;'><img src='resources/images/swan_raven.jpg' alt='Swan and Raven' style='max-width:90%; height:auto;' /></div>"
   },
   {
     title: "2. Parameterization",
