@@ -8,8 +8,9 @@ This is a VERY high-level task list for building the `michell` prototype. The pl
 - [ ] Set up the 3D rendering canvas (e.g., using Three.js) with basic lighting, camera rotation, and the RGB Vector Gizmo.
 - [ ] **HUMAN QA CHECKPOINT**: Verify that the slide transitions work, the 3D scene renders smoothly, and the XYZ vector colors (RGB) look bold and correct.
 
-## Phase 2: Geometry and The Wigley Hull
-- [ ] Implement the mathematical generation for the Wigley hull and primitive shapes (Cylinder, Rectangle, Triangle, Diamond, Sphere).
+## Phase 2: Geometry and Parameterization Basics
+- [ ] Implement the mathematical generation for the basic ELI5 math surface, the Wigley hull, and thin primitive shapes (Diamond, Wedge).
+- [ ] Implement the sphere/rectangle purely as "broken math" visual examples for the Thiccness slide.
 - [ ] Implement the half-hull rendering technique so the $f(x,z)$ curve can be boldly outlined.
 - [ ] Add the 3D Gizmo for scaling Width, Height, and Depth.
 - [ ] **HUMAN QA CHECKPOINT**: Visually inspect the half-hull rendering. Ensure the bold $f(x,z)$ line is prominent and that the 3D scaling gizmo is intuitive and functional.
