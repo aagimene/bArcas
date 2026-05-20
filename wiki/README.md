@@ -29,6 +29,12 @@ A research and design wiki for **bArcas** — a browser-based, API-first, visual
 5. **What designers optimize for** → [designs/README.md](designs/README.md)
 6. **How the app lets you design** → [project/api-design.md](project/api-design.md)
 
+### Michell Prototype (New)
+- **Prototype Plan** → [project/michell-prototype.md](project/michell-prototype.md)
+- **TODO / QA Checkpoints** → [project/michell-todo.md](project/michell-todo.md)
+- **Clarifications & Guidelines** → [project/michell-clarifications.md](project/michell-clarifications.md)
+- **Future Directions** → [project/future-directions.md](project/future-directions.md)
+
 ---
 
 ## Core principles

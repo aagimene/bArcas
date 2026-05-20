@@ -28,6 +28,12 @@ See [wiki/project/roadmap.md](wiki/project/roadmap.md) for staged plans.
 5. **Required export formats** → [wiki/project/export-formats.md](wiki/project/export-formats.md)
 6. **Roadmap** → [wiki/project/roadmap.md](wiki/project/roadmap.md)
 
+### Michell Prototype (New Phase)
+- **Michell Prototype Plan** → [wiki/project/michell-prototype.md](wiki/project/michell-prototype.md)
+- **Michell TODO** → [wiki/project/michell-todo.md](wiki/project/michell-todo.md)
+- **Clarifications & AI Directives** → [wiki/project/michell-clarifications.md](wiki/project/michell-clarifications.md)
+- **Future Directions** → [wiki/project/future-directions.md](wiki/project/future-directions.md)
+
 ## Core principles
 
 - **API-first.** Every design action is a documented, idempotent API call. The UI is one of several clients; AI agents are another.
