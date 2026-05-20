@@ -230,7 +230,7 @@ ctx.fillStyle = 'rgba(56, 189, 248, 0.8)';
 ctx.font = 'bold 28px sans-serif';
 ctx.textAlign = 'center';
 ctx.textBaseline = 'middle';
-ctx.fillText('WATER PLANE (Z=0)', 128, 32);
+ctx.fillText('WATER PLANE Z=0', 128, 32);
 
 const tex = new THREE.CanvasTexture(canvas);
 const labelGeo = new THREE.PlaneGeometry(2, 0.5);
@@ -241,11 +241,11 @@ const labelMat = new THREE.MeshBasicMaterial({
   depthWrite: false
 });
 const labelMesh = new THREE.Mesh(labelGeo, labelMat);
-// Plane is on XY (facing Z). Since Z is down, the label faces 'up' visually.
-// Rotate it so it reads correctly when viewed from above (positive Z looking down).
-// The PlaneGeometry normal is +Z by default; we rotate -90deg around Z to flip text right-side up.
-labelMesh.rotation.set(0, 0, Math.PI); // Flip text so it reads correctly when viewed from camera
-labelMesh.position.set(0, B * 1.2, 0);
+  // Position in negative X, negative Y quadrant (port side, behind bow)
+  labelMesh.position.set(-L * 0.3, -B * 0.6, 0.01);
+  // Orient normal toward negative Z (downward) and keep text upright
+  labelMesh.rotation.set(Math.PI, 0, 0);
+
 gizmoGroup.add(labelMesh);
 
 scene.add(gizmoGroup);
