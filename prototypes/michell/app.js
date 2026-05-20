@@ -142,16 +142,20 @@ const hullMat = new THREE.MeshPhongMaterial({
   color: 0x94a3b8, 
   side: THREE.DoubleSide,
   transparent: true,
-  opacity: 0.9,
-  polygonOffset: true,
-  polygonOffsetFactor: 1, // Push mesh back a bit so wireframe renders cleanly
-  polygonOffsetUnits: 1
+  opacity: 0.9
 });
 const diamondMesh = new THREE.Mesh(diamondGeo, hullMat);
 
 // Add wireframe over the shaded hull
 const wireframeGeo = new THREE.WireframeGeometry(diamondGeo);
-const wireframeMat = new THREE.LineBasicMaterial({ color: 0x1e293b, opacity: 0.5, transparent: true });
+const wireframeMat = new THREE.LineBasicMaterial({ 
+  color: 0x1e293b, 
+  opacity: 0.5, 
+  transparent: true,
+  polygonOffset: true,
+  polygonOffsetFactor: -1, // Pull wireframe forward
+  polygonOffsetUnits: -1
+});
 const wireframe = new THREE.LineSegments(wireframeGeo, wireframeMat);
 diamondMesh.add(wireframe);
 
